@@ -1,0 +1,7 @@
+#Project files
+.settings/
+.classpath
+.project
+bin/
+.gradle/
+logDir_IS_UNDEFINED/
