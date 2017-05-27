@@ -67,7 +67,7 @@ public class WampStreamingProvider implements StreamingProvider {
 			logger.info("Subscribing to topic " + topic);
 			return RxJavaInterop.toV2Observable(client.makeSubscription(topic))
 					.map(pubSubData -> {
-						return new WampStreamingPayload(pubSubData, currencyPair);
+						return new WampStreamingPayload(pubSubData, topic, currencyPair);
 					});
 		} else {
 			throw new IllegalStateException("Cannot subscribe in state " + connectedState);
@@ -90,10 +90,8 @@ public class WampStreamingProvider implements StreamingProvider {
 				if (client != null)
 					client.close();
 				completable.onComplete();
-				logger.info("DEBUG: CLOSE CALLED");
 			} catch (Exception e) {
 				completable.onError(e);
-				logger.info("DEBUG: ERROR ON CLOSE", e);
 			}
 
 		});

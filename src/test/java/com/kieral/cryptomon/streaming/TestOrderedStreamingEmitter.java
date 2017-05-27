@@ -34,9 +34,9 @@ public class TestOrderedStreamingEmitter {
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				errors.add(invocation.getArgument(0));
+				errors.add(invocation.getArgument(1));
 				return null;
-			}}).when(listener).onError(Mockito.anyString());
+			}}).when(listener).onOrderedStreamingError(Mockito.anyString(), Mockito.anyString());
 		emitted = new ArrayList<StreamingPayload>();
 		errors = new ArrayList<String>();
 		emitter = new OrderedStreamingEmitter(listener);
@@ -333,6 +333,9 @@ public class TestOrderedStreamingEmitter {
 
 	private StreamingPayload pl(final long seq) {
 		return new StreamingPayload() {
+			public String getTopic() {
+				return "TOPIC";
+			}
 			@Override
 			public long getSequenceNumber() {
 				return seq;
@@ -354,6 +357,9 @@ public class TestOrderedStreamingEmitter {
 
 	private StreamingPayload pl(final String cp, final long seq) {
 		return new StreamingPayload() {
+			public String getTopic() {
+				return "TOPIC-" + cp;
+			}
 			@Override
 			public long getSequenceNumber() {
 				return seq;

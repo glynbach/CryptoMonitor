@@ -18,8 +18,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// TODO: make the out of sequence error call back the topic as well so that only topic can be resubscribed
-// means adding topic to payload as well as currency key
+// TODO: add concept that snapshot required feeds wait for an orderbook snapshot discarding everything with a prior sequence
+
+// TODO: handle very first 2 messages are out of sequence order: e.g. 142, 141, 143
 
 public class OrderedStreamingEmitter {
 
@@ -41,7 +42,13 @@ public class OrderedStreamingEmitter {
 				thread.setDaemon(true);
 				return thread;
 			}});
-		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread thread = new Thread(r, "OrderedStreamingScheduler-" + COUNTER.incrementAndGet());
+				thread.setDaemon(true);
+				return thread;
+			}});
 		scheduler.scheduleAtFixedRate(new WardenTask(), 100, 100, TimeUnit.MILLISECONDS);
 		this.listener = listener;
 	}
@@ -76,10 +83,10 @@ public class OrderedStreamingEmitter {
 			listener.onOrderedStreamingPayload(streamingPayload);
 	}
 
-	private void error(String reason) {
+	private void error(String topic, String reason) {
 		logger.error("Error detected in streaming sequences: " + reason);
 		if (listener != null)
-			listener.onError(reason);
+			listener.onOrderedStreamingError(topic, reason);
 	}
 
 	private class EmitTask implements Runnable {
@@ -97,13 +104,15 @@ public class OrderedStreamingEmitter {
 
 	private class ErrorTask implements Runnable {
 
+		private final String topic;
 		private final String reason;
-		private ErrorTask(String reason) {
+		private ErrorTask(String topic, String reason) {
+			this.topic = topic;
 			this.reason = reason;
 		}
 		@Override
 		public void run() {
-			error(reason);
+			error(topic, reason);
 		}
 		
 	}
@@ -128,8 +137,6 @@ public class OrderedStreamingEmitter {
 
 		@Override
 		public void run() {
-			if (logger.isTraceEnabled())
-				logger.trace("WardenTask calling for review");
 			payloads.values().forEach(park -> {
 				park.review();
 			});
@@ -171,12 +178,12 @@ public class OrderedStreamingEmitter {
 							executor.submit(new EmitTask(streamingPayload));
 							i.remove();
 						} else if (lastSequence.get() >= streamingPayload.getSequenceNumber()) {
-							executor.submit(new ErrorTask("Expecting sequence number " + 
+							executor.submit(new ErrorTask(streamingPayload.getTopic(), "Expecting sequence number " + 
 									(lastSequence.get() + 1) + " but have parked message with sequence " + streamingPayload.getSequenceNumber())); 
 						}
 					}
 					if (parkedPayloads.size() > 0 && (System.currentTimeMillis() - lastReviewSuccess) > MAX_WAIT_ON_MISSING_SEQ) {
-						executor.submit(new ErrorTask("Waited " + (System.currentTimeMillis() - lastReviewSuccess) + "ms for sequence number " + 
+						executor.submit(new ErrorTask(parkedPayloads.get(0).getTopic(), "Waited " + (System.currentTimeMillis() - lastReviewSuccess) + "ms for sequence number " + 
 								(lastSequence.get() + 1) + " with parked messages " + parkedPayloads)); 
 					}
 				}
