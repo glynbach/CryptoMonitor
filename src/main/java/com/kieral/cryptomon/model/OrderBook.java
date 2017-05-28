@@ -7,6 +7,7 @@ public class OrderBook {
 
 	private final String market;
 	private final String currencyPair;
+	private long snapshotSequence;
 	private List<IOrderBookEntry> bids = Collections.emptyList();
 	private List<IOrderBookEntry> asks = Collections.emptyList();
 	
@@ -16,6 +17,14 @@ public class OrderBook {
 		this.currencyPair = currencyPair;
 	}
 	
+	public long getSnapshotSequence() {
+		return snapshotSequence;
+	}
+
+	public void setSnapshotSequence(long snapshotSequence) {
+		this.snapshotSequence = snapshotSequence;
+	}
+
 	public List<IOrderBookEntry> getBids() {
 		return bids;
 	}
@@ -48,6 +57,7 @@ public class OrderBook {
 		result = prime * result + ((bids == null) ? 0 : bids.hashCode());
 		result = prime * result + ((currencyPair == null) ? 0 : currencyPair.hashCode());
 		result = prime * result + ((market == null) ? 0 : market.hashCode());
+		result = prime * result + (int) (snapshotSequence ^ (snapshotSequence >>> 32));
 		return result;
 	}
 
@@ -80,13 +90,15 @@ public class OrderBook {
 				return false;
 		} else if (!market.equals(other.market))
 			return false;
+		if (snapshotSequence != other.snapshotSequence)
+			return false;
 		return true;
 	}
 
 	@Override
 	public String toString() {
-		return "OrderBook [market=" + market + ", currencyPair=" + currencyPair + ", bids=" + bids + ", asks=" + asks
-				+ "]";
+		return "OrderBook [market=" + market + ", currencyPair=" + currencyPair + ", snapshotSequence="
+				+ snapshotSequence + ", bids=" + bids + ", asks=" + asks + "]";
 	}
 	
 }

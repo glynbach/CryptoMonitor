@@ -4,11 +4,12 @@ import java.util.List;
 
 public class ServiceProperties {
 
-	private final String uri;
-	private final String apiKey;
-	private final int transactionsPerSecond;
-	private final List<SubscriptionProperties> marketDataTopics;
-	private final boolean sipValidationOnEmptyPayloads;
+	private String uri;
+	private String apiKey;
+	private int transactionsPerSecond;
+	private List<SubscriptionProperties> marketDataTopics;
+	private boolean sipValidationOnEmptyPayloads;
+	private boolean requiresSnapshot;
 
 	public static class Builder {
 		private String uri;
@@ -16,6 +17,7 @@ public class ServiceProperties {
 		private int transactionsPerSecond;
 		private List<SubscriptionProperties> marketDataTopics;
 		private boolean sipValidationOnEmptyPayloads;
+		private boolean requiresSnapshot;
 
 		public Builder uri(String uri) {
 			this.uri = uri;
@@ -42,6 +44,11 @@ public class ServiceProperties {
 			return this;
 		}
 
+		public Builder requiresSnapshot(boolean requiresSnapshot) {
+			this.requiresSnapshot = requiresSnapshot;
+			return this;
+		}
+
 		public ServiceProperties build() {
 			return new ServiceProperties(this);
 		}
@@ -53,8 +60,9 @@ public class ServiceProperties {
 		this.transactionsPerSecond = builder.transactionsPerSecond;
 		this.marketDataTopics = builder.marketDataTopics;
 		this.sipValidationOnEmptyPayloads = builder.sipValidationOnEmptyPayloads;
+		this.requiresSnapshot = builder.requiresSnapshot;
 	}
-	
+
 	public String getUri() {
 		return uri;
 	}
@@ -75,11 +83,15 @@ public class ServiceProperties {
 		return sipValidationOnEmptyPayloads;
 	}
 
+	public boolean isRequiresSnapshot() {
+		return requiresSnapshot;
+	}
+
 	@Override
 	public String toString() {
 		return "ServiceProperties [uri=" + uri + ", apiKey=" + apiKey + ", transactionsPerSecond="
 				+ transactionsPerSecond + ", marketDataTopics=" + marketDataTopics + ", sipValidationOnEmptyPayloads="
-				+ sipValidationOnEmptyPayloads + "]";
+				+ sipValidationOnEmptyPayloads + ", requiresSnapshot=" + requiresSnapshot + "]";
 	}
 
 }

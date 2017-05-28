@@ -1,19 +1,26 @@
 package com.kieral.cryptomon.service;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.kieral.cryptomon.model.ConnectionStatus;
 import com.kieral.cryptomon.model.OrderBook;
 import com.kieral.cryptomon.model.OrderBookUpdate;
+import com.kieral.cryptomon.streaming.IOrderedStreamingListener;
+import com.kieral.cryptomon.streaming.OrderedStreamingEmitter;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 
-public abstract class AbstractLiquidityProvider implements ILiquidityProvider {
+public abstract class AbstractLiquidityProvider implements ILiquidityProvider, IOrderedStreamingListener {
 
 	protected Logger logger = LoggerFactory.getLogger(this.getClass());
 	
@@ -21,7 +28,13 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider {
 	private final List<IOrderBookListener> orderBookListeners = new CopyOnWriteArrayList<IOrderBookListener>();
 	
 	protected final ServiceProperties serviceProperties;
-	private final OrderBookManager orderBookManager;
+	protected final OrderBookManager orderBookManager;
+	private final OrderedStreamingEmitter streamingEmitter;
+	
+	private final ConcurrentMap<String, AtomicBoolean> initialisedStreams = new ConcurrentHashMap<String, AtomicBoolean>();
+	
+	private final boolean skipEmptyUpdates;
+	private final boolean requiresSnapshot; 
 	
 	private final AtomicReference<ConnectionStatus> status = new AtomicReference<ConnectionStatus>();
 	{
@@ -35,6 +48,9 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider {
 	protected AbstractLiquidityProvider(final ServiceProperties serviceProperties, final OrderBookManager orderBookManager) {
 		this.serviceProperties = serviceProperties;
 		this.orderBookManager = orderBookManager;
+		this.streamingEmitter = new OrderedStreamingEmitter(this);
+		this.skipEmptyUpdates = serviceProperties != null && serviceProperties.isSipValidationOnEmptyPayloads();
+		this.requiresSnapshot = serviceProperties != null && serviceProperties.isRequiresSnapshot();
 	}
 	
 	@Override
@@ -109,19 +125,45 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider {
 	abstract protected boolean doDisconnect();
 
 	abstract protected void subscribeMarketDataTopics();
+	
+	abstract protected OrderBook subscribeOrderbookSnapshot(String topic, String currencyPair) throws JsonProcessingException, IOException;
 
 	abstract protected List<OrderBookUpdate> parsePayload(StreamingPayload streamingPayload) throws ParsingPayloadException;
 
-	protected void onPayloadUpdate(StreamingPayload streamingPayload) {
+	@Override
+	public void onOrderedStreamingPayload(StreamingPayload streamingPayload) {
 		try {
 			List<OrderBookUpdate> updates = parsePayload(streamingPayload);
 			if (updates != null)
 				this.onOrderBookUpdate(streamingPayload.getCurrencyPair(), updates);
 		} catch (ParsingPayloadException e) {
 			logger.error("Error parsing payload", e);
+			// TODO: resubscribe topic instead
 			this.disconnect();
 		}
+	}
 
+	@Override
+	public void onOrderedStreamingError(String topic, String reason) {
+		logger.error("Error on streaming topic " + topic + ": " + reason);
+		// TODO: re-subscribe topic
+	}
+
+	protected void onPayloadUpdate(StreamingPayload streamingPayload) {
+		AtomicBoolean initialised = initialisedStreams.putIfAbsent(streamingPayload.getTopic(), new AtomicBoolean(!requiresSnapshot));
+		if (requiresSnapshot && (initialised == null || !initialised.get())) {
+			logger.info("Received update on " + streamingPayload.getTopic() + " - requesting snapshot");
+			try {
+				OrderBook orderBookSnapshot = subscribeOrderbookSnapshot(streamingPayload.getTopic(), streamingPayload.getCurrencyPair());
+			} catch (Exception e) {
+				logger.error("Error subscriving to orderbook snapshot for " + streamingPayload.getTopic(), e);
+				// TODO: resubscribe topic instead
+				this.disconnect();
+			}
+		}
+		if (!skipEmptyUpdates || (streamingPayload.getJson().size() > 0)) {
+			this.streamingEmitter.onStreamingUpdate(streamingPayload);
+		}
 	}
 
 	protected void onOrderBookUpdate(String currencyPair, List<OrderBookUpdate> updates) {
