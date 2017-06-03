@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service;
+package com.kieral.cryptomon.service.liquidity;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,8 +32,6 @@ public class OrderBookManager {
 	}
 	
 	public OrderBook updateOrderBook(String market, String currencyPair, List<OrderBookUpdate> updates, boolean clear) {
-		if (!clear && (updates == null || updates.size() == 0))
-			return null;
 		if (market == null)
 			throw new IllegalArgumentException("market can not be null");
 		if (currencyPair == null)

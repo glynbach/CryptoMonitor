@@ -2,6 +2,8 @@ package com.kieral.cryptomon.service;
 
 import java.util.List;
 
+import com.kieral.cryptomon.service.liquidity.SubscriptionProperties;
+
 public class ServiceProperties {
 
 	private String uri;
@@ -12,6 +14,7 @@ public class ServiceProperties {
 	private boolean requiresSnapshot;
 
 	public static class Builder {
+		
 		private String uri;
 		private String apiKey;
 		private int transactionsPerSecond;

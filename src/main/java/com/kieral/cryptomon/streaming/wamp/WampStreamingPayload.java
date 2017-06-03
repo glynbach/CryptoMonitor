@@ -37,7 +37,9 @@ public class WampStreamingPayload implements StreamingPayload {
 		try {
 			payload.keywordArguments().findValuesAsText("seq").forEach(seq -> {seqNum.set(Long.parseLong(seq));});
 		} catch (Exception e) {
-			logger.warn("Could not get sequence number from " + payload.keywordArguments() + " for " + payload.arguments(), e);
+			logger.warn(
+					String.format("Could not get sequence number from %s for %s", payload.keywordArguments(), payload.arguments())
+					, e);
 		}
 		return seqNum.get();
 	}
@@ -93,6 +95,11 @@ public class WampStreamingPayload implements StreamingPayload {
 	public String toString() {
 		return "WampStreamingPayload [getTopic()=" + getTopic() + ", getSequenceNumber()=" + getSequenceNumber()
 				+ ", getCurrencyPair()=" + getCurrencyPair() + ", getJson()=" + getJson() + "]";
+	}
+
+	@Override
+	public String getRaw() {
+		return payload == null ? null : payload.keywordArguments() + " " + payload.details() + " " + payload.arguments();
 	}
 
 }

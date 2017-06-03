@@ -9,16 +9,17 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.kieral.cryptomon.model.ConnectionStatus;
 import com.kieral.cryptomon.model.IOrderBookEntry;
 import com.kieral.cryptomon.model.OrderBook;
 import com.kieral.cryptomon.model.OrderBookAction;
 import com.kieral.cryptomon.model.OrderBookUpdate;
-import com.kieral.cryptomon.service.AbstractLiquidityProvider;
-import com.kieral.cryptomon.service.OrderBookManager;
 import com.kieral.cryptomon.service.ServiceProperties;
-import com.kieral.cryptomon.service.SubscriptionProperties;
+import com.kieral.cryptomon.service.connection.ConnectionStatus;
+import com.kieral.cryptomon.service.liquidity.AbstractLiquidityProvider;
+import com.kieral.cryptomon.service.liquidity.OrderBookManager;
+import com.kieral.cryptomon.service.liquidity.SubscriptionProperties;
 import com.kieral.cryptomon.service.util.HttpUtils;
+import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 import com.kieral.cryptomon.streaming.StreamingProperties;
@@ -92,7 +93,7 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	protected List<OrderBookUpdate> parsePayload(StreamingPayload payload) throws ParsingPayloadException {
 		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
 		JsonNode json = payload.getJson();
-		logger.info("Received payload: " + payload);
+		logger.info("Received payload: %s", payload);
 		try {
 			json.elements().forEachRemaining(node -> {
 				JsonNode type = node.findValue("type");
@@ -133,9 +134,10 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	@Override
 	protected OrderBook subscribeOrderbookSnapshot(String topic, String currencyPair) throws JsonProcessingException, IOException {
 		String url = String.format(SNAPSHOT_URL, topic);
-		logger.info("Requesting orderbook snapshot from " + url);
+		logger.info("Requesting orderbook snapshot from %s", url);
 		JsonNode json = HttpUtils.getResponseAsJson(url);
-		logger.info("Orderbook snapshot response " + json);
+		logger.info("Orderbook snapshot response %s", json);
+		LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), json));
 		List<OrderBookUpdate> askUpdates = new ArrayList<OrderBookUpdate>();
 		List<OrderBookUpdate> bidUpdates = new ArrayList<OrderBookUpdate>();
 		JsonNode asks = json.get("asks");
@@ -159,7 +161,7 @@ public class PoloniexService extends AbstractLiquidityProvider {
 		return orderBookSnapshot;
 	}
 
-	public static void _main(String[] args) throws InterruptedException {
+	public static void main(String[] args) throws InterruptedException {
 		List<SubscriptionProperties> marketDataTopics = new ArrayList<SubscriptionProperties>();
 		marketDataTopics.add(new SubscriptionProperties.Builder().currencyPair("BTCLTC").topic("BTC_LTC").build());
 		//marketDataTopics.add(new SubscriptionProperties.Builder().currencyPair("BTCETH").topic("BTC_ETH").build());
@@ -176,8 +178,8 @@ public class PoloniexService extends AbstractLiquidityProvider {
 			print(orderBook);
 		});
 		poloniex.connect();
-		Thread.sleep(5000);
-		//Thread.sleep(1000 * 60 * 2);
+		//Thread.sleep(5000);
+		Thread.sleep(1000 * 60 * 1);
 		poloniex.disconnect();
 	}
 

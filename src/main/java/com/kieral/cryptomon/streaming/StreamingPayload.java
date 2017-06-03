@@ -8,5 +8,6 @@ public interface StreamingPayload {
 	long getSequenceNumber();
 	String getCurrencyPair();
 	JsonNode getJson();
+	String getRaw();
 	
 }
