@@ -1,6 +1,6 @@
 package com.kieral.cryptomon.streaming;
 
-import com.kieral.cryptomon.service.IStatusListener;
+import com.kieral.cryptomon.service.connection.IStatusListener;
 
 import io.reactivex.Completable;
 import io.reactivex.Observable;

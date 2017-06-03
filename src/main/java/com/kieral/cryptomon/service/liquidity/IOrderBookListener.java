@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service;
+package com.kieral.cryptomon.service.liquidity;
 
 import com.kieral.cryptomon.model.OrderBook;
 

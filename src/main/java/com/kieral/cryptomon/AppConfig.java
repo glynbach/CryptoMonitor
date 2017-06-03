@@ -1,5 +1,9 @@
 package com.kieral.cryptomon;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.catalina.connector.Connector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +22,12 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
 import com.kieral.cryptomon.dao.DaoManager;
+import com.kieral.cryptomon.service.ServiceProperties;
+import com.kieral.cryptomon.service.liquidity.AbstractLiquidityProvider;
+import com.kieral.cryptomon.service.liquidity.OrderBookManager;
+import com.kieral.cryptomon.service.liquidity.SubscriptionProperties;
+import com.kieral.cryptomon.service.poloniex.PoloniexService;
+import com.kieral.cryptomon.service.util.LoggingUtils;
 
 @EnableWebMvc
 @Configuration
@@ -47,6 +57,59 @@ public class AppConfig extends WebMvcConfigurerAdapter {
 		}
 	}
 
+	
+	@Value("${poloniex.push.api}")
+	private String poloniexUri;
+	@Value("${poloniex.api.key}")
+	private String poloniexApiKey;
+	@Value("${poloniex.maxtrans.second}")
+	private int poloniexTransactionsPerSecond;
+	@Value("${poloniex.streaming.data.topics}")
+	private String poloniexMarketDataTopicsStr;
+	@Value("${poloniex.emptypayload.skip}")
+	private boolean poloniexSipValidationOnEmptyPayloads;
+	@Value("${poloniex.snapshot.required}")
+	private boolean poloniexRequiresSnapshot;
+
+	/**
+	 * Creates the Poloniex service for market data and execution
+	 */
+	@Bean
+	AbstractLiquidityProvider poloniexService() {
+		List<SubscriptionProperties> marketDataTopics = new ArrayList<SubscriptionProperties>();
+		Arrays.asList(poloniexMarketDataTopicsStr.split(",")).forEach(topic -> {
+			marketDataTopics.add(new SubscriptionProperties.Builder()
+					.currencyPair(topic.replaceAll("_", ""))
+					.topic(topic).build());
+		});;
+		ServiceProperties properties = new ServiceProperties.Builder()
+											.uri(poloniexUri)
+											.marketDataTopics(marketDataTopics)
+											.transactionsPerSecond(poloniexTransactionsPerSecond)
+											.sipValidationOnEmptyPayloads(poloniexSipValidationOnEmptyPayloads)
+											.requiresSnapshot(poloniexRequiresSnapshot)
+											.build();
+		return new PoloniexService(properties, orderBookManager());		
+	}
+
+	@Bean
+	OrderBookManager orderBookManager() {
+		return new OrderBookManager();
+	}
+
+	@Value("${rawDataLoging.enabled}")
+	boolean rawDataLoggingEnabled;
+	@Value("${dataBufferingLogging.enabled}")
+	boolean dataBufferingLoggingEnabled;
+
+	/**
+	 * Set additional logging properties
+	 */
+	void configureLoggingUtils() {
+		LoggingUtils.setRawDataLoggingEnabled(rawDataLoggingEnabled);
+		LoggingUtils.setDataBufferingLoggingEnabled(dataBufferingLoggingEnabled);
+	}
+	
 	@Bean
 	DaoManager daoManager() {
 		return new DaoManager();

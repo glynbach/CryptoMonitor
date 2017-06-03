@@ -28,8 +28,33 @@
 			</timeBasedFileNamingAndTriggeringPolicy>
 		</rollingPolicy>
 	</appender>
+
+	<appender name="DATA_FILE"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${logDir}/CryptoMonitorData.log</file>
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<Pattern>
+				%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+			</Pattern>
+		</encoder>
+
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<!-- rollover daily -->
+			<fileNamePattern>${logDir}/CryptoMonitor/CryptoMonitorData.%d{yyyy-MM-dd}.%i.log
+                        </fileNamePattern>
+			<timeBasedFileNamingAndTriggeringPolicy
+				class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<maxFileSize>10MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+		</rollingPolicy>
+	</appender>
 	
-	<root level="TRACE">
+	<logger name="rawdata" additivity="false">
+		<appender-ref ref="STDOUT"/>
+		<appender-ref ref="DATA_FILE"/>
+	</logger>
+	
+	<root level="INFO">
 		<appender-ref ref="STDOUT" />
 		<appender-ref ref="FILE" />
 	</root>

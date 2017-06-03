@@ -1,6 +1,7 @@
-package com.kieral.cryptomon.service;
+package com.kieral.cryptomon.service.liquidity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -21,10 +22,16 @@ public class OrderBookManager {
 
 	private final ConcurrentMap<OrderBookKey, OrderBook> orderBooks = new ConcurrentHashMap<OrderBookKey, OrderBook>(); 
 	private final ConcurrentMap<OrderBookKey, Object> orderBookLocks = new ConcurrentHashMap<OrderBookKey, Object>(); 
-	
+
+	public OrderBook clearOrderBook(String market, String currencyPair) {
+		return updateOrderBook(market, currencyPair, null, true);
+	}
+
 	public OrderBook updateOrderBook(String market, String currencyPair, List<OrderBookUpdate> updates) {
-		if (updates == null || updates.size() == 0)
-			return null;
+		return updateOrderBook(market, currencyPair, updates, false);
+	}
+	
+	public OrderBook updateOrderBook(String market, String currencyPair, List<OrderBookUpdate> updates, boolean clear) {
 		if (market == null)
 			throw new IllegalArgumentException("market can not be null");
 		if (currencyPair == null)
@@ -35,34 +42,40 @@ public class OrderBookManager {
 		orderBookLocks.putIfAbsent(key, new Object());
 		Object lock = orderBookLocks.get(key);
 		synchronized(lock) {
-			final AtomicBoolean actioned = new AtomicBoolean(false);
-			for (OrderBookUpdate update : updates) {
-				actioned.set(false);
-				IOrderBookEntry entry = update.getEntry();
-				OrderBookAction action = update.getAction();
-				List<IOrderBookEntry> entries = new ArrayList<IOrderBookEntry>(entry.getSide() == Side.BID ? orderBook.getBids() : orderBook.getAsks());
-				PriceComparer comparer = entry.getSide() == Side.BID ? BID_COMPARER : ASK_COMPARER;
-				entries.sort(comparer);
-				Iterator<IOrderBookEntry> i = entries.iterator();
-				while (i.hasNext()) {
-					IOrderBookEntry bookEntry = i.next();
-					if (bookEntry.getPrice().compareTo(entry.getPrice()) == 0) {
-						if (action == OrderBookAction.REMOVE)
-							i.remove();
-						if (action == OrderBookAction.REPLACE) {
-							bookEntry.setAmount(entry.getAmount());
-							actioned.set(true);
+			if (clear) {
+				orderBook.setAsks(Collections.emptyList());
+				orderBook.setBids(Collections.emptyList());
+			}
+			if (updates != null) {
+				final AtomicBoolean actioned = new AtomicBoolean(false);
+				for (OrderBookUpdate update : updates) {
+					actioned.set(false);
+					IOrderBookEntry entry = update.getEntry();
+					OrderBookAction action = update.getAction();
+					List<IOrderBookEntry> entries = new ArrayList<IOrderBookEntry>(entry.getSide() == Side.BID ? orderBook.getBids() : orderBook.getAsks());
+					PriceComparer comparer = entry.getSide() == Side.BID ? BID_COMPARER : ASK_COMPARER;
+					entries.sort(comparer);
+					Iterator<IOrderBookEntry> i = entries.iterator();
+					while (i.hasNext()) {
+						IOrderBookEntry bookEntry = i.next();
+						if (bookEntry.getPrice().compareTo(entry.getPrice()) == 0) {
+							if (action == OrderBookAction.REMOVE)
+								i.remove();
+							if (action == OrderBookAction.REPLACE) {
+								bookEntry.setAmount(entry.getAmount());
+								actioned.set(true);
+							}
 						}
 					}
+					if (action == OrderBookAction.REPLACE && !actioned.get()) {
+						entries.add(entry);
+						entries.sort(comparer);
+					}
+					if (entry.getSide() == Side.BID)
+						orderBook.setBids(entries); 
+					else
+						orderBook.setAsks(entries);
 				}
-				if (action == OrderBookAction.REPLACE && !actioned.get()) {
-					entries.add(entry);
-					entries.sort(comparer);
-				}
-				if (entry.getSide() == Side.BID)
-					orderBook.setBids(entries); 
-				else
-					orderBook.setAsks(entries);
 			}
 		}
 		return orderBook;
