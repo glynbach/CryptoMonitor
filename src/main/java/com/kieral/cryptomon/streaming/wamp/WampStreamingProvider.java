@@ -64,7 +64,7 @@ public class WampStreamingProvider implements StreamingProvider {
 	@Override
 	public Observable<StreamingPayload> subscribe(final String topic, final String currencyPair) {
 		if (connectedState != null && connectedState instanceof WampClient.ConnectedState) {
-			logger.info("Subscribing to topic %s", topic);
+			logger.info("Subscribing to topic {}", topic);
 			return RxJavaInterop.toV2Observable(client.makeSubscription(topic))
 					.map(pubSubData -> {
 						return new WampStreamingPayload(pubSubData, topic, currencyPair);

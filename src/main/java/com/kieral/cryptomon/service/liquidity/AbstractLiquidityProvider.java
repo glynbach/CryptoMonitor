@@ -64,11 +64,11 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 				throw new IllegalStateException(String.format("Could not discconect from %s - check logs", getName()));
 		}
 		while (!(status.get() == ConnectionStatus.CONNECTED)) {
-			logger.info("Connecting to %s", getName());
+			logger.info("Connecting to {}", getName());
 			if (doConnect()) {
 				setStatus(ConnectionStatus.CONNECTED);
 				retryCount = 0;
-				logger.info("Connected to %s", getName());
+				logger.info("Connected to {}", getName());
 			} else {
 				retryCount++;
 				Thread.sleep((retryCount % 5 == 0) ? longSleep : shortSleep);
@@ -79,10 +79,10 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 	@Override
 	public void disconnect() {
 		if (!(status.get() == ConnectionStatus.DISCONNECTED)) {
-			logger.info("Disconnecting from %s", getName());
+			logger.info("Disconnecting from {}", getName());
 			if (doDisconnect()) {
 				setStatus(ConnectionStatus.DISCONNECTED);
-				logger.info("Disconnected from %s", getName());
+				logger.info("Disconnected from {}", getName());
 			}
 		}
 	}
@@ -97,8 +97,7 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 				try {
 					listener.onStatusChange(status);
 				} catch (Exception e) {
-					logger.warn(String.format("Error notifiying status listener %s of %s", listener, status)
-							, e);
+					logger.warn("Error notifiying status listener {} of {}", listener, status, e);
 				}
 			}
 		}
@@ -149,7 +148,7 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 
 	@Override
 	public void onOrderedStreamingError(String topic, String reason) {
-		logger.error(String.format("Error on streaming topic %s: %s", topic, reason));
+		logger.error("Error on streaming topic {}: {}", topic, reason);
 		// TODO: re-subscribe topic
 	}
 
@@ -158,15 +157,13 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 				String.format("%s: streaming: %s", getName(), streamingPayload.getRaw()));
 		AtomicBoolean initialised = initialisedStreams.putIfAbsent(streamingPayload.getTopic(), new AtomicBoolean(!requiresSnapshot));
 		if (requiresSnapshot && (initialised == null || !initialised.get())) {
-			logger.info("Received update on %s - requesting snapshot", streamingPayload.getTopic());
+			logger.info("Received update on {} - requesting snapshot", streamingPayload.getTopic());
 			try {
 				OrderBook orderBookSnapshot = subscribeOrderbookSnapshot(streamingPayload.getTopic(), streamingPayload.getCurrencyPair());
 				this.streamingEmitter.onSnashotUpdate(orderBookSnapshot);
 				initialisedStreams.get(streamingPayload.getTopic()).set(true);
 			} catch (Exception e) {
-				logger.error(
-						String.format("Error subscriving to orderbook snapshot for %s", streamingPayload.getTopic()), 
-						e);
+				logger.error("Error subscriving to orderbook snapshot for {}", streamingPayload.getTopic(), e);
 				// TODO: resubscribe topic instead
 				this.disconnect();
 			}

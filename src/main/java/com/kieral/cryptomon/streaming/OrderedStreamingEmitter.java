@@ -70,7 +70,7 @@ public class OrderedStreamingEmitter {
 					PayloadPark park = payloads.get(streamingPayload.getCurrencyPair());
 					park.onStreamingPayload(streamingPayload);
 				} catch (Exception e) {
-					logger.error(String.format("Exception on StreamingUpdate for %s", streamingPayload), e);
+					logger.error("Exception on StreamingUpdate for {}", streamingPayload, e);
 					error(streamingPayload.getTopic(), e.getMessage());
 				}
 			});
@@ -88,7 +88,7 @@ public class OrderedStreamingEmitter {
 				PayloadPark park = payloads.get(orderBook.getCurrencyPair());
 				park.onSnapshot(orderBook);
 			} catch (Exception e) {
-				logger.error(String.format("Exception on SnapshotUpdate for %s", orderBook), e);
+				logger.error("Exception on SnapshotUpdate for {}", orderBook, e);
 				error(orderBook.getCurrencyPair(), e.getMessage());
 			}
 		});
@@ -104,7 +104,7 @@ public class OrderedStreamingEmitter {
 				PayloadPark park = payloads.get(currencyPair);
 				park.suspend();
 			} catch (Exception e) {
-				logger.error(String.format("Exception on suspend for %s", currencyPair), e);
+				logger.error("Exception on suspend for {}", currencyPair, e);
 				error(currencyPair, e.getMessage());
 			}
 		});
@@ -116,7 +116,7 @@ public class OrderedStreamingEmitter {
 	}
 
 	private void error(String topic, String reason) {
-		logger.error("Error detected in streaming sequences: %s", reason);
+		logger.error("Error detected in streaming sequences: {}", reason);
 		if (listener != null)
 			listener.onOrderedStreamingError(topic, reason);
 	}
@@ -159,7 +159,7 @@ public class OrderedStreamingEmitter {
 		private void onStreamingPayload(StreamingPayload streamingPayload) {
 			if (snapshotRequired && !isSnapshotReceived()) {
 				if (LoggingUtils.isDataBufferingLoggingEnabled())
-					logger.info("Stashng payload %s as awaiting ssnapshot", streamingPayload);
+					logger.info("Stashng payload {} as awaiting ssnapshot", streamingPayload);
 				synchronized(parkLock) {
 					parkedPayloads.add(streamingPayload);
 					review();
@@ -169,7 +169,7 @@ public class OrderedStreamingEmitter {
 			if (snapshotRequired && streamingPayload.getSequenceNumber() <= snapshotSequences.get(streamingPayload.getCurrencyPair())) {
 				// discard
 				if (LoggingUtils.isDataBufferingLoggingEnabled())
-					logger.info("Discarding payload with sequence number %s - order snapshot sequence is %s",
+					logger.info("Discarding payload with sequence number {} - order snapshot sequence is {}",
 							streamingPayload.getSequenceNumber(), 
 							snapshotSequences.get(streamingPayload.getCurrencyPair()));
 				return;
@@ -182,7 +182,7 @@ public class OrderedStreamingEmitter {
 				lastSequence.compareAndSet(-100, streamingPayload.getSequenceNumber() - 1);
 				if (lastSequence.compareAndSet(streamingPayload.getSequenceNumber() - 1, streamingPayload.getSequenceNumber())) {
 					if (LoggingUtils.isDataBufferingLoggingEnabled())
-						logger.info("Emitting expected payload %s with sequence number %s",
+						logger.info("Emitting expected payload {} with sequence number {}",
 								streamingPayload,
 								streamingPayload.getSequenceNumber());
 					emit(streamingPayload);
@@ -190,7 +190,7 @@ public class OrderedStreamingEmitter {
 						review();
 				} else {
 					if (LoggingUtils.isDataBufferingLoggingEnabled())
-						logger.info("Parking unexpected %s with sequence number %s",
+						logger.info("Parking unexpected {} with sequence number {}",
 								streamingPayload,
 								streamingPayload.getSequenceNumber());
 					add(streamingPayload);
@@ -202,7 +202,7 @@ public class OrderedStreamingEmitter {
 		private void onSnapshot(OrderBook orderBook) {
 			if (snapshotRequired) {
 				if (LoggingUtils.isDataBufferingLoggingEnabled())
-					logger.info("Received orderBook snapshot %s", orderBook);
+					logger.info("Received orderBook snapshot {}", orderBook);
 				if (orderBook == null)
 					throw new IllegalStateException("orderBook can not be null");
 				if (snapshotsReceived.putIfAbsent(currencyPair, new AtomicBoolean(true)) != null)
@@ -228,20 +228,20 @@ public class OrderedStreamingEmitter {
 				synchronized(parkLock) {
 					Collections.sort(parkedPayloads, SEQ_COMPARATOR);
 					if (LoggingUtils.isDataBufferingLoggingEnabled())
-						logger.info("Reviewing %s payloads %s", currencyPair, parkedPayloads);
+						logger.info("Reviewing {} payloads {}", currencyPair, parkedPayloads);
 					Iterator<StreamingPayload> i = parkedPayloads.iterator();
 					while (i.hasNext()) {
 						StreamingPayload streamingPayload = i.next();
 						if (LoggingUtils.isDataBufferingLoggingEnabled())
-							logger.info("Review comparing sequence number %s with last sent %s",
+							logger.info("Review comparing sequence number {} with last sent {}",
 									streamingPayload.getSequenceNumber(), lastSequence.get());
 						if (snapshotRequired)
-							logger.info("Review comparing sequence number %s snapshotSequence %s",
+							logger.info("Review comparing sequence number {} snapshotSequence {}",
 									streamingPayload.getSequenceNumber(), snapshotSequences.get(currencyPair));
 						if (!snapshotRequired || streamingPayload.getSequenceNumber() > snapshotSequences.get(currencyPair)) {
 							if (lastSequence.compareAndSet(streamingPayload.getSequenceNumber() - 1, streamingPayload.getSequenceNumber())) {
 								if (LoggingUtils.isDataBufferingLoggingEnabled())
-									logger.info("Review found payload with sequence number %s ready for sending", streamingPayload.getSequenceNumber());
+									logger.info("Review found payload with sequence number {} ready for sending", streamingPayload.getSequenceNumber());
 								lastReviewSuccess = System.currentTimeMillis(); 
 								emit(streamingPayload);
 								i.remove();
@@ -251,7 +251,7 @@ public class OrderedStreamingEmitter {
 							}
 						} else {
 							if (LoggingUtils.isDataBufferingLoggingEnabled())
-								logger.info("Discarding %s with sequence less than snapshot sequence %s",
+								logger.info("Discarding {} with sequence less than snapshot sequence {}",
 										streamingPayload.getSequenceNumber(), snapshotSequences.get(currencyPair));
 							i.remove();
 						}
