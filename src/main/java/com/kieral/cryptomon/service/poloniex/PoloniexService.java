@@ -93,7 +93,7 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	protected List<OrderBookUpdate> parsePayload(StreamingPayload payload) throws ParsingPayloadException {
 		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
 		JsonNode json = payload.getJson();
-		logger.info("Received payload: %s", payload);
+		logger.info("Received payload: {}", payload);
 		try {
 			json.elements().forEachRemaining(node -> {
 				JsonNode type = node.findValue("type");
@@ -134,9 +134,9 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	@Override
 	protected OrderBook subscribeOrderbookSnapshot(String topic, String currencyPair) throws JsonProcessingException, IOException {
 		String url = String.format(SNAPSHOT_URL, topic);
-		logger.info("Requesting orderbook snapshot from %s", url);
+		logger.info("Requesting orderbook snapshot from {}", url);
 		JsonNode json = HttpUtils.getResponseAsJson(url);
-		logger.info("Orderbook snapshot response %s", json);
+		logger.info("Orderbook snapshot response {}", json);
 		LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), json));
 		List<OrderBookUpdate> askUpdates = new ArrayList<OrderBookUpdate>();
 		List<OrderBookUpdate> bidUpdates = new ArrayList<OrderBookUpdate>();

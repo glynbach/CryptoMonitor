@@ -37,9 +37,7 @@ public class WampStreamingPayload implements StreamingPayload {
 		try {
 			payload.keywordArguments().findValuesAsText("seq").forEach(seq -> {seqNum.set(Long.parseLong(seq));});
 		} catch (Exception e) {
-			logger.warn(
-					String.format("Could not get sequence number from %s for %s", payload.keywordArguments(), payload.arguments())
-					, e);
+			logger.warn("Could not get sequence number from {} for {}", payload.keywordArguments(), payload.arguments(), e);
 		}
 		return seqNum.get();
 	}

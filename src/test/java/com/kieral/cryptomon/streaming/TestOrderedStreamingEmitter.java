@@ -61,7 +61,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -78,7 +78,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -99,7 +99,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(4));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -140,7 +140,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(15));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl(14));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(15, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -156,7 +156,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(1500);
+		Thread.sleep(2500);
 		assertEquals(1, emitted.size());
 		assertEquals(1, emitted.get(0).getSequenceNumber());
 		assertTrue(errors.size() > 0);
@@ -170,7 +170,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(3));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertTrue(errors.size() > 0);
 		assertTrue(errors.get(0).contains("Expecting"));
 	}
@@ -182,7 +182,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(2));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertTrue(errors.size() > 0);
 		assertTrue(errors.get(0).contains("Expecting"));
 	}
@@ -196,20 +196,20 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("A", 3));
 		emitter.onStreamingUpdate(pl("B", 2));
 		emitter.onStreamingUpdate(pl("B", 3));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(6, emitted.size());
-		assertEquals(1, emitted.get(0).getSequenceNumber());
-		assertEquals(2, emitted.get(1).getSequenceNumber());
-		assertEquals(1, emitted.get(2).getSequenceNumber());
-		assertEquals(3, emitted.get(3).getSequenceNumber());
-		assertEquals(2, emitted.get(4).getSequenceNumber());
-		assertEquals(3, emitted.get(5).getSequenceNumber());
-		assertEquals("A", emitted.get(0).getCurrencyPair());
-		assertEquals("A", emitted.get(1).getCurrencyPair());
-		assertEquals("B", emitted.get(2).getCurrencyPair());
-		assertEquals("A", emitted.get(3).getCurrencyPair());
-		assertEquals("B", emitted.get(4).getCurrencyPair());
-		assertEquals("B", emitted.get(5).getCurrencyPair());
+		AtomicInteger seq = new AtomicInteger(0);
+		emitted.stream()
+			.filter(payload -> payload.getCurrencyPair().equals("A"))
+			.collect(Collectors.toList()).forEach(payload -> {
+				assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
+			});
+		seq.set(0);
+		emitted.stream()
+		.filter(payload -> payload.getCurrencyPair().equals("B"))
+		.collect(Collectors.toList()).forEach(payload -> {
+			assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
+		});
 	}
 
 	@Test
@@ -223,7 +223,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("A", 2));
 		emitter.onStreamingUpdate(pl("B", 4));
 		emitter.onStreamingUpdate(pl("A", 4));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(8, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -258,7 +258,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 4));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl("A", 4));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(8, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -309,7 +309,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 8));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl("A", 5));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(16, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -333,7 +333,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 1));
 		emitter.onStreamingUpdate(pl("B", 3));
 		emitter.onStreamingUpdate(pl("A", 3));
-		Thread.sleep(1500);
+		Thread.sleep(2500);
 		assertEquals(2, emitted.size());
 		assertEquals(1, emitted.get(0).getSequenceNumber());
 		assertTrue(errors.size() > 0);
@@ -351,7 +351,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 3));
 		emitter.onStreamingUpdate(pl("B", 1));
 		emitter.onStreamingUpdate(pl("A", 2));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertTrue(errors.size() > 0);
 		assertTrue(errors.get(0).contains("Expecting"));
 	}
@@ -420,13 +420,13 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(0, emitted.size());
 		emitter.onSnashotUpdate(ob(4));
 		emitter.onStreamingUpdate(pl(6));
 		emitter.onStreamingUpdate(pl(7));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(3, emitted.size());
 		AtomicInteger seq = new AtomicInteger(4);
@@ -443,14 +443,14 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 2));
 		emitter.onStreamingUpdate(pl("B", 3));
 		emitter.onStreamingUpdate(pl("B", 1));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(0, emitted.size());
 		emitter.onSnashotUpdate(ob("A", 0));
 		emitter.onStreamingUpdate(pl("A", 4));
 		emitter.onSnashotUpdate(ob("B", 2));
 		emitter.onStreamingUpdate(pl("A", 3));
-		Thread.sleep(100);
+		Thread.sleep(500);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger aSeq = new AtomicInteger(0);
