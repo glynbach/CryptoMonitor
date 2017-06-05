@@ -62,13 +62,13 @@ public class AppConfig extends WebMvcConfigurerAdapter {
 	private String poloniexUri;
 	@Value("${poloniex.api.key}")
 	private String poloniexApiKey;
-	@Value("${poloniex.maxtrans.second}")
+	@Value("${poloniex.maxtrans.second:5}")
 	private int poloniexTransactionsPerSecond;
 	@Value("${poloniex.streaming.data.topics}")
 	private String poloniexMarketDataTopicsStr;
-	@Value("${poloniex.emptypayload.skip}")
+	@Value("${poloniex.emptypayload.skip:true}")
 	private boolean poloniexSipValidationOnEmptyPayloads;
-	@Value("${poloniex.snapshot.required}")
+	@Value("${poloniex.snapshot.required:true}")
 	private boolean poloniexRequiresSnapshot;
 
 	/**
@@ -76,11 +76,12 @@ public class AppConfig extends WebMvcConfigurerAdapter {
 	 */
 	@Bean
 	AbstractLiquidityProvider poloniexService() {
+		configureLoggingUtils();
 		List<SubscriptionProperties> marketDataTopics = new ArrayList<SubscriptionProperties>();
 		Arrays.asList(poloniexMarketDataTopicsStr.split(",")).forEach(topic -> {
 			marketDataTopics.add(new SubscriptionProperties.Builder()
-					.currencyPair(topic.replaceAll("_", ""))
-					.topic(topic).build());
+					.currencyPair(topic.replaceAll("_", "").trim())
+					.topic(topic.trim()).build());
 		});;
 		ServiceProperties properties = new ServiceProperties.Builder()
 											.uri(poloniexUri)

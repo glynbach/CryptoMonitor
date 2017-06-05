@@ -50,7 +50,7 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	}
 	
 	@Override
-	protected String getName() {
+	public String getName() {
 		return POLONIEX;
 	}
 
