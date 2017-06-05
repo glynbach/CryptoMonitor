@@ -32,7 +32,7 @@ import io.reactivex.Observable;
 public class PoloniexService extends AbstractLiquidityProvider {
 
 	private static final String POLONIEX = "Poloniex";
-	private static final String SNAPSHOT_URL = "https://poloniex.com/public?command=returnOrderBook&currencyPair=%s&depth=10";
+	private static final String SNAPSHOT_URL = "https://poloniex.com/public?command=returnOrderBook&currencyPair=%s&depth=20";
 
 	private final StreamingProvider streamingProvider = new WampStreamingProvider();
 	private final StreamingProperties streamingProperties;
@@ -93,7 +93,8 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	protected List<OrderBookUpdate> parsePayload(StreamingPayload payload) throws ParsingPayloadException {
 		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
 		JsonNode json = payload.getJson();
-		logger.info("Received payload: {}", payload);
+		if (logger.isDebugEnabled())
+			logger.debug("Received payload: {}", payload);
 		try {
 			json.elements().forEachRemaining(node -> {
 				JsonNode type = node.findValue("type");

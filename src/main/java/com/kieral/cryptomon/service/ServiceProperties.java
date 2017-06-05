@@ -12,15 +12,16 @@ public class ServiceProperties {
 	private List<SubscriptionProperties> marketDataTopics;
 	private boolean sipValidationOnEmptyPayloads;
 	private boolean requiresSnapshot;
+	private boolean useSnapshotSequence;
 
 	public static class Builder {
-		
 		private String uri;
 		private String apiKey;
 		private int transactionsPerSecond;
 		private List<SubscriptionProperties> marketDataTopics;
 		private boolean sipValidationOnEmptyPayloads;
 		private boolean requiresSnapshot;
+		private boolean useSnapshotSequence;
 
 		public Builder uri(String uri) {
 			this.uri = uri;
@@ -52,6 +53,11 @@ public class ServiceProperties {
 			return this;
 		}
 
+		public Builder useSnapshotSequence(boolean useSnapshotSequence) {
+			this.useSnapshotSequence = useSnapshotSequence;
+			return this;
+		}
+
 		public ServiceProperties build() {
 			return new ServiceProperties(this);
 		}
@@ -64,6 +70,7 @@ public class ServiceProperties {
 		this.marketDataTopics = builder.marketDataTopics;
 		this.sipValidationOnEmptyPayloads = builder.sipValidationOnEmptyPayloads;
 		this.requiresSnapshot = builder.requiresSnapshot;
+		this.useSnapshotSequence = builder.useSnapshotSequence;
 	}
 
 	public String getUri() {
@@ -90,11 +97,16 @@ public class ServiceProperties {
 		return requiresSnapshot;
 	}
 
+	public boolean isUseSnapshotSequence() {
+		return useSnapshotSequence;
+	}
+
 	@Override
 	public String toString() {
 		return "ServiceProperties [uri=" + uri + ", apiKey=" + apiKey + ", transactionsPerSecond="
 				+ transactionsPerSecond + ", marketDataTopics=" + marketDataTopics + ", sipValidationOnEmptyPayloads="
-				+ sipValidationOnEmptyPayloads + ", requiresSnapshot=" + requiresSnapshot + "]";
+				+ sipValidationOnEmptyPayloads + ", requiresSnapshot=" + requiresSnapshot + ", useSnapshotSequence="
+				+ useSnapshotSequence + "]";
 	}
-
+	
 }

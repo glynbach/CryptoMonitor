@@ -9,33 +9,40 @@ public class OrderBookMessage {
 
 	private String market;
 	private String currencyPair;
-	private List<String[]> bids;
-	private List<String[]> asks;
+	private List<OrderBookRow> obEntries = new ArrayList<OrderBookRow>();
 	
 	public OrderBookMessage() {
 	}
 
-	public OrderBookMessage(String market, String currencyPair, List<String[]> bids, List<String[]> asks) {
+	public OrderBookMessage(String market, String currencyPair, List<OrderBookRow> obEntries) {
 		super();
 		this.market = market;
 		this.currencyPair = currencyPair;
-		this.bids = bids;
-		this.asks = asks;
+		this.obEntries = obEntries;
 	}
 
 	public OrderBookMessage(OrderBook orderBook) {
 		if (orderBook != null) {
 			this.market = orderBook.getMarket();
 			this.currencyPair = orderBook.getCurrencyPair();
-			bids = new ArrayList<String[]>();
-			asks = new ArrayList<String[]>();
-			orderBook.getBids().forEach(entry -> {
-				bids.add(new String[] {entry.getPrice().toPlainString(),
-										entry.getAmount().toPlainString()});
-			});
-			orderBook.getAsks().forEach(entry -> {
-				asks.add(new String[] {entry.getPrice().toPlainString(),
-										entry.getAmount().toPlainString()});
+			obEntries = new ArrayList<OrderBookRow>();
+			for (int i=0; i<orderBook.getBids().size(); i++) {
+				if (obEntries.size() <= i)
+					obEntries.add(new OrderBookRow());
+				obEntries.get(i).setBidPrice(orderBook.getBids().get(i).getPrice().toPlainString());
+				obEntries.get(i).setBidAmount(orderBook.getBids().get(i).getAmount().toPlainString());
+			}
+			for (int i=0; i<orderBook.getAsks().size(); i++) {
+				if (obEntries.size() <= i)
+					obEntries.add(new OrderBookRow());
+				obEntries.get(i).setAskPrice(orderBook.getAsks().get(i).getPrice().toPlainString());
+				obEntries.get(i).setAskAmount(orderBook.getAsks().get(i).getAmount().toPlainString());
+			}
+			obEntries.forEach(row -> {
+				if (row.getBidPrice() == null) row.setBidPrice("");
+				if (row.getBidAmount() == null) row.setBidAmount("");
+				if (row.getAskPrice() == null) row.setAskPrice("");
+				if (row.getAskAmount() == null) row.setAskAmount("");
 			});
 		}
 	}
@@ -56,20 +63,18 @@ public class OrderBookMessage {
 		this.currencyPair = currencyPair;
 	}
 
-	public List<String[]> getBids() {
-		return bids;
+	public List<OrderBookRow> getObEntries() {
+		return obEntries;
 	}
 
-	public void setBids(List<String[]> bids) {
-		this.bids = bids;
+	public void setObEntries(List<OrderBookRow> obEntries) {
+		this.obEntries = obEntries;
 	}
 
-	public List<String[]> getAsks() {
-		return asks;
-	}
-
-	public void setAsks(List<String[]> asks) {
-		this.asks = asks;
+	@Override
+	public String toString() {
+		return "OrderBookMessage [market=" + market + ", currencyPair=" + currencyPair + ", obEntries="
+				+ obEntries + "]";
 	}
 	
 }

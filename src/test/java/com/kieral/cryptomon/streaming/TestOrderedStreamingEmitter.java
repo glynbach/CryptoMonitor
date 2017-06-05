@@ -38,7 +38,6 @@ public class TestOrderedStreamingEmitter {
 			public Void answer(InvocationOnMock invocation) throws Throwable {
 				testLatch.countDown();
 				emitted.add(invocation.getArgument(0));
-				System.out.println("DEBUG: added " + invocation.getArgument(0) + ": " + emitted);
 				return null;
 			}}).when(listener).onOrderedStreamingPayload(Mockito.any(StreamingPayload.class));
 		Mockito.doAnswer(new Answer<Void>() {
@@ -57,7 +56,7 @@ public class TestOrderedStreamingEmitter {
 	}
 
 	private void init(int latchEventCount, boolean requiresSnasphot) {
-		emitter = new OrderedStreamingEmitter("Test", listener, requiresSnasphot, poolSize);
+		emitter = new OrderedStreamingEmitter("Test", listener, requiresSnasphot, true, poolSize);
 		testLatch = new CountDownLatch(latchEventCount);
 	}
 	
@@ -342,7 +341,6 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 3));
 		emitter.onStreamingUpdate(pl("A", 3));
 		testLatch.await(5000, TimeUnit.MILLISECONDS);
-		System.out.println("DEBUG: emitted: " + emitted);
 		assertEquals(2, emitted.size());
 		assertEquals(1, emitted.get(0).getSequenceNumber());
 		assertTrue(errors.size() > 0);
