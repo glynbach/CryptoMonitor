@@ -8,6 +8,8 @@ import java.util.concurrent.ConcurrentMap;
 
 import javax.annotation.PostConstruct;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
@@ -22,6 +24,8 @@ import com.kieral.cryptomon.service.liquidity.AbstractLiquidityProvider;
 @EnableScheduling
 public class ClientMessagingController {
 
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+
 	@Autowired 
 	private AbstractLiquidityProvider poloniexService;
 	private ConcurrentMap<String, OrderBookMessage> orderBooks = new ConcurrentHashMap<String, OrderBookMessage>();
@@ -32,14 +36,9 @@ public class ClientMessagingController {
     
     @PostConstruct
     public void init(){
-    	try {
-    		poloniexService.registerOrderBookListener(orderBook -> {
-    			orderBooks.put(poloniexService.getName(), new OrderBookMessage(orderBook));
-    		});
-			poloniexService.connect();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+		poloniexService.registerOrderBookListener(orderBook -> {
+			orderBooks.put(poloniexService.getName(), new OrderBookMessage(orderBook));
+		});
     }
 
     @MessageMapping("/orderBook")
@@ -47,16 +46,17 @@ public class ClientMessagingController {
     public OrderBookMessage subscribeOrderBooks(SubscriptionMessage subscription) {
     	if (!subscriptions.contains(subscription.getMarket()))
     		subscriptions.add(subscription.getMarket());	
-    	if (orderBooks.containsKey(subscription.getMarket()))
+    	if (orderBooks.containsKey(subscription.getMarket())) {
 			return orderBooks.get(subscription.getMarket());
+    	}
         return new OrderBookMessage();
     }
 
-    @Scheduled(fixedRate = 500)
+    @Scheduled(fixedRate = 2000)
     public void publishUpdates(){
-       subscriptions.forEach(market -> {
-           template.convertAndSend("/topic/orderBooks", orderBooks.getOrDefault(market, new OrderBookMessage()));
-       });
+		subscriptions.forEach(market -> {
+			template.convertAndSend("/topic/orderBooks", orderBooks.getOrDefault(market, new OrderBookMessage()));
+		});
     }
 
 }

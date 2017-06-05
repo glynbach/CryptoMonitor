@@ -18,7 +18,7 @@ public class ClientMessagingConfig extends AbstractWebSocketMessageBrokerConfigu
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/marketdata-websocket").setAllowedOrigins("*"). withSockJS();
+        registry.addEndpoint("/marketdata-websocket").setAllowedOrigins("*").withSockJS();
     }	
 
 }

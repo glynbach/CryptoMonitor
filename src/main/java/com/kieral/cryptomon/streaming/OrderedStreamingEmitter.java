@@ -33,6 +33,7 @@ public class OrderedStreamingEmitter {
 	
 	private final IOrderedStreamingListener listener;
 	private final boolean snapshotRequired;
+	private final boolean useSnapshotSequence;
 	private final ConcurrentMap<String, AtomicBoolean> snapshotsReceived = new ConcurrentHashMap<String, AtomicBoolean>();
 	private final ConcurrentMap<String, Long> snapshotSequences = new ConcurrentHashMap<String, Long>();
 	
@@ -41,7 +42,7 @@ public class OrderedStreamingEmitter {
 	private ConcurrentMap<String, PayloadPark> payloads = new ConcurrentHashMap<String, PayloadPark>();
 	
 	public OrderedStreamingEmitter(String market, IOrderedStreamingListener listener, boolean snapshotRequired,
-			int processorPoolSize) {
+			boolean useSnapshotSequence, int processorPoolSize) {
 		this.stickyThreadPool = new StickyThreadPool(market, processorPoolSize);
 		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new ThreadFactory() {
 			@Override
@@ -53,6 +54,7 @@ public class OrderedStreamingEmitter {
 		scheduler.scheduleAtFixedRate(new WardenTask(), 100, 100, TimeUnit.MILLISECONDS);
 		this.listener = listener;
 		this.snapshotRequired = snapshotRequired;
+		this.useSnapshotSequence = useSnapshotSequence;
 	}
 	
 	public void onStreamingUpdate(final StreamingPayload streamingPayload) {
@@ -166,7 +168,7 @@ public class OrderedStreamingEmitter {
 				}
 				return;
 			}
-			if (snapshotRequired && streamingPayload.getSequenceNumber() <= snapshotSequences.get(streamingPayload.getCurrencyPair())) {
+			if (snapshotRequired && useSnapshotSequence && streamingPayload.getSequenceNumber() <= snapshotSequences.get(streamingPayload.getCurrencyPair())) {
 				// discard
 				if (LoggingUtils.isDataBufferingLoggingEnabled())
 					logger.info("Discarding payload with sequence number {} - order snapshot sequence is {}",
@@ -208,7 +210,8 @@ public class OrderedStreamingEmitter {
 				if (snapshotsReceived.putIfAbsent(currencyPair, new AtomicBoolean(true)) != null)
 					snapshotsReceived.get(currencyPair).set(true);
 				snapshotSequences.put(currencyPair, orderBook.getSnapshotSequence());
-				lastSequence.set(orderBook.getSnapshotSequence());
+				if (useSnapshotSequence)
+					lastSequence.set(orderBook.getSnapshotSequence());
 			}
 			review();
 		}
@@ -235,10 +238,11 @@ public class OrderedStreamingEmitter {
 						if (LoggingUtils.isDataBufferingLoggingEnabled())
 							logger.info("Review comparing sequence number {} with last sent {}",
 									streamingPayload.getSequenceNumber(), lastSequence.get());
-						if (snapshotRequired)
+						boolean checkSnapshotSequence = snapshotRequired && useSnapshotSequence;  
+						if (checkSnapshotSequence)
 							logger.info("Review comparing sequence number {} snapshotSequence {}",
 									streamingPayload.getSequenceNumber(), snapshotSequences.get(currencyPair));
-						if (!snapshotRequired || streamingPayload.getSequenceNumber() > snapshotSequences.get(currencyPair)) {
+						if (!checkSnapshotSequence || streamingPayload.getSequenceNumber() > snapshotSequences.get(currencyPair)) {
 							if (lastSequence.compareAndSet(streamingPayload.getSequenceNumber() - 1, streamingPayload.getSequenceNumber())) {
 								if (LoggingUtils.isDataBufferingLoggingEnabled())
 									logger.info("Review found payload with sequence number {} ready for sending", streamingPayload.getSequenceNumber());

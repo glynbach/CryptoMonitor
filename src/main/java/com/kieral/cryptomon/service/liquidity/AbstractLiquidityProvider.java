@@ -53,7 +53,8 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 		this.orderBookManager = orderBookManager;
 		this.skipEmptyUpdates = serviceProperties != null && serviceProperties.isSipValidationOnEmptyPayloads();
 		this.requiresSnapshot = serviceProperties != null && serviceProperties.isRequiresSnapshot();
-		this.streamingEmitter = new OrderedStreamingEmitter(getName(), this, requiresSnapshot, 4);
+		this.streamingEmitter = new OrderedStreamingEmitter(getName(), this, 
+				requiresSnapshot, serviceProperties.isUseSnapshotSequence(), 4);
 	}
 	
 	@Override
