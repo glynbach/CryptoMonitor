@@ -115,7 +115,7 @@ public abstract class AbstractLiquidityProvider implements ILiquidityProvider, I
 			statusListeners.add(statusListener);
 	}
 
-	abstract protected String getName();
+	abstract public String getName();
 	
 	/*
 	 * Blocks until it can return result of connection

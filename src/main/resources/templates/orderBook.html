@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+<title>CryptoMonitor</title>
+<!--/*/ <th:block th:include="fragments/headerinc :: head"></th:block> /*/-->
+</head>
+<script type="text/javascript">
+  var app = angular.module('cryptoMonitorOrderBooks', ['ngStomp']); 
+  app.controller('OBController', function ($stomp, $scope) {
+       $scope.myres = [];
+       $stomp.connect('http://localhost:8080/marketdata-websocket', {})
+            .then(function (frame) {
+                var subscription = $stomp.subscribe('/topic/orderBooks', 
+                    function (payload, headers, res) {
+                        $scope.myres = payload;
+                        $scope.$apply($scope.myres);
+                });
+                $stomp.send('/app/orderBook', {}, JSON.stringify({'market': 'Poloniex'}));
+         });
+  });
+  
+ </script>
+<body>
+	<div class="container">
+		<!--/*/ <th:block th:include="fragments/header :: header"></th:block> /*/-->
+		<div class="orderBook" ng-app="cryptoMonitorOrderBooks" ng-controller="OBController">
+		   <p>OrderBook</p>
+		   <!--
+		    <ul>
+		        <li ng-repeat="x in myres">{{$index+1}} - {{x.name}} - <b>{{x.runs}}</b> runs (<b>{{x.balls}}</b>balls)</li>
+		    </ul>
+		    -->
+		</div>  	
+	</div>
+</body>
+</html>

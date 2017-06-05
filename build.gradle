@@ -27,6 +27,7 @@ targetCompatibility = 1.8
 dependencies {
     compile("org.springframework.boot:spring-boot-starter-thymeleaf:1.5.3.RELEASE")
     compile("org.springframework.boot:spring-boot-devtools:1.5.3.RELEASE")
+    compile("org.springframework.boot:spring-boot-starter-websocket:1.5.3.RELEASE")
     compile("org.springframework.security:spring-security-web:4.2.2.RELEASE")
     compile("org.springframework.security:spring-security-config:4.2.2.RELEASE")
     compile("org.springframework:spring-tx:4.3.8.RELEASE")

@@ -3,7 +3,10 @@ package com.kieral.cryptomon.streaming;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -19,6 +22,7 @@ import com.kieral.cryptomon.service.util.LoggingUtils;
 
 public class TestOrderedStreamingEmitter {
 
+	CountDownLatch testLatch;
 	OrderedStreamingEmitter emitter;
 	IOrderedStreamingListener listener;
 	List<StreamingPayload> emitted;
@@ -32,36 +36,40 @@ public class TestOrderedStreamingEmitter {
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
+				testLatch.countDown();
 				emitted.add(invocation.getArgument(0));
+				System.out.println("DEBUG: added " + invocation.getArgument(0) + ": " + emitted);
 				return null;
 			}}).when(listener).onOrderedStreamingPayload(Mockito.any(StreamingPayload.class));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
+				testLatch.countDown();
 				errors.add(invocation.getArgument(1));
 				return null;
 			}}).when(listener).onOrderedStreamingError(Mockito.anyString(), Mockito.anyString());
-		emitted = new ArrayList<StreamingPayload>();
-		errors = new ArrayList<String>();
+		emitted = Collections.synchronizedList(new ArrayList<StreamingPayload>());
+		errors = Collections.synchronizedList(new ArrayList<String>());
 	}
 
-	private void init() {
-		init(false);
+	private void init(int latchEventCount) {
+		init(latchEventCount, false);
 	}
 
-	private void init(boolean requiresSnasphot) {
+	private void init(int latchEventCount, boolean requiresSnasphot) {
 		emitter = new OrderedStreamingEmitter("Test", listener, requiresSnasphot, poolSize);
+		testLatch = new CountDownLatch(latchEventCount);
 	}
 	
 	@Test
 	public void testInOrderMessages() throws InterruptedException {
-		init();
+		init(5);
 		emitter.onStreamingUpdate(pl(1));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -72,13 +80,13 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testOutOfOrderMessages() throws InterruptedException {
-		init();
+		init(5);
 		emitter.onStreamingUpdate(pl(1));
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -89,7 +97,7 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testDrippingOutOfOrderMessages() throws InterruptedException {
-		init();
+		init(5);
 		emitter.onStreamingUpdate(pl(1));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl(3));
@@ -99,7 +107,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(4));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -110,7 +118,7 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testManyDrippingOutOfOrderMessages() throws InterruptedException {
-		init();
+		init(15);
 		emitter.onStreamingUpdate(pl(1));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl(3));
@@ -140,7 +148,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl(15));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl(14));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(15, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -151,12 +159,12 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testMissedMessages() throws InterruptedException {
-		init();
+		init(5);
 		emitter.onStreamingUpdate(pl(1));
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(4));
 		emitter.onStreamingUpdate(pl(5));
-		Thread.sleep(2500);
+		testLatch.await(5000, TimeUnit.MILLISECONDS);
 		assertEquals(1, emitted.size());
 		assertEquals(1, emitted.get(0).getSequenceNumber());
 		assertTrue(errors.size() > 0);
@@ -165,38 +173,38 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testMessagesOfEqualSequence() throws InterruptedException {
-		init();
+		init(4);
 		emitter.onStreamingUpdate(pl(1));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(3));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertTrue(errors.size() > 0);
 		assertTrue(errors.get(0).contains("Expecting"));
 	}
 
 	@Test
 	public void testMessagesOfLowerSequence() throws InterruptedException {
-		init();
+		init(4);
 		emitter.onStreamingUpdate(pl(1));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(3));
 		emitter.onStreamingUpdate(pl(2));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertTrue(errors.size() > 0);
 		assertTrue(errors.get(0).contains("Expecting"));
 	}
 
 	@Test
 	public void testInOrderMultiCcyMessages() throws InterruptedException {
-		init();
+		init(6);
 		emitter.onStreamingUpdate(pl("A", 1));
 		emitter.onStreamingUpdate(pl("A", 2));
 		emitter.onStreamingUpdate(pl("B", 1));
 		emitter.onStreamingUpdate(pl("A", 3));
 		emitter.onStreamingUpdate(pl("B", 2));
 		emitter.onStreamingUpdate(pl("B", 3));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(6, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
 		emitted.stream()
@@ -214,7 +222,7 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testOutOfOrderMultipleCcyMessages() throws InterruptedException {
-		init();
+		init(8);
 		emitter.onStreamingUpdate(pl("A", 1));
 		emitter.onStreamingUpdate(pl("A", 3));
 		emitter.onStreamingUpdate(pl("B", 1));
@@ -223,7 +231,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("A", 2));
 		emitter.onStreamingUpdate(pl("B", 4));
 		emitter.onStreamingUpdate(pl("A", 4));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(8, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -242,7 +250,7 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testDrippingOutOfOrderMultipleCcyMessages() throws InterruptedException {
-		init();
+		init(8);
 		emitter.onStreamingUpdate(pl("A", 1));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl("A", 3));
@@ -258,7 +266,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 4));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl("A", 4));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(8, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -277,7 +285,7 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testManyDrippingOutOfOrderMultipleCcyMessages() throws InterruptedException {
-		init();
+		init(16);
 		emitter.onStreamingUpdate(pl("A", 1));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl("A", 3));
@@ -309,7 +317,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 8));
 		Thread.sleep(1);
 		emitter.onStreamingUpdate(pl("A", 5));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(16, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
@@ -328,12 +336,13 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testMissedMessagesMultipleCcy() throws InterruptedException {
-		init();
+		init(4);
 		emitter.onStreamingUpdate(pl("A", 1));
 		emitter.onStreamingUpdate(pl("B", 1));
 		emitter.onStreamingUpdate(pl("B", 3));
 		emitter.onStreamingUpdate(pl("A", 3));
-		Thread.sleep(2500);
+		testLatch.await(5000, TimeUnit.MILLISECONDS);
+		System.out.println("DEBUG: emitted: " + emitted);
 		assertEquals(2, emitted.size());
 		assertEquals(1, emitted.get(0).getSequenceNumber());
 		assertTrue(errors.size() > 0);
@@ -342,7 +351,7 @@ public class TestOrderedStreamingEmitter {
 	
 	@Test
 	public void testMessagesOfLowerSequenceMultipleCcy() throws InterruptedException {
-		init();
+		init(8);
 		emitter.onStreamingUpdate(pl("A", 1));
 		emitter.onStreamingUpdate(pl("B", 1));
 		emitter.onStreamingUpdate(pl("A", 2));
@@ -351,7 +360,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("B", 3));
 		emitter.onStreamingUpdate(pl("B", 1));
 		emitter.onStreamingUpdate(pl("A", 2));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertTrue(errors.size() > 0);
 		assertTrue(errors.get(0).contains("Expecting"));
 	}
@@ -381,6 +390,17 @@ public class TestOrderedStreamingEmitter {
 			public String getRaw() {
 				return "CP:CP SEQ:" + seq;
 			}
+			@Override
+			public boolean equals(Object obj) {
+				if (obj instanceof StreamingPayload) {
+					return getRaw().equals(((StreamingPayload)obj).getRaw());
+				}
+				return super.equals(obj);
+			}
+			@Override
+			public int hashCode() {
+				return getRaw().hashCode();
+			}
 		};
 	}
 
@@ -409,12 +429,23 @@ public class TestOrderedStreamingEmitter {
 			public String getRaw() {
 				return "CP:" + cp + " SEQ:" + seq;
 			}
+			@Override
+			public boolean equals(Object obj) {
+				if (obj instanceof StreamingPayload) {
+					return getRaw().equals(((StreamingPayload)obj).getRaw());
+				}
+				return super.equals(obj);
+			}
+			@Override
+			public int hashCode() {
+				return getRaw().hashCode();
+			}
 		};
 	}
 
 	@Test
 	public void testRequiresSnapshot() throws InterruptedException {
-		init(true);
+		init(3, true);
 		emitter.onStreamingUpdate(pl(1));
 		emitter.onStreamingUpdate(pl(2));
 		emitter.onStreamingUpdate(pl(3));
@@ -426,7 +457,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onSnashotUpdate(ob(4));
 		emitter.onStreamingUpdate(pl(6));
 		emitter.onStreamingUpdate(pl(7));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(3, emitted.size());
 		AtomicInteger seq = new AtomicInteger(4);
@@ -437,7 +468,7 @@ public class TestOrderedStreamingEmitter {
 
 	@Test
 	public void testRequiresSnapshotMultipleCcy() throws InterruptedException {
-		init(true);
+		init(5, true);
 		emitter.onStreamingUpdate(pl("A", 1));
 		emitter.onStreamingUpdate(pl("A", 2));
 		emitter.onStreamingUpdate(pl("B", 2));
@@ -450,7 +481,7 @@ public class TestOrderedStreamingEmitter {
 		emitter.onStreamingUpdate(pl("A", 4));
 		emitter.onSnashotUpdate(ob("B", 2));
 		emitter.onStreamingUpdate(pl("A", 3));
-		Thread.sleep(500);
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
 		assertEquals(0, errors.size());
 		assertEquals(5, emitted.size());
 		AtomicInteger aSeq = new AtomicInteger(0);
