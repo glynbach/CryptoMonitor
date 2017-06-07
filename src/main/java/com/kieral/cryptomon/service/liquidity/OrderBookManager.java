@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.kieral.cryptomon.model.OrderBook;
+import com.kieral.cryptomon.model.CurrencyPair;
 import com.kieral.cryptomon.model.IOrderBookEntry;
 import com.kieral.cryptomon.model.OrderBookAction;
 import com.kieral.cryptomon.model.OrderBookUpdate;
@@ -23,20 +24,20 @@ public class OrderBookManager {
 	private final ConcurrentMap<OrderBookKey, OrderBook> orderBooks = new ConcurrentHashMap<OrderBookKey, OrderBook>(); 
 	private final ConcurrentMap<OrderBookKey, Object> orderBookLocks = new ConcurrentHashMap<OrderBookKey, Object>(); 
 
-	public OrderBook clearOrderBook(String market, String currencyPair) {
+	public OrderBook clearOrderBook(String market, CurrencyPair currencyPair) {
 		return updateOrderBook(market, currencyPair, null, true);
 	}
 
-	public OrderBook updateOrderBook(String market, String currencyPair, List<OrderBookUpdate> updates) {
+	public OrderBook updateOrderBook(String market, CurrencyPair currencyPair, List<OrderBookUpdate> updates) {
 		return updateOrderBook(market, currencyPair, updates, false);
 	}
 	
-	public OrderBook updateOrderBook(String market, String currencyPair, List<OrderBookUpdate> updates, boolean clear) {
+	public OrderBook updateOrderBook(String market, CurrencyPair currencyPair, List<OrderBookUpdate> updates, boolean clear) {
 		if (market == null)
 			throw new IllegalArgumentException("market can not be null");
 		if (currencyPair == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		OrderBookKey key = new OrderBookKey(market, currencyPair);
+		OrderBookKey key = new OrderBookKey(market, currencyPair.getName());
 		orderBooks.putIfAbsent(key, new OrderBook(market, currencyPair));
 		OrderBook orderBook = orderBooks.get(key);
 		orderBookLocks.putIfAbsent(key, new Object());

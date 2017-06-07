@@ -2,14 +2,13 @@ package com.kieral.cryptomon.messaging;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import javax.annotation.PostConstruct;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
@@ -18,17 +17,27 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
-import com.kieral.cryptomon.service.liquidity.AbstractLiquidityProvider;
+import com.kieral.cryptomon.service.liquidity.BaseService;
 
 @Controller
 @EnableScheduling
 public class ClientMessagingController {
 
-	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+	private static final Comparator<OrderBookMessage> obComparator = new Comparator<OrderBookMessage>(){
+		@Override
+		public int compare(OrderBookMessage o1, OrderBookMessage o2) {
+			int marketCompare = o1.getMarket().compareTo(o2.getCurrencyPair()); 
+			if (marketCompare == 0)
+				return o1.getCurrencyPair().compareTo(o2.getCurrencyPair());
+			return marketCompare;
+		}
+	}; 
 
 	@Autowired 
-	private AbstractLiquidityProvider poloniexService;
-	private ConcurrentMap<String, OrderBookMessage> orderBooks = new ConcurrentHashMap<String, OrderBookMessage>();
+	private BaseService poloniexService;
+	@Autowired 
+	private BaseService bittrexService;
+	private ConcurrentMap<String, ConcurrentMap<String, OrderBookMessage>> orderBooks = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBookMessage>>();
 	private List<String> subscriptions = Collections.synchronizedList(new ArrayList<String>());
 
     @Autowired
@@ -37,26 +46,42 @@ public class ClientMessagingController {
     @PostConstruct
     public void init(){
 		poloniexService.registerOrderBookListener(orderBook -> {
-			orderBooks.put(poloniexService.getName(), new OrderBookMessage(orderBook));
+			orderBooks.putIfAbsent(poloniexService.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
+			orderBooks.get(poloniexService.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
+		});
+		bittrexService.registerOrderBookListener(orderBook -> {
+			orderBooks.putIfAbsent(bittrexService.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
+			orderBooks.get(bittrexService.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
 		});
     }
 
     @MessageMapping("/orderBook")
     @SendTo("/topic/orderBooks")
-    public OrderBookMessage subscribeOrderBooks(SubscriptionMessage subscription) {
+    public List<OrderBookMessage> subscribeOrderBooks(SubscriptionMessage subscription) {
     	if (!subscriptions.contains(subscription.getMarket()))
-    		subscriptions.add(subscription.getMarket());	
-    	if (orderBooks.containsKey(subscription.getMarket())) {
-			return orderBooks.get(subscription.getMarket());
-    	}
-        return new OrderBookMessage();
+    		subscriptions.add(subscription.getMarket());
+        return getOrderBooksForMarket(subscription.getMarket());
     }
 
     @Scheduled(fixedRate = 2000)
     public void publishUpdates(){
 		subscriptions.forEach(market -> {
-			template.convertAndSend("/topic/orderBooks", orderBooks.getOrDefault(market, new OrderBookMessage()));
+			template.convertAndSend("/topic/orderBooks", getOrderBooksForMarket(market));
 		});
     }
 
+    private List<OrderBookMessage> getOrderBooksForMarket(String market) {
+    	List<OrderBookMessage> rtn = new ArrayList<OrderBookMessage>(); 
+    	if ("ALL".equalsIgnoreCase(market)) {
+    		orderBooks.values().forEach(bookMap -> {
+    			rtn.addAll(bookMap.values());
+    		});
+    	} else if (orderBooks.containsKey(market)) {
+			rtn.addAll(orderBooks.get(market).values());
+    	}
+    	if (rtn.size() > 0) {
+    		rtn.sort(obComparator);
+    	}
+    	return rtn;
+    }
 }

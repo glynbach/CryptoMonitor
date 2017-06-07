@@ -6,12 +6,12 @@ import java.util.List;
 public class OrderBook {
 
 	private final String market;
-	private final String currencyPair;
+	private final CurrencyPair currencyPair;
 	private long snapshotSequence;
 	private List<IOrderBookEntry> bids = Collections.emptyList();
 	private List<IOrderBookEntry> asks = Collections.emptyList();
 	
-	public OrderBook(String market, String currencyPair) {
+	public OrderBook(String market, CurrencyPair currencyPair) {
 		super();
 		this.market = market;
 		this.currencyPair = currencyPair;
@@ -45,7 +45,7 @@ public class OrderBook {
 		return market;
 	}
 	
-	public String getCurrencyPair() {
+	public CurrencyPair getCurrencyPair() {
 		return currencyPair;
 	}
 

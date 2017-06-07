@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kieral.cryptomon.model.CurrencyPair;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.IStatusListener;
 import com.kieral.cryptomon.streaming.StreamingPayload;
@@ -62,12 +63,12 @@ public class WampStreamingProvider implements StreamingProvider {
 	}
 
 	@Override
-	public Observable<StreamingPayload> subscribe(final String topic, final String currencyPair) {
+	public Observable<StreamingPayload> subscribe(final CurrencyPair currencyPair) {
 		if (connectedState != null && connectedState instanceof WampClient.ConnectedState) {
-			logger.info("Subscribing to topic {}", topic);
-			return RxJavaInterop.toV2Observable(client.makeSubscription(topic))
+			logger.info("Subscribing to topic {}", currencyPair.getTopic());
+			return RxJavaInterop.toV2Observable(client.makeSubscription(currencyPair.getTopic()))
 					.map(pubSubData -> {
-						return new WampStreamingPayload(pubSubData, topic, currencyPair);
+						return new WampStreamingPayload(pubSubData, currencyPair);
 					});
 		} else {
 			throw new IllegalStateException(String.format("Cannot subscribe in state %s", connectedState));
