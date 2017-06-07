@@ -17,6 +17,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.kieral.cryptomon.model.CurrencyPair;
 import com.kieral.cryptomon.model.OrderBook;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 
@@ -207,13 +208,13 @@ public class TestOrderedStreamingEmitter {
 		assertEquals(6, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
 		emitted.stream()
-			.filter(payload -> payload.getCurrencyPair().equals("A"))
+			.filter(payload -> payload.getCurrencyPair().getName().equals("A"))
 			.collect(Collectors.toList()).forEach(payload -> {
 				assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 			});
 		seq.set(0);
 		emitted.stream()
-		.filter(payload -> payload.getCurrencyPair().equals("B"))
+		.filter(payload -> payload.getCurrencyPair().getName().equals("B"))
 		.collect(Collectors.toList()).forEach(payload -> {
 			assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 		});
@@ -235,13 +236,13 @@ public class TestOrderedStreamingEmitter {
 		assertEquals(8, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
 		emitted.stream()
-			.filter(payload -> payload.getCurrencyPair().equals("A"))
+			.filter(payload -> payload.getCurrencyPair().getName().equals("A"))
 			.collect(Collectors.toList()).forEach(payload -> {
 				assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 			});
 		seq.set(0);
 		emitted.stream()
-		.filter(payload -> payload.getCurrencyPair().equals("B"))
+		.filter(payload -> payload.getCurrencyPair().getName().equals("B"))
 		.collect(Collectors.toList()).forEach(payload -> {
 			assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 		});
@@ -270,13 +271,13 @@ public class TestOrderedStreamingEmitter {
 		assertEquals(8, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
 		emitted.stream()
-			.filter(payload -> payload.getCurrencyPair().equals("A"))
+			.filter(payload -> payload.getCurrencyPair().getName().equals("A"))
 			.collect(Collectors.toList()).forEach(payload -> {
 				assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 			});
 		seq.set(0);
 		emitted.stream()
-		.filter(payload -> payload.getCurrencyPair().equals("B"))
+		.filter(payload -> payload.getCurrencyPair().getName().equals("B"))
 		.collect(Collectors.toList()).forEach(payload -> {
 			assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 		});
@@ -321,13 +322,13 @@ public class TestOrderedStreamingEmitter {
 		assertEquals(16, emitted.size());
 		AtomicInteger seq = new AtomicInteger(0);
 		emitted.stream()
-			.filter(payload -> payload.getCurrencyPair().equals("A"))
+			.filter(payload -> payload.getCurrencyPair().getName().equals("A"))
 			.collect(Collectors.toList()).forEach(payload -> {
 				assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 			});
 		seq.set(0);
 		emitted.stream()
-		.filter(payload -> payload.getCurrencyPair().equals("B"))
+		.filter(payload -> payload.getCurrencyPair().getName().equals("B"))
 		.collect(Collectors.toList()).forEach(payload -> {
 			assertEquals(seq.incrementAndGet(), payload.getSequenceNumber());
 		});
@@ -365,16 +366,13 @@ public class TestOrderedStreamingEmitter {
 
 	private StreamingPayload pl(final long seq) {
 		return new StreamingPayload() {
-			public String getTopic() {
-				return "TOPIC";
-			}
 			@Override
 			public long getSequenceNumber() {
 				return seq;
 			}
 			@Override
-			public String getCurrencyPair() {
-				return "CP";
+			public CurrencyPair getCurrencyPair() {
+				return new CurrencyPair("CP","CP");
 			}
 			@Override
 			public JsonNode getJson() {
@@ -398,22 +396,23 @@ public class TestOrderedStreamingEmitter {
 			@Override
 			public int hashCode() {
 				return getRaw().hashCode();
+			}
+			@Override
+			public boolean isHeartbeat() {
+				return false;
 			}
 		};
 	}
 
 	private StreamingPayload pl(final String cp, final long seq) {
 		return new StreamingPayload() {
-			public String getTopic() {
-				return "TOPIC-" + cp;
-			}
 			@Override
 			public long getSequenceNumber() {
 				return seq;
 			}
 			@Override
-			public String getCurrencyPair() {
-				return cp;
+			public CurrencyPair getCurrencyPair() {
+				return new CurrencyPair(cp, cp);
 			}
 			@Override
 			public JsonNode getJson() {
@@ -437,6 +436,10 @@ public class TestOrderedStreamingEmitter {
 			@Override
 			public int hashCode() {
 				return getRaw().hashCode();
+			}
+			@Override
+			public boolean isHeartbeat() {
+				return false;
 			}
 		};
 	}
@@ -485,7 +488,7 @@ public class TestOrderedStreamingEmitter {
 		AtomicInteger aSeq = new AtomicInteger(0);
 		AtomicInteger BSeq = new AtomicInteger(2);
 		emitted.forEach(payload -> {
-			if (payload.getCurrencyPair().equals("A"))
+			if (payload.getCurrencyPair().getName().equals("A"))
 				assertEquals(aSeq.incrementAndGet(), payload.getSequenceNumber());
 			else
 				assertEquals(BSeq.incrementAndGet(), payload.getSequenceNumber());
@@ -497,7 +500,7 @@ public class TestOrderedStreamingEmitter {
 	}
 
 	private OrderBook ob(String cp, long seq) {
-		OrderBook ob = new OrderBook("TEST", cp);
+		OrderBook ob = new OrderBook("TEST", new CurrencyPair(cp, cp));
 		ob.setSnapshotSequence(seq);
 		return ob;
 	}

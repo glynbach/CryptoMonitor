@@ -1,0 +1,74 @@
+server:
+  port: 443
+  ssl:
+    key-store: "${user.home}/.keystore"
+    key-store-password: changeit
+    key-password: changeit
+tomcat: 
+  ajp: 
+    port: 8444
+    remoteauthentication: false
+    enabled: true 
+logging:
+  data-buffering-logging: true
+  raw-data-logging: true
+POLONIEX: 
+  exchange: poloniex
+  push-api: "wss://api.poloniex.com"
+  snapshot-api: "https://poloniex.com/public"
+  trading-api: "https://poloniex.com/tradingApi"
+  subscription-mode: POLLING
+  polling-interval: 2000
+  max-trans-per-second: 6
+  skip-hearbeats: true
+  snapshot-baseline: true
+  snapshot-baseline-Sequence: true
+  api-key-loc: "${user.home}/.poloniexApiKey"
+  api-secret-loc: "${user.home}/.poloniexApiSecret"
+  currency-pairs: 
+    - pair: "BTC_LTC"
+      price-scale: 8
+      trading-fee: "0"
+    - pair: "BTC_ETH"
+      price-scale: 8
+      trading-fee: "0"
+BITTREX: 
+  exchange: bittrex
+  push-api: ""
+  snapshot-api: "https://bittrex.com/api/v1.1/public"
+  trading-api: "https://bittrex.com/api/v1.1/market"
+  subscription-mode: POLLING
+  polling-interval: 2000
+  max-trans-per-second: 6
+  skip-hearbeats: false
+  snapshot-baseline: false
+  snapshot-baseline-Sequence: false
+  api-key-loc: "${user.home}/.bittrexApiKey"
+  api-secret-loc: "${user.home}/.bittrexApiSecret"
+  currency-pairs: 
+    - pair: "BTC-LTC"
+      price-scale: 8
+      trading-fee: "0"
+    - pair: "BTC-ETH"
+      price-scale: 8
+      trading-fee: "0"
+GDAX: 
+  exchange: gdax
+  push-api: ""
+  snapshot-api: "https://api.gdax.com"
+  trading-api: "https://api.gdax.com"
+  subscription-mode: POLLING
+  polling-interval: 2000
+  max-trans-per-second: 6
+  skip-hearbeats: false
+  snapshot-baseline: false
+  snapshot-baseline-Sequence: false
+  api-key-loc: "${user.home}/.gdaxApiKey"
+  api-secret-loc: "${user.home}/.gdaxApiSecret"
+  currency-pairs: 
+    - pair: "BTC-LTC"
+      price-scale: 8
+      trading-fee: "0"
+    - pair: "BTC-ETH"
+      price-scale: 8
+      trading-fee: "0"

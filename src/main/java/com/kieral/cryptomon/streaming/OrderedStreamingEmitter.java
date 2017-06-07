@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kieral.cryptomon.model.CurrencyPair;
 import com.kieral.cryptomon.model.OrderBook;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.service.util.threading.StickyThreadPool;
@@ -65,15 +66,15 @@ public class OrderedStreamingEmitter {
 				logger.info("Emitting payload without currency pair synchonously");
 			emit(streamingPayload);
 		}
-		payloads.putIfAbsent(streamingPayload.getCurrencyPair(), new PayloadPark(streamingPayload.getCurrencyPair()));
-		stickyThreadPool.getSingleThreadExecutor(streamingPayload.getCurrencyPair())
+		payloads.putIfAbsent(streamingPayload.getCurrencyPair().getName(), new PayloadPark(streamingPayload.getCurrencyPair()));
+		stickyThreadPool.getSingleThreadExecutor(streamingPayload.getCurrencyPair().getName())
 			.submit(() -> {
 				try {
-					PayloadPark park = payloads.get(streamingPayload.getCurrencyPair());
+					PayloadPark park = payloads.get(streamingPayload.getCurrencyPair().getName());
 					park.onStreamingPayload(streamingPayload);
 				} catch (Exception e) {
 					logger.error("Exception on StreamingUpdate for {}", streamingPayload, e);
-					error(streamingPayload.getTopic(), e.getMessage());
+					error(streamingPayload.getCurrencyPair().getTopic(), e.getMessage());
 				}
 			});
 	}
@@ -83,15 +84,15 @@ public class OrderedStreamingEmitter {
 			return;
 		if (orderBook.getCurrencyPair() == null)
 			throw new IllegalStateException("currencyPair in orderBook can not be null");
-		payloads.putIfAbsent(orderBook.getCurrencyPair(), new PayloadPark(orderBook.getCurrencyPair()));
-		stickyThreadPool.getSingleThreadExecutor(orderBook.getCurrencyPair())
+		payloads.putIfAbsent(orderBook.getCurrencyPair().getName(), new PayloadPark(orderBook.getCurrencyPair()));
+		stickyThreadPool.getSingleThreadExecutor(orderBook.getCurrencyPair().getName())
 		.submit(() -> {
 			try {
-				PayloadPark park = payloads.get(orderBook.getCurrencyPair());
+				PayloadPark park = payloads.get(orderBook.getCurrencyPair().getName());
 				park.onSnapshot(orderBook);
 			} catch (Exception e) {
 				logger.error("Exception on SnapshotUpdate for {}", orderBook, e);
-				error(orderBook.getCurrencyPair(), e.getMessage());
+				error(orderBook.getCurrencyPair().getTopic(), e.getMessage());
 			}
 		});
 	}
@@ -99,17 +100,18 @@ public class OrderedStreamingEmitter {
 	public void suspend(final String currencyPair) {
 		if (currencyPair == null)
 			return;
-		payloads.putIfAbsent(currencyPair, new PayloadPark(currencyPair));
-		stickyThreadPool.getSingleThreadExecutor(currencyPair)
-		.submit(() -> {
-			try {
-				PayloadPark park = payloads.get(currencyPair);
-				park.suspend();
-			} catch (Exception e) {
-				logger.error("Exception on suspend for {}", currencyPair, e);
-				error(currencyPair, e.getMessage());
-			}
-		});
+		if (payloads.containsKey(currencyPair)) {
+			stickyThreadPool.getSingleThreadExecutor(currencyPair)
+			.submit(() -> {
+				try {
+					PayloadPark park = payloads.get(currencyPair);
+					park.suspend();
+				} catch (Exception e) {
+					logger.error("Exception on suspend for {}", currencyPair, e);
+					error(currencyPair, e.getMessage());
+				}
+			});
+		}
 	}
 	
 	private void emit(StreamingPayload streamingPayload) {
@@ -128,7 +130,7 @@ public class OrderedStreamingEmitter {
 		@Override
 		public void run() {
 			payloads.values().forEach(park -> {
-				stickyThreadPool.getSingleThreadExecutor(park.currencyPair)
+				stickyThreadPool.getSingleThreadExecutor(park.currencyPair.getName())
 					.submit(() -> {
 						park.review();
 				});
@@ -142,11 +144,11 @@ public class OrderedStreamingEmitter {
 		private final AtomicLong lastSequence = new AtomicLong(-100);
 		private final Object parkLock = new Object();
 		private final List<StreamingPayload> parkedPayloads = new ArrayList<StreamingPayload>();
-		private final String currencyPair;
+		private final CurrencyPair currencyPair;
 
 		private long lastReviewSuccess = System.currentTimeMillis(); 
 
-		private PayloadPark(String currencyPair) {
+		private PayloadPark(CurrencyPair currencyPair) {
 			this.currencyPair = currencyPair;
 		}
 		
@@ -161,19 +163,19 @@ public class OrderedStreamingEmitter {
 		private void onStreamingPayload(StreamingPayload streamingPayload) {
 			if (snapshotRequired && !isSnapshotReceived()) {
 				if (LoggingUtils.isDataBufferingLoggingEnabled())
-					logger.info("Stashng payload {} as awaiting ssnapshot", streamingPayload);
+					logger.info("Stashing payload {} as awaiting snapshot", streamingPayload);
 				synchronized(parkLock) {
 					parkedPayloads.add(streamingPayload);
 					review();
 				}
 				return;
 			}
-			if (snapshotRequired && useSnapshotSequence && streamingPayload.getSequenceNumber() <= snapshotSequences.get(streamingPayload.getCurrencyPair())) {
+			if (snapshotRequired && useSnapshotSequence && streamingPayload.getSequenceNumber() <= snapshotSequences.get(streamingPayload.getCurrencyPair().getName())) {
 				// discard
 				if (LoggingUtils.isDataBufferingLoggingEnabled())
 					logger.info("Discarding payload with sequence number {} - order snapshot sequence is {}",
 							streamingPayload.getSequenceNumber(), 
-							snapshotSequences.get(streamingPayload.getCurrencyPair()));
+							snapshotSequences.get(streamingPayload.getCurrencyPair().getName()));
 				return;
 			}
 			// case for first in on just initialised and no snapshot
@@ -207,9 +209,9 @@ public class OrderedStreamingEmitter {
 					logger.info("Received orderBook snapshot {}", orderBook);
 				if (orderBook == null)
 					throw new IllegalStateException("orderBook can not be null");
-				if (snapshotsReceived.putIfAbsent(currencyPair, new AtomicBoolean(true)) != null)
-					snapshotsReceived.get(currencyPair).set(true);
-				snapshotSequences.put(currencyPair, orderBook.getSnapshotSequence());
+				if (snapshotsReceived.putIfAbsent(currencyPair.getName(), new AtomicBoolean(true)) != null)
+					snapshotsReceived.get(currencyPair.getName()).set(true);
+				snapshotSequences.put(currencyPair.getName(), orderBook.getSnapshotSequence());
 				if (useSnapshotSequence)
 					lastSequence.set(orderBook.getSnapshotSequence());
 			}
@@ -218,8 +220,8 @@ public class OrderedStreamingEmitter {
 		
 		private void suspend() {
 			if (snapshotRequired) {
-				if (snapshotsReceived.putIfAbsent(currencyPair, new AtomicBoolean(false)) != null)
-					snapshotsReceived.get(currencyPair).set(false);
+				if (snapshotsReceived.putIfAbsent(currencyPair.getName(), new AtomicBoolean(false)) != null)
+					snapshotsReceived.get(currencyPair.getName()).set(false);
 			}
 		}
 		
@@ -231,7 +233,7 @@ public class OrderedStreamingEmitter {
 				synchronized(parkLock) {
 					Collections.sort(parkedPayloads, SEQ_COMPARATOR);
 					if (LoggingUtils.isDataBufferingLoggingEnabled())
-						logger.info("Reviewing {} payloads {}", currencyPair, parkedPayloads);
+						logger.info("Reviewing {} payloads {}", currencyPair.getName(), parkedPayloads);
 					Iterator<StreamingPayload> i = parkedPayloads.iterator();
 					while (i.hasNext()) {
 						StreamingPayload streamingPayload = i.next();
@@ -241,8 +243,8 @@ public class OrderedStreamingEmitter {
 						boolean checkSnapshotSequence = snapshotRequired && useSnapshotSequence;  
 						if (checkSnapshotSequence)
 							logger.info("Review comparing sequence number {} snapshotSequence {}",
-									streamingPayload.getSequenceNumber(), snapshotSequences.get(currencyPair));
-						if (!checkSnapshotSequence || streamingPayload.getSequenceNumber() > snapshotSequences.get(currencyPair)) {
+									streamingPayload.getSequenceNumber(), snapshotSequences.get(currencyPair.getName()));
+						if (!checkSnapshotSequence || streamingPayload.getSequenceNumber() > snapshotSequences.get(currencyPair.getName())) {
 							if (lastSequence.compareAndSet(streamingPayload.getSequenceNumber() - 1, streamingPayload.getSequenceNumber())) {
 								if (LoggingUtils.isDataBufferingLoggingEnabled())
 									logger.info("Review found payload with sequence number {} ready for sending", streamingPayload.getSequenceNumber());
@@ -250,19 +252,19 @@ public class OrderedStreamingEmitter {
 								emit(streamingPayload);
 								i.remove();
 							} else if (lastSequence.get() >= streamingPayload.getSequenceNumber()) {
-								error(streamingPayload.getTopic(), String.format("Expecting sequence number %s but have parked message with sequence %s",  
+								error(streamingPayload.getCurrencyPair().getTopic(), String.format("Expecting sequence number %s but have parked message with sequence %s",  
 										(lastSequence.get() + 1), streamingPayload.getSequenceNumber())); 
 							}
 						} else {
 							if (LoggingUtils.isDataBufferingLoggingEnabled())
 								logger.info("Discarding {} with sequence less than snapshot sequence {}",
-										streamingPayload.getSequenceNumber(), snapshotSequences.get(currencyPair));
+										streamingPayload.getSequenceNumber(), snapshotSequences.get(streamingPayload.getCurrencyPair().getName()));
 							i.remove();
 						}
 						// any left add them back to the parkedPayloads
 					}
 					if (parkedPayloads.size() > 0 && (System.currentTimeMillis() - lastReviewSuccess) > MAX_WAIT_ON_MISSING_SEQ) {
-						error(parkedPayloads.get(0).getTopic(), 
+						error(parkedPayloads.get(0).getCurrencyPair().getTopic(), 
 								String.format("Waited %s millis for sequence number %s with parked messages %s",
 										(System.currentTimeMillis() - lastReviewSuccess), 
 										(lastSequence.get() + 1),
@@ -274,9 +276,9 @@ public class OrderedStreamingEmitter {
 		
 		private boolean isSnapshotReceived() {
 			if (snapshotRequired) {
-				snapshotsReceived.putIfAbsent(currencyPair, new AtomicBoolean(false));
-				snapshotSequences.putIfAbsent(currencyPair, -100L);
-				if (!snapshotsReceived.get(currencyPair).get()) {
+				snapshotsReceived.putIfAbsent(currencyPair.getName(), new AtomicBoolean(false));
+				snapshotSequences.putIfAbsent(currencyPair.getName(), -100L);
+				if (!snapshotsReceived.get(currencyPair.getName()).get()) {
 					return false;
 				}
 				return true;

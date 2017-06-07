@@ -2,7 +2,7 @@ package com.kieral.cryptomon.service.liquidity;
 
 import com.kieral.cryptomon.service.connection.IStatusListener;
 
-public interface ILiquidityProvider {
+public interface IService {
 
 	void connect() throws InterruptedException;
 	

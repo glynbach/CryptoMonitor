@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service.poloniex;
+package com.kieral.cryptomon.service.exchange.gdax;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -9,15 +9,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.kieral.cryptomon.model.IOrderBookEntry;
+import com.kieral.cryptomon.model.CurrencyPair;
 import com.kieral.cryptomon.model.OrderBook;
 import com.kieral.cryptomon.model.OrderBookAction;
 import com.kieral.cryptomon.model.OrderBookUpdate;
-import com.kieral.cryptomon.service.ServiceProperties;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
-import com.kieral.cryptomon.service.liquidity.AbstractLiquidityProvider;
+import com.kieral.cryptomon.service.liquidity.BaseService;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
-import com.kieral.cryptomon.service.liquidity.SubscriptionProperties;
 import com.kieral.cryptomon.service.util.HttpUtils;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
@@ -29,31 +27,23 @@ import com.kieral.cryptomon.streaming.wamp.WampStreamingProvider;
 import io.reactivex.Completable;
 import io.reactivex.Observable;
 
-public class PoloniexService extends AbstractLiquidityProvider {
-
-	private static final String POLONIEX = "Poloniex";
-	private static final String SNAPSHOT_URL = "https://poloniex.com/public?command=returnOrderBook&currencyPair=%s&depth=20";
+public class GdaxService extends BaseService {
 
 	private final StreamingProvider streamingProvider = new WampStreamingProvider();
 	private final StreamingProperties streamingProperties;
 
 	private AtomicLong lastSequence = new AtomicLong(-1);
 	
-	public PoloniexService(ServiceProperties serviceProperties, OrderBookManager orderBookManager) {
+	public GdaxService(GdaxServiceConfig serviceProperties, OrderBookManager orderBookManager) {
 		super(serviceProperties, orderBookManager);
 		if (serviceProperties == null)
 			throw new IllegalArgumentException("serviceProperties can not be null");
 		streamingProperties = new StreamingProperties.Builder()
-				.uri(serviceProperties.getUri())
+				.uri(serviceProperties.getPushApi())
 				.realm("realm1")
 				.build();
 	}
 	
-	@Override
-	public String getName() {
-		return POLONIEX;
-	}
-
 	@Override
 	protected boolean doConnect() {
 		final AtomicBoolean connected = new AtomicBoolean();
@@ -80,9 +70,10 @@ public class PoloniexService extends AbstractLiquidityProvider {
 
 	@Override
 	protected void subscribeMarketDataTopics() {
-		if (serviceProperties.getMarketDataTopics() != null)
-			serviceProperties.getMarketDataTopics().forEach(subscription -> {
-				Observable<StreamingPayload> result = streamingProvider.subscribe(subscription.getTopic(), subscription.getTopic());
+		List<CurrencyPair> currencyPairs = serviceProperties.getPairs();
+		if (currencyPairs != null)
+			currencyPairs.forEach(pair -> {
+				Observable<StreamingPayload> result = streamingProvider.subscribe(pair);
 				result.subscribe(streamingPayload -> {
 					onPayloadUpdate(streamingPayload);
 				});
@@ -133,12 +124,35 @@ public class PoloniexService extends AbstractLiquidityProvider {
 	}
 
 	@Override
-	protected OrderBook subscribeOrderbookSnapshot(String topic, String currencyPair) throws JsonProcessingException, IOException {
-		String url = String.format(SNAPSHOT_URL, topic);
+	protected OrderBook getOrderBookSnapshot(CurrencyPair currencyPair) throws JsonProcessingException, IOException {
+		String url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
 		logger.info("Requesting orderbook snapshot from {}", url);
 		JsonNode json = HttpUtils.getResponseAsJson(url);
 		logger.info("Orderbook snapshot response {}", json);
 		LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), json));
+		return processOrderBookNode(json, currencyPair);
+	}
+
+	@Override
+	protected List<OrderBook> getOrderBookSnapshots(List<CurrencyPair> pairs)
+			throws JsonProcessingException, IOException {
+		if (pairs == null)
+			return null;
+		List<OrderBook> orderBooks = new ArrayList<OrderBook>();
+		String url = serviceProperties.getOrderBookSnapshotQuery("all");
+		logger.info("Requesting orderbook snapshot from {}", url);
+		JsonNode json = HttpUtils.getResponseAsJson(url);
+		logger.info("Orderbook snapshot response {}", json);
+		LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), json));
+		pairs.forEach(pair -> {
+			JsonNode pairNode = json.findValue(pair.getTopic());
+			if (pairNode != null && pairNode.size() > 0)
+				orderBooks.add(processOrderBookNode(pairNode, pair));
+		});
+		return orderBooks;
+	}
+
+	private OrderBook processOrderBookNode(JsonNode json, CurrencyPair currencyPair) {
 		List<OrderBookUpdate> askUpdates = new ArrayList<OrderBookUpdate>();
 		List<OrderBookUpdate> bidUpdates = new ArrayList<OrderBookUpdate>();
 		JsonNode asks = json.get("asks");
@@ -150,57 +164,22 @@ public class PoloniexService extends AbstractLiquidityProvider {
 		JsonNode bids = json.get("bids");
 		if (bids != null) {
 			bids.elements().forEachRemaining(bidNode -> {
-				askUpdates.add(new OrderBookUpdate("bid", bidNode.get(0).asText(), bidNode.get(1).asText(), OrderBookAction.REPLACE));
+				bidUpdates.add(new OrderBookUpdate("bid", bidNode.get(0).asText(), bidNode.get(1).asText(), OrderBookAction.REPLACE));
 			});
 		}
 		String seq = json.findValue("seq").asText();
 		//String isFrozen = json.findValue("isFrozen").asText();
-		orderBookManager.updateOrderBook(POLONIEX, currencyPair, askUpdates, true);
-		OrderBook orderBookSnapshot = orderBookManager.updateOrderBook(POLONIEX, currencyPair, bidUpdates, false);
+		orderBookManager.updateOrderBook(getName(), currencyPair, askUpdates, true);
+		OrderBook orderBookSnapshot = orderBookManager.updateOrderBook(getName(), currencyPair, bidUpdates, false);
 		orderBookSnapshot.setSnapshotSequence(Long.parseLong(seq));
 		//TODO: add frozen concept
 		return orderBookSnapshot;
 	}
-
-	public static void main(String[] args) throws InterruptedException {
-		List<SubscriptionProperties> marketDataTopics = new ArrayList<SubscriptionProperties>();
-		marketDataTopics.add(new SubscriptionProperties.Builder().currencyPair("BTCLTC").topic("BTC_LTC").build());
-		//marketDataTopics.add(new SubscriptionProperties.Builder().currencyPair("BTCETH").topic("BTC_ETH").build());
-		ServiceProperties properties = new ServiceProperties.Builder()
-											.uri("wss://api.poloniex.com")
-											.marketDataTopics(marketDataTopics)
-											.transactionsPerSecond(6)
-											.sipValidationOnEmptyPayloads(true)
-											.requiresSnapshot(true)
-											.build();
-		OrderBookManager orderBookManager = new OrderBookManager();
-		PoloniexService poloniex = new PoloniexService(properties, orderBookManager);
-		poloniex.registerOrderBookListener(orderBook -> {
-			print(orderBook);
-		});
-		poloniex.connect();
-		//Thread.sleep(5000);
-		Thread.sleep(1000 * 60 * 1);
-		poloniex.disconnect();
+	
+	@Override
+	protected void unsubscribeMarketDataTopics() {
+		// TODO Auto-generated method stub
+		
 	}
 
-	private static void print(OrderBook orderBook) {
-		System.out.println(orderBook.getMarket() + " - " + orderBook.getCurrencyPair());
-		System.out.println("Asks\t\t\tBids\t\t\t");
-		System.out.println("Price\tAmount\tPrice\tAmount\t");
-		for (int i=0; i<10; i++) {
-			List<IOrderBookEntry> asks = orderBook.getAsks();
-			List<IOrderBookEntry> bids = orderBook.getBids();
-			StringBuffer line = new StringBuffer();
-			if (asks.size() > (i+1)) 
-				line.append(asks.get(i).getPrice().toPlainString()+"\t"+asks.get(i).getAmount().toPlainString()+"\t");
-			else 
-				line.append("\t\t\t");
-			if (bids.size() > (i+1)) 
-				line.append(bids.get(i).getPrice().toPlainString()+"\t"+bids.get(i).getAmount().toPlainString()+"\t");
-			else 
-				line.append("\t\t\t");
-			System.out.println(line.toString());
-		}
-	}
 }

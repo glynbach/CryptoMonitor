@@ -1,10 +1,9 @@
 package com.kieral.cryptomon;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import javax.annotation.PostConstruct;
 
 import org.apache.catalina.connector.Connector;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.embedded.EmbeddedServletContainerFactory;
 import org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainerFactory;
@@ -17,18 +16,19 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
-import com.kieral.cryptomon.service.ServiceProperties;
-import com.kieral.cryptomon.service.liquidity.AbstractLiquidityProvider;
+import com.kieral.cryptomon.service.exchange.bittrex.BittrexService;
+import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
+import com.kieral.cryptomon.service.exchange.poloniex.PoloniexService;
+import com.kieral.cryptomon.service.exchange.poloniex.PoloniexServiceConfig;
+import com.kieral.cryptomon.service.liquidity.BaseService;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
-import com.kieral.cryptomon.service.liquidity.SubscriptionProperties;
-import com.kieral.cryptomon.service.poloniex.PoloniexService;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 
 @EnableWebMvc
 @Configuration
 @ComponentScan(basePackages = "com.kieral.cryptomon")
-@PropertySource(value = { "classpath:application.properties" })
-public class AppConfig extends WebMvcConfigurerAdapter {
+@PropertySource(value = { "classpath:application.yaml" })
+public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 
 	@Value("${tomcat.ajp.port}")
 	int ajpPort;
@@ -38,7 +38,29 @@ public class AppConfig extends WebMvcConfigurerAdapter {
 
 	@Value("${tomcat.ajp.enabled}")
 	boolean tomcatAjpEnabled;
-	
+
+	@Value("${logging.dataBufferingLogging:false}")
+	boolean dataBufferingLoggingEnabled;
+
+	@Value("${logging.datarawDataLogging:true}")
+	boolean rawDataLoggingEnabled;
+
+	@Autowired
+	PoloniexServiceConfig poloniexServiceConfig;
+
+	@Autowired
+	BittrexServiceConfig bittrexServiceConfig;
+
+	@Bean
+	BaseService poloniexService() {
+		return new PoloniexService(poloniexServiceConfig, orderBookManager());		
+	}
+
+	@Bean
+	BaseService bittrexService() {
+		return new BittrexService(bittrexServiceConfig, orderBookManager());		
+	}
+
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
 		super.addResourceHandlers(registry);
@@ -47,57 +69,15 @@ public class AppConfig extends WebMvcConfigurerAdapter {
 		}
 	}
 	
-	@Value("${poloniex.push.api}")
-	private String poloniexUri;
-	@Value("${poloniex.api.key}")
-	private String poloniexApiKey;
-	@Value("${poloniex.maxtrans.second:5}")
-	private int poloniexTransactionsPerSecond;
-	@Value("${poloniex.streaming.data.topics}")
-	private String poloniexMarketDataTopicsStr;
-	@Value("${poloniex.emptypayload.skip:true}")
-	private boolean poloniexSipValidationOnEmptyPayloads;
-	@Value("${poloniex.snapshot.required:true}")
-	private boolean poloniexRequiresSnapshot;
-	@Value("${poloniex.use.snapshot.sequence:true}")
-	private boolean poloniexUseSnaphotSequence;
-
-	/**
-	 * Creates the Poloniex service for market data and execution
-	 */
 	@Bean
-	AbstractLiquidityProvider poloniexService() {
-		configureLoggingUtils();
-		List<SubscriptionProperties> marketDataTopics = new ArrayList<SubscriptionProperties>();
-		Arrays.asList(poloniexMarketDataTopicsStr.split(",")).forEach(topic -> {
-			marketDataTopics.add(new SubscriptionProperties.Builder()
-					.currencyPair(topic.replaceAll("_", "").trim())
-					.topic(topic.trim()).build());
-		});;
-		ServiceProperties properties = new ServiceProperties.Builder()
-											.uri(poloniexUri)
-											.marketDataTopics(marketDataTopics)
-											.transactionsPerSecond(poloniexTransactionsPerSecond)
-											.sipValidationOnEmptyPayloads(poloniexSipValidationOnEmptyPayloads)
-											.requiresSnapshot(poloniexRequiresSnapshot)
-											.useSnapshotSequence(poloniexUseSnaphotSequence)
-											.build();
-		return new PoloniexService(properties, orderBookManager());		
-	}
-
-	@Bean
-	OrderBookManager orderBookManager() {
+	protected OrderBookManager orderBookManager() {
 		return new OrderBookManager();
 	}
-
-	@Value("${rawDataLoging.enabled:true}")
-	boolean rawDataLoggingEnabled;
-	@Value("${dataBufferingLogging.enabled:false}")
-	boolean dataBufferingLoggingEnabled;
 
 	/**
 	 * Set additional logging properties
 	 */
+	@PostConstruct
 	void configureLoggingUtils() {
 		LoggingUtils.setRawDataLoggingEnabled(rawDataLoggingEnabled);
 		LoggingUtils.setDataBufferingLoggingEnabled(dataBufferingLoggingEnabled);

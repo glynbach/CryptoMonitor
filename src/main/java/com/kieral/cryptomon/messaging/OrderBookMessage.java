@@ -7,6 +7,8 @@ import com.kieral.cryptomon.model.OrderBook;
 
 public class OrderBookMessage {
 
+	private final static int MAX_DEPTH = 5;
+	
 	private String market;
 	private String currencyPair;
 	private List<OrderBookRow> obEntries = new ArrayList<OrderBookRow>();
@@ -24,15 +26,15 @@ public class OrderBookMessage {
 	public OrderBookMessage(OrderBook orderBook) {
 		if (orderBook != null) {
 			this.market = orderBook.getMarket();
-			this.currencyPair = orderBook.getCurrencyPair();
+			this.currencyPair = orderBook.getCurrencyPair().getName();
 			obEntries = new ArrayList<OrderBookRow>();
-			for (int i=0; i<orderBook.getBids().size(); i++) {
+			for (int i=0; i<orderBook.getBids().size() && i<MAX_DEPTH; i++) {
 				if (obEntries.size() <= i)
 					obEntries.add(new OrderBookRow());
 				obEntries.get(i).setBidPrice(orderBook.getBids().get(i).getPrice().toPlainString());
 				obEntries.get(i).setBidAmount(orderBook.getBids().get(i).getAmount().toPlainString());
 			}
-			for (int i=0; i<orderBook.getAsks().size(); i++) {
+			for (int i=0; i<orderBook.getAsks().size() && i<MAX_DEPTH; i++) {
 				if (obEntries.size() <= i)
 					obEntries.add(new OrderBookRow());
 				obEntries.get(i).setAskPrice(orderBook.getAsks().get(i).getPrice().toPlainString());
