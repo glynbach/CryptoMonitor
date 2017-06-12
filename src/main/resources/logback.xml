@@ -50,10 +50,15 @@
 	</appender>
 	
 	<logger name="rawdata" additivity="false">
-		<appender-ref ref="STDOUT"/>
 		<appender-ref ref="DATA_FILE"/>
 	</logger>
-	
+
+	<!--
+	<logger name="com.kieral.cryptomon.service.arb.ArbMonitorService" level="DEBUG" />
+	<logger name="com.kieral.cryptomon.service.exchange.bittrex" level="DEBUG" />
+	<logger name="com.kieral.cryptomon.service.liquidity.OrderBookManager" level="DEBUG" />
+	-->
+		
 	<root level="INFO">
 		<appender-ref ref="STDOUT" />
 		<appender-ref ref="FILE" />

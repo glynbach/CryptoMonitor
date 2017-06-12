@@ -9,6 +9,7 @@ public class LoggingUtils {
 
 	private static boolean rawDataLoggingEnabled;
 	private static boolean dataBufferingLoggingEnabled;
+	private static boolean tickstoreLoggingEnabled;
 	
 	public static boolean isRawDataLoggingEnabled() {
 		return rawDataLoggingEnabled;
@@ -21,6 +22,12 @@ public class LoggingUtils {
 	}
 	public static void setDataBufferingLoggingEnabled(boolean dataBufferingLoggingEnabled) {
 		LoggingUtils.dataBufferingLoggingEnabled = dataBufferingLoggingEnabled;
+	}
+	public static boolean isTickstoreLoggingEnabled() {
+		return LoggingUtils.tickstoreLoggingEnabled;
+	}
+	public static void setTickstoreLoggingEnabled(boolean tickstoreLoggingEnabled) {
+		LoggingUtils.tickstoreLoggingEnabled = tickstoreLoggingEnabled;
 	}
 
 	public static void logRawData(String msg) {

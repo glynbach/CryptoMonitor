@@ -17,7 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
-import com.kieral.cryptomon.service.liquidity.BaseService;
+import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 
 @Controller
 @EnableScheduling
@@ -26,17 +26,16 @@ public class ClientMessagingController {
 	private static final Comparator<OrderBookMessage> obComparator = new Comparator<OrderBookMessage>(){
 		@Override
 		public int compare(OrderBookMessage o1, OrderBookMessage o2) {
-			int marketCompare = o1.getMarket().compareTo(o2.getCurrencyPair()); 
-			if (marketCompare == 0)
-				return o1.getCurrencyPair().compareTo(o2.getCurrencyPair());
-			return marketCompare;
+			int ccyPairCompare = o1.getCurrencyPair().compareTo(o2.getCurrencyPair()); 
+			if (ccyPairCompare == 0)
+				return o1.getMarket().compareTo(o2.getMarket());
+			return ccyPairCompare;
 		}
 	}; 
 
 	@Autowired 
-	private BaseService poloniexService;
-	@Autowired 
-	private BaseService bittrexService;
+	ExchangeManagerService exchangeManager;
+
 	private ConcurrentMap<String, ConcurrentMap<String, OrderBookMessage>> orderBooks = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBookMessage>>();
 	private List<String> subscriptions = Collections.synchronizedList(new ArrayList<String>());
 
@@ -45,14 +44,12 @@ public class ClientMessagingController {
     
     @PostConstruct
     public void init(){
-		poloniexService.registerOrderBookListener(orderBook -> {
-			orderBooks.putIfAbsent(poloniexService.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
-			orderBooks.get(poloniexService.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
-		});
-		bittrexService.registerOrderBookListener(orderBook -> {
-			orderBooks.putIfAbsent(bittrexService.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
-			orderBooks.get(bittrexService.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
-		});
+    	exchangeManager.getEnabledExchanges().forEach(service -> {
+    		service.registerOrderBookListener(orderBook -> {
+    			orderBooks.putIfAbsent(service.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
+    			orderBooks.get(service.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
+    		});
+    	});
     }
 
     @MessageMapping("/orderBook")

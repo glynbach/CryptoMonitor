@@ -10,15 +10,48 @@ tomcat:
     remoteauthentication: false
     enabled: true 
 logging:
-  data-buffering-logging: true
-  raw-data-logging: true
+  dataBufferingLogging: true
+  rawDataLogging: true
+  tickstoreLoggingEnabled: false
+spring:
+  datasource:
+    url: "jdbc:mysql://localhost:3306/cryptomon?verifyServerCertificate=false&useSSL=false&requireSSL=false"
+    username: cryptorun
+    password: cryptorun
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        show_sql: true
+orderbook: 
+  default-significant-amount: 0.005
+  currencies:
+    - currency: "BTC"
+      significant-amount: 0.005
+    - currency: "LTC"
+      significant-amount: 0.5
+    - currency: "ETH"
+      significant-amount: 0.5
+  markets:
+    - market: "bittrex"
+      default-significant-amount: 0.005
+      currencies:
+        - currency: "BTC"
+          significant-amount: 0.01
+        - currency: "LTC"
+          significant-amount: 0.5
+        - currency: "ETH"
+          significant-amount: 0.5
 POLONIEX: 
   exchange: poloniex
+  enabled: false
   push-api: "wss://api.poloniex.com"
   snapshot-api: "https://poloniex.com/public"
   trading-api: "https://poloniex.com/tradingApi"
   subscription-mode: POLLING
   polling-interval: 2000
+  max-levels: 10
   max-trans-per-second: 6
   skip-hearbeats: true
   snapshot-baseline: true
@@ -28,18 +61,20 @@ POLONIEX:
   currency-pairs: 
     - pair: "BTC_LTC"
       price-scale: 8
-      trading-fee: "0"
+      trading-fee: "0.25"
     - pair: "BTC_ETH"
       price-scale: 8
-      trading-fee: "0"
+      trading-fee: "0.25"
 BITTREX: 
   exchange: bittrex
+  enabled: true
   push-api: ""
   snapshot-api: "https://bittrex.com/api/v1.1/public"
   trading-api: "https://bittrex.com/api/v1.1/market"
   subscription-mode: POLLING
   polling-interval: 2000
   max-trans-per-second: 6
+  max-levels: 10
   skip-hearbeats: false
   snapshot-baseline: false
   snapshot-baseline-Sequence: false
@@ -48,27 +83,29 @@ BITTREX:
   currency-pairs: 
     - pair: "BTC-LTC"
       price-scale: 8
-      trading-fee: "0"
+      trading-fee: "0.25"
     - pair: "BTC-ETH"
       price-scale: 8
-      trading-fee: "0"
+      trading-fee: "0.25"
 GDAX: 
   exchange: gdax
+  enabled: false
   push-api: ""
   snapshot-api: "https://api.gdax.com"
   trading-api: "https://api.gdax.com"
   subscription-mode: POLLING
   polling-interval: 2000
   max-trans-per-second: 6
+  max-levels: 10
   skip-hearbeats: false
   snapshot-baseline: false
   snapshot-baseline-Sequence: false
   api-key-loc: "${user.home}/.gdaxApiKey"
   api-secret-loc: "${user.home}/.gdaxApiSecret"
   currency-pairs: 
-    - pair: "BTC-LTC"
+    - pair: "LTC-BTC"
       price-scale: 8
-      trading-fee: "0"
-    - pair: "BTC-ETH"
+      trading-fee: "0.25"
+    - pair: "ETH-BTC"
       price-scale: 8
-      trading-fee: "0"
+      trading-fee: "0.25"

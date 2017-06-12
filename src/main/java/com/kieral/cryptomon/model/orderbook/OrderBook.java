@@ -1,20 +1,24 @@
-package com.kieral.cryptomon.model;
+package com.kieral.cryptomon.model.orderbook;
 
 import java.util.Collections;
 import java.util.List;
+
+import com.kieral.cryptomon.model.general.CurrencyPair;
 
 public class OrderBook {
 
 	private final String market;
 	private final CurrencyPair currencyPair;
 	private long snapshotSequence;
+	private long snapshotReceived;
 	private List<IOrderBookEntry> bids = Collections.emptyList();
 	private List<IOrderBookEntry> asks = Collections.emptyList();
 	
-	public OrderBook(String market, CurrencyPair currencyPair) {
-		super();
+	public OrderBook(String market, CurrencyPair currencyPair, long sequence, long createdTime) {
 		this.market = market;
 		this.currencyPair = currencyPair;
+		this.snapshotSequence = sequence;
+		this.snapshotReceived = createdTime;
 	}
 	
 	public long getSnapshotSequence() {
@@ -23,6 +27,14 @@ public class OrderBook {
 
 	public void setSnapshotSequence(long snapshotSequence) {
 		this.snapshotSequence = snapshotSequence;
+	}
+
+	public long getSnapshotReceived() {
+		return snapshotReceived;
+	}
+
+	public void setSnapshotReceived(long snapshotReceived) {
+		this.snapshotReceived = snapshotReceived;
 	}
 
 	public List<IOrderBookEntry> getBids() {
@@ -53,10 +65,9 @@ public class OrderBook {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((asks == null) ? 0 : asks.hashCode());
-		result = prime * result + ((bids == null) ? 0 : bids.hashCode());
 		result = prime * result + ((currencyPair == null) ? 0 : currencyPair.hashCode());
 		result = prime * result + ((market == null) ? 0 : market.hashCode());
+		result = prime * result + (int) (snapshotReceived ^ (snapshotReceived >>> 32));
 		result = prime * result + (int) (snapshotSequence ^ (snapshotSequence >>> 32));
 		return result;
 	}
@@ -70,16 +81,6 @@ public class OrderBook {
 		if (getClass() != obj.getClass())
 			return false;
 		OrderBook other = (OrderBook) obj;
-		if (asks == null) {
-			if (other.asks != null)
-				return false;
-		} else if (!asks.equals(other.asks))
-			return false;
-		if (bids == null) {
-			if (other.bids != null)
-				return false;
-		} else if (!bids.equals(other.bids))
-			return false;
 		if (currencyPair == null) {
 			if (other.currencyPair != null)
 				return false;
@@ -90,6 +91,8 @@ public class OrderBook {
 				return false;
 		} else if (!market.equals(other.market))
 			return false;
+		if (snapshotReceived != other.snapshotReceived)
+			return false;
 		if (snapshotSequence != other.snapshotSequence)
 			return false;
 		return true;
@@ -98,7 +101,8 @@ public class OrderBook {
 	@Override
 	public String toString() {
 		return "OrderBook [market=" + market + ", currencyPair=" + currencyPair + ", snapshotSequence="
-				+ snapshotSequence + ", bids=" + bids + ", asks=" + asks + "]";
+				+ snapshotSequence + ", snapshotReceived=" + snapshotReceived + ", bids=" + bids + ", asks=" + asks
+				+ "]";
 	}
 	
 }

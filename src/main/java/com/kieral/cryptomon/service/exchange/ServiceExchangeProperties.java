@@ -1,14 +1,15 @@
-package com.kieral.cryptomon.service;
+package com.kieral.cryptomon.service.exchange;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.kieral.cryptomon.model.Currency;
-import com.kieral.cryptomon.model.CurrencyPair;
+import com.kieral.cryptomon.model.accounting.TradingFeeType;
+import com.kieral.cryptomon.model.general.Currency;
+import com.kieral.cryptomon.model.general.CurrencyPair;
 
-public abstract class ServiceProperties {
+public abstract class ServiceExchangeProperties {
 
 	public enum SubscriptionMode {
 		POLLING,
@@ -16,12 +17,14 @@ public abstract class ServiceProperties {
 	}
 	
     protected String exchange;
+    protected boolean enabled;
     protected String pushApi;
     protected String snapshotApi;
     protected String tradingApi;
     protected SubscriptionMode subscriptionMode;
     protected long pollingInterval;
     protected int maxTransPerSecond;
+    protected int maxLevels;
     protected boolean skipHearbeats;
     protected boolean snapshotBaseline;
     protected boolean snapshotBaselineSequence;
@@ -32,20 +35,22 @@ public abstract class ServiceProperties {
 	private final AtomicBoolean initialised = new AtomicBoolean(false);
 	private final List<CurrencyPair> pairs = new ArrayList<CurrencyPair>();
 
-    public ServiceProperties() {
+    public ServiceExchangeProperties() {
     }
     
-	public ServiceProperties(String exchange, String pushApi, String snapshotApi, String tradingApi,
-			SubscriptionMode subscriptionMode, long pollingInterval, int maxTransPerSecond, boolean skipHearbeats, boolean snapshotBaseline, 
+	public ServiceExchangeProperties(String exchange, boolean enabled, String pushApi, String snapshotApi, String tradingApi,
+			SubscriptionMode subscriptionMode, long pollingInterval, int maxTransPerSecond, int maxLevels, boolean skipHearbeats, boolean snapshotBaseline, 
 			boolean snapshotBaselineSequence, String apiKeyLoc, String apiSecretLoc, List<CurrencyPairProperties> currencyPairs) {
 		super();
 		this.exchange = exchange;
+		this.enabled = enabled;
 		this.pushApi = pushApi;
 		this.snapshotApi = snapshotApi;
 		this.tradingApi = tradingApi;
 		this.subscriptionMode = subscriptionMode;
 		this.pollingInterval = pollingInterval;
 		this.maxTransPerSecond = maxTransPerSecond;
+		this.maxLevels = maxLevels;
 		this.skipHearbeats = skipHearbeats;
 		this.snapshotBaseline = snapshotBaseline;
 		this.snapshotBaselineSequence = snapshotBaselineSequence;
@@ -60,6 +65,14 @@ public abstract class ServiceProperties {
 
 	public void setExchange(String exchange) {
 		this.exchange = exchange;
+	}
+
+	public boolean isEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(boolean enabled) {
+		this.enabled = enabled;
 	}
 
 	public String getPushApi() {
@@ -108,6 +121,14 @@ public abstract class ServiceProperties {
 
 	public void setMaxTransPerSecond(int maxTransPerSecond) {
 		this.maxTransPerSecond = maxTransPerSecond;
+	}
+
+	public int getMaxLevels() {
+		return maxLevels;
+	}
+
+	public void setMaxLevels(int maxLevels) {
+		this.maxLevels = maxLevels;
 	}
 
 	public boolean isSkipHearbeats() {
@@ -165,11 +186,12 @@ public abstract class ServiceProperties {
 			throw new IllegalArgumentException("currencyPair can not be null");
 		String topic = currencyPair.getPair();
 		String[] pairs = splitPair(currencyPair.getPair());
-		Currency currency1 = Currency.valueOf(pairs[0].trim());
-		Currency currency2 = Currency.valueOf(pairs[1].trim());
+		Currency baseCurrency = Currency.valueOf(pairs[0].trim());
+		Currency quotedCurrency = Currency.valueOf(pairs[1].trim());
 		// TODO: add trading fees and currency
-		return new CurrencyPair(pairs[0].trim() + pairs[1].trim(), currency1, currency2, topic.trim(),
-				currencyPair.getPriceScale(), currencyPair.getTradingFee() != null ? new BigDecimal(currencyPair.getTradingFee()) : BigDecimal.ZERO, null);
+		return new CurrencyPair(pairs[0].trim() + pairs[1].trim(), baseCurrency, quotedCurrency, topic.trim(),
+				currencyPair.getPriceScale(), currencyPair.getTradingFee() != null ? new BigDecimal(currencyPair.getTradingFee()) : BigDecimal.ZERO, 
+				getTradingFeeType());
 	}
 
 	public List<CurrencyPair> getPairs() {
@@ -185,14 +207,17 @@ public abstract class ServiceProperties {
 
 	public abstract String getOrderBookSnapshotQuery(String currencyPairSymbol);
 
+	public abstract TradingFeeType getTradingFeeType();
+
 	@Override
 	public String toString() {
-		return "ServiceProperties [exchange=" + exchange + ", pushApi=" + pushApi + ", snapshotApi=" + snapshotApi
-				+ ", tradingApi=" + tradingApi + ", subscriptionMode=" + subscriptionMode + ", pollingInterval="
-				+ pollingInterval + ", maxTransPerSecond=" + maxTransPerSecond + ", skipHearbeats=" + skipHearbeats
-				+ ", snapshotBaseline=" + snapshotBaseline + ", snapshotBaselineSequence=" + snapshotBaselineSequence
-				+ ", apiKeyLoc=" + apiKeyLoc + ", apiSecretLoc=" + apiSecretLoc + ", currencyPairs=" + currencyPairs
-				+ "]";
+		return "ServiceProperties [exchange=" + exchange + ", enabled=" + enabled + ", pushApi=" + pushApi
+				+ ", snapshotApi=" + snapshotApi + ", tradingApi=" + tradingApi + ", subscriptionMode="
+				+ subscriptionMode + ", pollingInterval=" + pollingInterval + ", maxTransPerSecond=" + maxTransPerSecond
+				+ ", maxLevels=" + maxLevels
+				+ ", skipHearbeats=" + skipHearbeats + ", snapshotBaseline=" + snapshotBaseline
+				+ ", snapshotBaselineSequence=" + snapshotBaselineSequence + ", apiKeyLoc=" + apiKeyLoc
+				+ ", apiSecretLoc=" + apiSecretLoc + ", currencyPairs=" + currencyPairs + "]";
 	}
 	
 }

@@ -1,6 +1,6 @@
 package com.kieral.cryptomon.streaming;
 
-import com.kieral.cryptomon.model.CurrencyPair;
+import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.service.connection.IStatusListener;
 
 import io.reactivex.Completable;

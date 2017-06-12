@@ -17,9 +17,10 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.kieral.cryptomon.model.CurrencyPair;
-import com.kieral.cryptomon.model.OrderBook;
+import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.service.util.LoggingUtils;
+import com.kieral.cryptomon.test.utlil.TestUtils;
 
 public class TestOrderedStreamingEmitter {
 
@@ -401,6 +402,10 @@ public class TestOrderedStreamingEmitter {
 			public boolean isHeartbeat() {
 				return false;
 			}
+			@Override
+			public long getTimeReceived() {
+				return 0;
+			}
 		};
 	}
 
@@ -440,6 +445,10 @@ public class TestOrderedStreamingEmitter {
 			@Override
 			public boolean isHeartbeat() {
 				return false;
+			}
+			@Override
+			public long getTimeReceived() {
+				return 0;
 			}
 		};
 	}
@@ -500,9 +509,7 @@ public class TestOrderedStreamingEmitter {
 	}
 
 	private OrderBook ob(String cp, long seq) {
-		OrderBook ob = new OrderBook("TEST", new CurrencyPair(cp, cp));
-		ob.setSnapshotSequence(seq);
-		return ob;
+		return TestUtils.ob("TEST", new CurrencyPair(cp, cp), seq);
 	}
 
 }

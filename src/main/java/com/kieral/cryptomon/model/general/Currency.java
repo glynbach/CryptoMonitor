@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.model;
+package com.kieral.cryptomon.model.general;
 
 public enum Currency {
 
