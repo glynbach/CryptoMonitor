@@ -18,8 +18,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.kieral.cryptomon.model.CurrencyPair;
-import com.kieral.cryptomon.model.OrderBook;
+import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.service.util.threading.StickyThreadPool;
 

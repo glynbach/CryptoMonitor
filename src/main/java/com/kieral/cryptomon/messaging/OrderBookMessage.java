@@ -3,7 +3,7 @@ package com.kieral.cryptomon.messaging;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.kieral.cryptomon.model.OrderBook;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
 
 public class OrderBookMessage {
 

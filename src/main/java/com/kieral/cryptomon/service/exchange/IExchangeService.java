@@ -1,8 +1,9 @@
-package com.kieral.cryptomon.service.liquidity;
+package com.kieral.cryptomon.service.exchange;
 
 import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
 
-public interface IService {
+public interface IExchangeService {
 
 	void connect() throws InterruptedException;
 	
@@ -11,5 +12,9 @@ public interface IService {
 	void registerOrderBookListener(IOrderBookListener orderBookListener);
 	
 	void registerStatusListener(IStatusListener statusListener);
+
+	boolean isEnabled();
+
+	String getName();
 	
 }

@@ -1,6 +1,6 @@
 package com.kieral.cryptomon.service.liquidity;
 
-import com.kieral.cryptomon.model.OrderBook;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
 
 public interface IOrderBookListener {
 

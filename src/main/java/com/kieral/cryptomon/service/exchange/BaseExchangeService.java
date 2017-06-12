@@ -1,6 +1,6 @@
-package com.kieral.cryptomon.service.liquidity;
+package com.kieral.cryptomon.service.exchange;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -15,22 +15,26 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.kieral.cryptomon.model.CurrencyPair;
-import com.kieral.cryptomon.model.OrderBook;
-import com.kieral.cryptomon.model.OrderBookUpdate;
-import com.kieral.cryptomon.service.ServiceProperties;
-import com.kieral.cryptomon.service.ServiceProperties.SubscriptionMode;
+import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
+import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
+import com.kieral.cryptomon.service.BalanceHandler;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.SubscriptionMode;
+import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
+import com.kieral.cryptomon.service.liquidity.OrderBookManager;
+import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.streaming.IOrderedStreamingListener;
 import com.kieral.cryptomon.streaming.OrderedStreamingEmitter;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 
-public abstract class BaseService implements IService, IOrderedStreamingListener {
+public abstract class BaseExchangeService implements IExchangeService, IOrderedStreamingListener {
 
 	protected Logger logger = LoggerFactory.getLogger(this.getClass());
 	
@@ -44,9 +48,15 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 	private ScheduledFuture<?> marketDataPoller;
 	private final List<IStatusListener> statusListeners = new CopyOnWriteArrayList<IStatusListener>();
 	private final List<IOrderBookListener> orderBookListeners = new CopyOnWriteArrayList<IOrderBookListener>();
-	
-	protected final ServiceProperties serviceProperties;
-	protected final OrderBookManager orderBookManager;
+
+	@Autowired
+	protected OrderBookManager orderBookManager;
+	@Autowired
+	protected BalanceHandler balanceHandler;
+	@Autowired
+	protected RestTemplate restTemplate;
+
+	protected final ServiceExchangeProperties serviceProperties;
 	private final OrderedStreamingEmitter streamingEmitter;
 	
 	private final ConcurrentMap<String, AtomicBoolean> initialisedStreams = new ConcurrentHashMap<String, AtomicBoolean>();
@@ -63,21 +73,25 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 	private final long longSleep = 30 * 1000;
 	private int retryCount = 0;
 	
-	protected BaseService(final ServiceProperties serviceProperties, final OrderBookManager orderBookManager) {
+	protected BaseExchangeService(final ServiceExchangeProperties serviceProperties) {
 		if (serviceProperties == null)
 			throw new IllegalArgumentException("serviceProperties can not be null");
-		if (orderBookManager == null)
-			throw new IllegalArgumentException("orderBookManager can not be null");
+		logger.info("Creating service with properties {}", serviceProperties);
 		this.serviceProperties = serviceProperties;
-		this.orderBookManager = orderBookManager;
 		this.skipHeartbeats = serviceProperties.isSkipHearbeats();
 		this.snapshotBaseline = serviceProperties.isSnapshotBaseline();
 		this.streamingEmitter = new OrderedStreamingEmitter(getName(), this, 
 									snapshotBaseline, serviceProperties.isSnapshotBaselineSequence(), 4);
 	}
 
+	@Override
 	public String getName() {
 		return serviceProperties.getExchange();
+	}
+	
+	@Override
+	public boolean isEnabled() {
+		return serviceProperties.isEnabled();
 	}
 	
 	@Override
@@ -150,20 +164,21 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 			marketDataPoller = scheduler.scheduleWithFixedDelay(new Runnable(){
 				@Override
 				public void run() {
-					List<OrderBook> orderBooks = null;
+					List<OrderBookResponse> orderBookResponses = null;
 					try {
-						orderBooks = getOrderBookSnapshots(serviceProperties.getPairs());
+						orderBookResponses = getOrderBookResponses(serviceProperties.getPairs());
 					} catch (Exception e) {
 						logger.error("Error requesting order book snapshots", e);
 					}
-					if (orderBooks != null) {
-						orderBooks.forEach(orderBook -> {
+					if (orderBookResponses != null) {
+						orderBookResponses.forEach(orderBookResponse -> {
 							try {
 								orderBookListeners.forEach(listener -> {
-									listener.onOrderBookUpdate(orderBook);
+									listener.onOrderBookUpdate(orderBookManager.getOrderBook(orderBookResponse, 
+											getName(), orderBookResponse.getCurrencyPair(), serviceProperties.getMaxLevels()));
 								});
 							} catch (Exception e) {
-								logger.error("Error processing order book snapshots {}", orderBook, e);
+								logger.error("Error processing order book response {}", orderBookResponse, e);
 							}
 						});
 					}
@@ -195,10 +210,6 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 	
 	abstract protected void unsubscribeMarketDataTopics();
 	
-	abstract protected OrderBook getOrderBookSnapshot(CurrencyPair pair) throws JsonProcessingException, IOException;
-	
-	abstract protected List<OrderBook> getOrderBookSnapshots(List<CurrencyPair> pairs) throws JsonProcessingException, IOException;
-
 	abstract protected List<OrderBookUpdate> parsePayload(StreamingPayload streamingPayload) throws ParsingPayloadException;
 
 	@Override
@@ -206,7 +217,8 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 		try {
 			List<OrderBookUpdate> updates = parsePayload(streamingPayload);
 			if (updates != null)
-				this.onOrderBookUpdate(streamingPayload.getCurrencyPair(), updates);
+				this.onOrderBookUpdate(streamingPayload.getCurrencyPair(), updates, 
+						streamingPayload.getSequenceNumber(), streamingPayload.getTimeReceived());
 		} catch (ParsingPayloadException e) {
 			logger.error("Error parsing payload", e);
 			// TODO: resubscribe topic instead
@@ -227,8 +239,9 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 		if (snapshotBaseline && (initialised == null || !initialised.get())) {
 			logger.info("Received update on {} - requesting snapshot", streamingPayload.getCurrencyPair().getTopic());
 			try {
-				OrderBook orderBookSnapshot = getOrderBookSnapshot(streamingPayload.getCurrencyPair());
-				this.streamingEmitter.onSnashotUpdate(orderBookSnapshot);
+				OrderBookResponse orderBookResponse = getOrderBookResponse(streamingPayload.getCurrencyPair());
+				this.streamingEmitter.onSnashotUpdate(orderBookManager.getOrderBook(orderBookResponse,
+						getName(), streamingPayload.getCurrencyPair(), serviceProperties.getMaxLevels()));
 				initialisedStreams.get(streamingPayload.getCurrencyPair().getTopic()).set(true);
 			} catch (Exception e) {
 				logger.error("Error subscribing to orderbook snapshot for {}", streamingPayload.getCurrencyPair().getTopic(), e);
@@ -241,9 +254,36 @@ public abstract class BaseService implements IService, IOrderedStreamingListener
 		}
 	}
 
-	protected void onOrderBookUpdate(CurrencyPair currencyPair, List<OrderBookUpdate> updates) {
+	protected OrderBookResponse getOrderBookResponse(CurrencyPair currencyPair) {
+		String url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
+		if (logger.isDebugEnabled())
+			logger.debug("Requesting orderbook snapshot from {}", url);
+		OrderBookResponse response = restTemplate.getForObject(url, getOrderBookResponseClazz());
+		response.setCurrencyPair(currencyPair);
+		if (logger.isDebugEnabled())
+			logger.debug("Orderbook snapshot response {}", response);
+		LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), response));
+		return response;
+	}
+
+	protected abstract Class<? extends OrderBookResponse> getOrderBookResponseClazz();
+
+	protected List<OrderBookResponse> getOrderBookResponses(List<CurrencyPair> pairs) {
+		if (pairs == null)
+			return null;
+		List<OrderBookResponse> orderBookResponses = new ArrayList<OrderBookResponse>();
+		for (CurrencyPair pair : pairs) {
+			OrderBookResponse orderBookResponse = getOrderBookResponse(pair);
+			if (orderBookResponse != null)
+				orderBookResponses.add(orderBookResponse);
+		}
+		return orderBookResponses;
+	}
+
+	protected void onOrderBookUpdate(CurrencyPair currencyPair, List<OrderBookUpdate> updates, long sequenceNumber, long updatesReceived) {
 		if (orderBookManager != null) {
-			OrderBook orderBook = orderBookManager.updateOrderBook(getName(), currencyPair, updates);
+			OrderBook orderBook = orderBookManager.updateOrderBook(getName(), currencyPair, updates, 
+					sequenceNumber, updatesReceived, serviceProperties.getMaxLevels());
 			if (orderBookListeners != null) {
 				orderBookListeners.forEach(listener -> {
 					listener.onOrderBookUpdate(orderBook);

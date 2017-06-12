@@ -1,5 +1,6 @@
 package com.kieral.cryptomon.service.liquidity;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -9,53 +10,107 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.kieral.cryptomon.model.OrderBook;
-import com.kieral.cryptomon.model.CurrencyPair;
-import com.kieral.cryptomon.model.IOrderBookEntry;
-import com.kieral.cryptomon.model.OrderBookAction;
-import com.kieral.cryptomon.model.OrderBookUpdate;
-import com.kieral.cryptomon.model.Side;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.LiquidityEntry;
+import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.orderbook.IOrderBookEntry;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
+import com.kieral.cryptomon.model.orderbook.OrderBookAction;
+import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
+import com.kieral.cryptomon.model.sided.BidAskAmount;
+import com.kieral.cryptomon.model.sided.BidAskPrice;
+import com.kieral.cryptomon.service.rest.OrderBookResponse;
+import com.kieral.cryptomon.service.rest.OrderBookResponseEntry;
 
 public class OrderBookManager {
 
+	public static final long AUTO_INCREMENT_SEQUENCE = -1L;
+	
 	private static final PriceComparer BID_COMPARER = new PriceComparer(Side.BID);  
 	private static final PriceComparer ASK_COMPARER = new PriceComparer(Side.ASK);  
 
 	private final ConcurrentMap<OrderBookKey, OrderBook> orderBooks = new ConcurrentHashMap<OrderBookKey, OrderBook>(); 
 	private final ConcurrentMap<OrderBookKey, Object> orderBookLocks = new ConcurrentHashMap<OrderBookKey, Object>(); 
 
-	public OrderBook clearOrderBook(String market, CurrencyPair currencyPair) {
-		return updateOrderBook(market, currencyPair, null, true);
-	}
-
-	public OrderBook updateOrderBook(String market, CurrencyPair currencyPair, List<OrderBookUpdate> updates) {
-		return updateOrderBook(market, currencyPair, updates, false);
-	}
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
-	public OrderBook updateOrderBook(String market, CurrencyPair currencyPair, List<OrderBookUpdate> updates, boolean clear) {
+	@Autowired
+	OrderBookConfig orderBookConfig;
+
+	public OrderBook getOrderBook(OrderBookResponse orderBookResponse, String market, 
+			CurrencyPair currencyPair, int maxLevel) {
 		if (market == null)
 			throw new IllegalArgumentException("market can not be null");
 		if (currencyPair == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
+		clearOrderBook(market, currencyPair);
+		if (orderBookResponse == null) {
+			return updateOrderBook(market, currencyPair, null, 0, System.currentTimeMillis(), 0);
+		}
+		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
+		if(orderBookResponse.getBidEntries() != null) {
+			updates.addAll(getUpdatesFromEntries(Side.BID, orderBookResponse.getBidEntries()));
+			updates.addAll(getUpdatesFromEntries(Side.ASK, orderBookResponse.getAskEntries()));
+		}
+		return updateOrderBook(market, currencyPair, updates, orderBookResponse.getSequence(),
+				orderBookResponse.getCreatedTime(), maxLevel);
+	}
+	
+	private List<OrderBookUpdate> getUpdatesFromEntries(Side side, List<OrderBookResponseEntry> entries) {
+		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
+		if (entries != null) {
+			entries.forEach(entry -> {
+				updates.add(new OrderBookUpdate(side, entry.getPrice(), entry.getAmount(), OrderBookAction.REPLACE));
+			});
+		}
+		return updates;
+	}
+
+	public void clearOrderBook(String market, CurrencyPair currencyPair) {
 		OrderBookKey key = new OrderBookKey(market, currencyPair.getName());
-		orderBooks.putIfAbsent(key, new OrderBook(market, currencyPair));
+		orderBooks.remove(key);
+	}
+
+	/**
+	 * Sending a sequence number of -1 will auto-increment the orderbook sequence 
+	 */
+	public OrderBook updateOrderBook(String market, CurrencyPair currencyPair, List<OrderBookUpdate> updates, 
+			long sequenceNumber, long updatesReceiedTime, int maxLevel) {
+		if (market == null)
+			throw new IllegalArgumentException("market can not be null");
+		if (currencyPair == null)
+			throw new IllegalArgumentException("currencyPair can not be null");
+		if (logger.isDebugEnabled())
+			logger.debug("Received updates {} for {} from {} with seq {} and maxLevel {}", updates, currencyPair.getName(),
+					market, sequenceNumber, maxLevel);
+		OrderBookKey key = new OrderBookKey(market, currencyPair.getName());
+		orderBooks.putIfAbsent(key, new OrderBook(market, currencyPair, 
+				sequenceNumber == AUTO_INCREMENT_SEQUENCE ? 0 : sequenceNumber, updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime));
 		OrderBook orderBook = orderBooks.get(key);
 		orderBookLocks.putIfAbsent(key, new Object());
 		Object lock = orderBookLocks.get(key);
 		synchronized(lock) {
-			if (clear) {
-				orderBook.setAsks(Collections.emptyList());
-				orderBook.setBids(Collections.emptyList());
-			}
-			if (updates != null) {
+			List <IOrderBookEntry> bids;
+			List <IOrderBookEntry> asks;
+			if (updates == null || updates.size() == 0) {
+				bids = Collections.emptyList();
+				asks = Collections.emptyList();
+			} else {
 				final AtomicBoolean actioned = new AtomicBoolean(false);
-				for (OrderBookUpdate update : updates) {
-					actioned.set(false);
+				final AtomicBoolean hasBid = new AtomicBoolean(false);
+				final AtomicBoolean hasAsk = new AtomicBoolean(false);
+				bids = new ArrayList<IOrderBookEntry>(orderBook.getBids());
+				asks = new ArrayList<IOrderBookEntry>(orderBook.getAsks());
+				updates.forEach(update -> {
 					IOrderBookEntry entry = update.getEntry();
+					hasBid.compareAndSet(false, entry.getSide() == Side.BID);
+					hasAsk.compareAndSet(false, entry.getSide() == Side.ASK);
 					OrderBookAction action = update.getAction();
-					List<IOrderBookEntry> entries = new ArrayList<IOrderBookEntry>(entry.getSide() == Side.BID ? orderBook.getBids() : orderBook.getAsks());
-					PriceComparer comparer = entry.getSide() == Side.BID ? BID_COMPARER : ASK_COMPARER;
-					entries.sort(comparer);
+					List<IOrderBookEntry> entries = entry.getSide() == Side.BID ? bids : asks;
 					Iterator<IOrderBookEntry> i = entries.iterator();
 					while (i.hasNext()) {
 						IOrderBookEntry bookEntry = i.next();
@@ -70,16 +125,67 @@ public class OrderBookManager {
 					}
 					if (action == OrderBookAction.REPLACE && !actioned.get()) {
 						entries.add(entry);
-						entries.sort(comparer);
 					}
-					if (entry.getSide() == Side.BID)
-						orderBook.setBids(entries); 
-					else
-						orderBook.setAsks(entries);
+				});
+				if (logger.isDebugEnabled())
+					logger.debug("Ended update detected hasBid={} hasAsk={}", hasBid.get(), hasAsk.get());
+				if (hasBid.get()) {
+					if (logger.isDebugEnabled())
+						logger.debug("Sorting bids {}", bids);
+					bids.sort(BID_COMPARER);
+					if (bids.size() > maxLevel) {
+						if (logger.isDebugEnabled())
+							logger.debug("Truncating bids {}", bids);
+						bids.subList(maxLevel, bids.size()).clear();
+					}
+					if (logger.isDebugEnabled())
+						logger.debug("Setting bids {}", bids);
+					orderBook.setBids(bids);
+				}
+				if (hasAsk.get()) {
+					if (logger.isDebugEnabled())
+						logger.debug("Sorting asks {}", asks);
+					asks.sort(ASK_COMPARER);
+					if (asks.size() > maxLevel) {
+						if (logger.isDebugEnabled())
+							logger.debug("Truncating asks {}", asks);
+						asks.subList(maxLevel, asks.size()).clear();
+					}
+					if (logger.isDebugEnabled())
+						logger.debug("Setting asks {}", asks);
+					orderBook.setAsks(asks);
 				}
 			}
+			orderBook.setSnapshotReceived(updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime);
+			if (sequenceNumber == AUTO_INCREMENT_SEQUENCE)
+				sequenceNumber = orderBook.getSnapshotSequence() + 1;
+			orderBook.setSnapshotSequence(sequenceNumber);
 		}
 		return orderBook;
+	}
+	
+	public LiquidityEntry getBestBidAsk(OrderBook orderBook) {
+		if (orderBook == null)
+			return null;
+		BigDecimal bidAmount = BigDecimal.ZERO;
+		BigDecimal bidPrice = null;
+		for (IOrderBookEntry entry : orderBook.getBids()) {
+			bidAmount = bidAmount.add(entry.getAmount());
+			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
+				bidPrice = entry.getPrice();
+				break;
+			}
+		}
+		BigDecimal askAmount = BigDecimal.ZERO;
+		BigDecimal askPrice = null;
+		for (IOrderBookEntry entry : orderBook.getAsks()) {
+			askAmount = askAmount.add(entry.getAmount());
+			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
+				askPrice = entry.getPrice();
+				break;
+			}
+		}
+		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(bidAmount, askAmount));
 	}
 	
 	private static final class PriceComparer implements Comparator<IOrderBookEntry> {
@@ -151,4 +257,6 @@ public class OrderBookManager {
 			return "OrderBookKey [market=" + market + ", currencyPair=" + currencyPair + "]";
 		}
 	}
+
+
 }
