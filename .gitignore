@@ -3,5 +3,6 @@
 .classpath
 .project
 bin/
+build/
 .gradle/
 logDir_IS_UNDEFINED/

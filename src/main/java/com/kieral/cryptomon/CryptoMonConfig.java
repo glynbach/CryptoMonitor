@@ -28,10 +28,13 @@ import com.kieral.cryptomon.service.arb.IArbExaminer;
 import com.kieral.cryptomon.service.arb.IArbInstructionHandler;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.exchange.IExchangeService;
+import com.kieral.cryptomon.service.exchange.bittrex.BittrexSecurityModule;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexService;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
+import com.kieral.cryptomon.service.exchange.gdax.GdaxSecurityModule;
 import com.kieral.cryptomon.service.exchange.gdax.GdaxService;
 import com.kieral.cryptomon.service.exchange.gdax.GdaxServiceConfig;
+import com.kieral.cryptomon.service.exchange.poloniex.PoloniexSecurityModule;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexService;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexServiceConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
@@ -80,17 +83,17 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 
 	@Bean
 	IExchangeService poloniexService() {
-		return new PoloniexService(poloniexServiceConfig);		
+		return new PoloniexService(poloniexServiceConfig, new PoloniexSecurityModule(poloniexServiceConfig));		
 	}
 
 	@Bean
 	IExchangeService bittrexService() {
-		return new BittrexService(bittrexServiceConfig);		
+		return new BittrexService(bittrexServiceConfig, new BittrexSecurityModule(bittrexServiceConfig));		
 	}
 
 	@Bean
 	IExchangeService gdaxService() {
-		return new GdaxService(gdaxServiceConfig);		
+		return new GdaxService(gdaxServiceConfig, new GdaxSecurityModule(gdaxServiceConfig));		
 	}
 
 	@Bean
@@ -117,9 +120,9 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 		balanceHandler.setConfirmedBalance("bittrex", Currency.BTC, new BigDecimal(1), true);
 		balanceHandler.setConfirmedBalance("bittrex", Currency.LTC, new BigDecimal(50), true);
 		balanceHandler.setConfirmedBalance("bittrex", Currency.ETH, new BigDecimal(10), true);
-		balanceHandler.setConfirmedBalance("gdax", Currency.BTC, new BigDecimal(1), true);
-		balanceHandler.setConfirmedBalance("gdax", Currency.LTC, new BigDecimal(50), true);
-		balanceHandler.setConfirmedBalance("gdax", Currency.ETH, new BigDecimal(10), true);
+//		balanceHandler.setConfirmedBalance("gdax", Currency.BTC, new BigDecimal(1), true);
+//		balanceHandler.setConfirmedBalance("gdax", Currency.LTC, new BigDecimal(50), true);
+//		balanceHandler.setConfirmedBalance("gdax", Currency.ETH, new BigDecimal(10), true);
 		return balanceHandler;
 	}
 	

@@ -1,5 +1,8 @@
 package com.kieral.cryptomon.messaging;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,19 +11,26 @@ import com.kieral.cryptomon.model.orderbook.OrderBook;
 public class OrderBookMessage {
 
 	private final static int MAX_DEPTH = 5;
+	private final static DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yy hh:mm:ss");
 	
 	private String market;
 	private String currencyPair;
 	private List<OrderBookRow> obEntries = new ArrayList<OrderBookRow>();
+	private String lastUpdated;
+	private boolean valid;
 	
 	public OrderBookMessage() {
 	}
 
-	public OrderBookMessage(String market, String currencyPair, List<OrderBookRow> obEntries) {
+	public OrderBookMessage(String market, String currencyPair, List<OrderBookRow> obEntries, long lastUpdated,
+			boolean valid) {
 		super();
 		this.market = market;
 		this.currencyPair = currencyPair;
 		this.obEntries = obEntries;
+		this.lastUpdated = dtf.format(Instant.ofEpochMilli(lastUpdated)
+				.atZone(ZoneId.systemDefault()).toLocalDateTime());
+		this.valid = valid;
 	}
 
 	public OrderBookMessage(OrderBook orderBook) {
@@ -47,6 +57,10 @@ public class OrderBookMessage {
 				if (row.getAskAmount() == null) row.setAskAmount("");
 			});
 		}
+		this.lastUpdated = dtf.format(Instant.ofEpochMilli(orderBook.getSnapshotReceived())
+				.atZone(ZoneId.systemDefault()).toLocalDateTime());
+		// TOOO: implement OB frozen in the model 
+		this.valid = true;
 	}
 
 	public String getMarket() {
@@ -73,10 +87,26 @@ public class OrderBookMessage {
 		this.obEntries = obEntries;
 	}
 
+	public String getLastUpdated() {
+		return lastUpdated;
+	}
+
+	public void setLastUpdated(String lastUpdated) {
+		this.lastUpdated = lastUpdated;
+	}
+
+	public boolean isValid() {
+		return valid;
+	}
+
+	public void setValid(boolean valid) {
+		this.valid = valid;
+	}
+
 	@Override
 	public String toString() {
-		return "OrderBookMessage [market=" + market + ", currencyPair=" + currencyPair + ", obEntries="
-				+ obEntries + "]";
+		return "OrderBookMessage [market=" + market + ", currencyPair=" + currencyPair + ", obEntries=" + obEntries
+				+ ", lastUpdated=" + lastUpdated + ", valid=" + valid + "]";
 	}
 	
 }

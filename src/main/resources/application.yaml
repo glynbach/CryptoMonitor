@@ -45,7 +45,7 @@ orderbook:
           significant-amount: 0.5
 POLONIEX: 
   exchange: poloniex
-  enabled: false
+  enabled: true
   push-api: "wss://api.poloniex.com"
   snapshot-api: "https://poloniex.com/public"
   trading-api: "https://poloniex.com/tradingApi"
@@ -56,8 +56,8 @@ POLONIEX:
   skip-hearbeats: true
   snapshot-baseline: true
   snapshot-baseline-Sequence: true
-  api-key-loc: "${user.home}/.poloniexApiKey"
-  api-secret-loc: "${user.home}/.poloniexApiSecret"
+  api-key-loc: "${user.home}/.cryptomon/.poloniexApiKey"
+  api-secret-loc: "${user.home}/.cryptomon/.poloniexApiSecret"
   currency-pairs: 
     - pair: "BTC_LTC"
       price-scale: 8
@@ -69,8 +69,8 @@ BITTREX:
   exchange: bittrex
   enabled: true
   push-api: ""
-  snapshot-api: "https://bittrex.com/api/v1.1/public"
-  trading-api: "https://bittrex.com/api/v1.1/market"
+  snapshot-api: "https://bittrex.com/api/v1.1"
+  trading-api: "https://bittrex.com/api/v1.1"
   subscription-mode: POLLING
   polling-interval: 2000
   max-trans-per-second: 6
@@ -78,8 +78,8 @@ BITTREX:
   skip-hearbeats: false
   snapshot-baseline: false
   snapshot-baseline-Sequence: false
-  api-key-loc: "${user.home}/.bittrexApiKey"
-  api-secret-loc: "${user.home}/.bittrexApiSecret"
+  api-key-loc: "${user.home}/.cryptomon/.bittrexApiKey"
+  api-secret-loc: "${user.home}/.cryptomon/.bittrexApiSecret"
   currency-pairs: 
     - pair: "BTC-LTC"
       price-scale: 8
@@ -89,7 +89,7 @@ BITTREX:
       trading-fee: "0.25"
 GDAX: 
   exchange: gdax
-  enabled: false
+  enabled: true
   push-api: ""
   snapshot-api: "https://api.gdax.com"
   trading-api: "https://api.gdax.com"
@@ -100,8 +100,9 @@ GDAX:
   skip-hearbeats: false
   snapshot-baseline: false
   snapshot-baseline-Sequence: false
-  api-key-loc: "${user.home}/.gdaxApiKey"
-  api-secret-loc: "${user.home}/.gdaxApiSecret"
+  api-key-loc: "${user.home}/.cryptomon/.gdaxApiKey"
+  api-secret-loc: "${user.home}/.cryptomon/.gdaxApiSecret"
+  api-passphrase-loc: "${user.home}/.cryptomon/.gdaxApiPassphrase"
   currency-pairs: 
     - pair: "LTC-BTC"
       price-scale: 8

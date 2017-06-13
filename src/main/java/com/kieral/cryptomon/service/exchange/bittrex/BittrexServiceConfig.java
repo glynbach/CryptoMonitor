@@ -5,6 +5,8 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.accounting.TradingFeeType;
+import com.kieral.cryptomon.model.general.ApiRequest;
+import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 
 @Component
@@ -12,7 +14,8 @@ import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 @ConfigurationProperties(prefix="BITTREX")
 public class BittrexServiceConfig extends ServiceExchangeProperties {
 
-	private static final String SNAPSHOT_QUERY = "/getorderbook?market=%s&type=both&depth=%s";
+	private static final String SNAPSHOT_QUERY = "/public/getorderbook?market=%s&type=both&depth=%s";
+	private static final String ACCOUNTS_QUERY = "/account/getbalances";
 
 	@Override
 	protected String[] splitPair(String topicStr) {
@@ -25,13 +28,18 @@ public class BittrexServiceConfig extends ServiceExchangeProperties {
 	}
 	
 	@Override
-	public String getOrderBookSnapshotQuery(String currencyPairSymbol) {
-		return snapshotApi + String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels);
+	public ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
+		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels), Method.GET);
 	}
 
 	@Override
 	public TradingFeeType getTradingFeeType() {
 		return TradingFeeType.PERCENTAGE;
+	}
+
+	@Override
+	public ApiRequest getAccountsQuery() {
+		return new ApiRequest(snapshotApi, ACCOUNTS_QUERY, Method.GET);
 	}
 
 }

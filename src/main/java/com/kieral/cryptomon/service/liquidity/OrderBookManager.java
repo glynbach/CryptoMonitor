@@ -85,8 +85,8 @@ public class OrderBookManager {
 		if (currencyPair == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
 		if (logger.isDebugEnabled())
-			logger.debug("Received updates {} for {} from {} with seq {} and maxLevel {}", updates, currencyPair.getName(),
-					market, sequenceNumber, maxLevel);
+			logger.debug("Received updates for {} from {} with seq {} and maxLevel {} - {}", currencyPair.getName(),
+					market, sequenceNumber, maxLevel, updates);
 		OrderBookKey key = new OrderBookKey(market, currencyPair.getName());
 		orderBooks.putIfAbsent(key, new OrderBook(market, currencyPair, 
 				sequenceNumber == AUTO_INCREMENT_SEQUENCE ? 0 : sequenceNumber, updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime));
@@ -176,8 +176,11 @@ public class OrderBookManager {
 				break;
 			}
 		}
+		if (logger.isDebugEnabled() && bidPrice == null)
+			logger.debug("No best bid price from orerbook {} " + orderBook);
 		BigDecimal askAmount = BigDecimal.ZERO;
 		BigDecimal askPrice = null;
+		// TODO: write some tests around cumulating significant amounts and the best bid / ask returned 
 		for (IOrderBookEntry entry : orderBook.getAsks()) {
 			askAmount = askAmount.add(entry.getAmount());
 			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
@@ -185,6 +188,8 @@ public class OrderBookManager {
 				break;
 			}
 		}
+		if (logger.isDebugEnabled() && askPrice == null)
+			logger.debug("No best ask price from orerbook {} " + orderBook);
 		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(bidAmount, askAmount));
 	}
 	

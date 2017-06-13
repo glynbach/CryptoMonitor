@@ -5,6 +5,8 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.accounting.TradingFeeType;
+import com.kieral.cryptomon.model.general.ApiRequest;
+import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 
 @Component
@@ -13,6 +15,7 @@ import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 public class PoloniexServiceConfig extends ServiceExchangeProperties {
 
 	private static final String SNAPSHOT_QUERY = "?command=returnOrderBook&currencyPair=%s&depth=%s";
+	private static final String ACCOUNTS_QUERY = "returnCompleteBalances";
 
 	@Override
 	protected String[] splitPair(String topicStr) {
@@ -25,13 +28,20 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 	}
 	
 	@Override
-	public String getOrderBookSnapshotQuery(String currencyPairSymbol) {
-		return snapshotApi + String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels);
+	public ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
+		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels), Method.GET);
 	}
 
 	@Override
 	public TradingFeeType getTradingFeeType() {
 		return TradingFeeType.PERCENTAGE;
+	}
+
+	@Override
+	public ApiRequest getAccountsQuery() {
+		ApiRequest apiRequest = new ApiRequest(snapshotApi, "", Method.POST);
+		apiRequest.addPostParameter("command", ACCOUNTS_QUERY);
+		return apiRequest;
 	}
 
 }
