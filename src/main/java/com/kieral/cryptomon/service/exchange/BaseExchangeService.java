@@ -1,5 +1,7 @@
 package com.kieral.cryptomon.service.exchange;
 
+import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,9 +18,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.ApiRequest;
+import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.BalanceHandler;
@@ -27,6 +35,7 @@ import com.kieral.cryptomon.service.connection.IStatusListener;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.SubscriptionMode;
 import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
+import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.streaming.IOrderedStreamingListener;
@@ -41,7 +50,7 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
 		@Override
 		public Thread newThread(Runnable r) {
-			Thread thread = new Thread(r, "ServiceScheduler");
+			Thread thread = new Thread(r, "ServiceScheduler-" + getName());
 			thread.setDaemon(true);
 			return thread;
 		}});
@@ -57,6 +66,7 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 	protected RestTemplate restTemplate;
 
 	protected final ServiceExchangeProperties serviceProperties;
+	protected final ServiceSecurityModule securityModule;
 	private final OrderedStreamingEmitter streamingEmitter;
 	
 	private final ConcurrentMap<String, AtomicBoolean> initialisedStreams = new ConcurrentHashMap<String, AtomicBoolean>();
@@ -73,11 +83,14 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 	private final long longSleep = 30 * 1000;
 	private int retryCount = 0;
 	
-	protected BaseExchangeService(final ServiceExchangeProperties serviceProperties) {
+	protected BaseExchangeService(final ServiceExchangeProperties serviceProperties, final ServiceSecurityModule securityModule) {
 		if (serviceProperties == null)
 			throw new IllegalArgumentException("serviceProperties can not be null");
+		if (securityModule == null)
+			throw new IllegalArgumentException("securityModule can not be null");
 		logger.info("Creating service with properties {}", serviceProperties);
 		this.serviceProperties = serviceProperties;
+		this.securityModule = securityModule;
 		this.skipHeartbeats = serviceProperties.isSkipHearbeats();
 		this.snapshotBaseline = serviceProperties.isSnapshotBaseline();
 		this.streamingEmitter = new OrderedStreamingEmitter(getName(), this, 
@@ -173,9 +186,10 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 					if (orderBookResponses != null) {
 						orderBookResponses.forEach(orderBookResponse -> {
 							try {
+								OrderBook orderBook = orderBookManager.getOrderBook(orderBookResponse, 
+										getName(), orderBookResponse.getCurrencyPair(), serviceProperties.getMaxLevels());
 								orderBookListeners.forEach(listener -> {
-									listener.onOrderBookUpdate(orderBookManager.getOrderBook(orderBookResponse, 
-											getName(), orderBookResponse.getCurrencyPair(), serviceProperties.getMaxLevels()));
+									listener.onOrderBookUpdate(orderBook);
 								});
 							} catch (Exception e) {
 								logger.error("Error processing order book response {}", orderBookResponse, e);
@@ -255,10 +269,10 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 	}
 
 	protected OrderBookResponse getOrderBookResponse(CurrencyPair currencyPair) {
-		String url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
+		ApiRequest url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
 		if (logger.isDebugEnabled())
-			logger.debug("Requesting orderbook snapshot from {}", url);
-		OrderBookResponse response = restTemplate.getForObject(url, getOrderBookResponseClazz());
+			logger.debug("Requesting orderbook snapshot from {}", url.getUrl());
+		OrderBookResponse response = restTemplate.getForObject(url.getUrl(), getOrderBookResponseClazz());
 		response.setCurrencyPair(currencyPair);
 		if (logger.isDebugEnabled())
 			logger.debug("Orderbook snapshot response {}", response);
@@ -291,7 +305,51 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 			}
 		}
 	}
+
+	@Override
+	public boolean isTradingLocked() {
+		return securityModule.isLocked();
+	}
+
+	@Override
+	public boolean unlockTrading(String secretKey) {
+		return securityModule.unLock(secretKey);
+	}
+
+	protected abstract Class<? extends AccountsResponse> getAccountsResponseClazz();
+
+	protected AccountsResponse getAccountsResponse() throws Exception {
+		ApiRequest apiRequest = serviceProperties.getAccountsQuery();
+		if (apiRequest.getMethod() == Method.GET)
+			return getTradingResponseForGet(apiRequest, "accounts", getAccountsResponseClazz());
+		else
+			return getTradingResponseForPut(apiRequest, "accounts", getAccountsResponseClazz());
+	}
 	
+	protected <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
+		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
+		if (logger.isDebugEnabled())
+			logger.debug("Requesting {} from POST {}", descr, apiRequest);
+		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.POST, apiRequest.getRequestPath(), apiRequest.getPostParametersAsQueryString());
+		HttpEntity<?> entity = new HttpEntity<>(apiRequest.getPostParameters(), headers);
+		ResponseEntity<? extends T> response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
+		if (logger.isDebugEnabled())
+			logger.debug("{} response {}", descr, response.getBody());
+		LoggingUtils.logRawData(String.format("%s: descr: %s", getName(), response.getBody()));
+		return response.getBody();
+	}
 	
-	
+	protected <T> T getTradingResponseForGet(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
+		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), Method.GET);
+		if (logger.isDebugEnabled())
+			logger.debug("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
+		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.GET, securityEnrichedUrl.getRequestPath(), null);
+		HttpEntity<?> entity = new HttpEntity<>(headers);
+		URI uri = new URL(apiRequest.getUrl()).toURI();
+		ResponseEntity<? extends T> response = restTemplate.exchange(uri, HttpMethod.GET, entity, clazz);
+		if (logger.isDebugEnabled())
+			logger.debug("{} response {}", descr, response.getBody());
+		LoggingUtils.logRawData(String.format("%s: descr: %s", getName(), response.getBody()));
+		return response.getBody();
+	}
 }

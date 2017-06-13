@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.kieral.cryptomon.model.accounting.TradingFeeType;
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.ApiRequest;
 
 public abstract class ServiceExchangeProperties {
 
@@ -30,6 +31,7 @@ public abstract class ServiceExchangeProperties {
     protected boolean snapshotBaselineSequence;
     protected String apiKeyLoc;
     protected String apiSecretLoc;
+    protected String apiPassphraseLoc;
     protected List<CurrencyPairProperties> currencyPairs;
 
 	private final AtomicBoolean initialised = new AtomicBoolean(false);
@@ -38,27 +40,6 @@ public abstract class ServiceExchangeProperties {
     public ServiceExchangeProperties() {
     }
     
-	public ServiceExchangeProperties(String exchange, boolean enabled, String pushApi, String snapshotApi, String tradingApi,
-			SubscriptionMode subscriptionMode, long pollingInterval, int maxTransPerSecond, int maxLevels, boolean skipHearbeats, boolean snapshotBaseline, 
-			boolean snapshotBaselineSequence, String apiKeyLoc, String apiSecretLoc, List<CurrencyPairProperties> currencyPairs) {
-		super();
-		this.exchange = exchange;
-		this.enabled = enabled;
-		this.pushApi = pushApi;
-		this.snapshotApi = snapshotApi;
-		this.tradingApi = tradingApi;
-		this.subscriptionMode = subscriptionMode;
-		this.pollingInterval = pollingInterval;
-		this.maxTransPerSecond = maxTransPerSecond;
-		this.maxLevels = maxLevels;
-		this.skipHearbeats = skipHearbeats;
-		this.snapshotBaseline = snapshotBaseline;
-		this.snapshotBaselineSequence = snapshotBaselineSequence;
-		this.apiKeyLoc = apiKeyLoc;
-		this.apiSecretLoc = apiSecretLoc;
-		this.currencyPairs = currencyPairs;
-	}
-
 	public String getExchange() {
 		return exchange;
 	}
@@ -171,6 +152,14 @@ public abstract class ServiceExchangeProperties {
 		this.apiSecretLoc = apiSecretLoc;
 	}
 
+	public String getApiPassphraseLoc() {
+		return apiPassphraseLoc;
+	}
+
+	public void setApiPassphraseLoc(String apiPassphraseLoc) {
+		this.apiPassphraseLoc = apiPassphraseLoc;
+	}
+
 	public List<CurrencyPairProperties> getCurrencyPairs() {
 		return currencyPairs;
 	}
@@ -205,19 +194,22 @@ public abstract class ServiceExchangeProperties {
 		return pairs;
 	}
 
-	public abstract String getOrderBookSnapshotQuery(String currencyPairSymbol);
+	public abstract ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol);
 
 	public abstract TradingFeeType getTradingFeeType();
 
+	public abstract ApiRequest getAccountsQuery();
+
 	@Override
 	public String toString() {
-		return "ServiceProperties [exchange=" + exchange + ", enabled=" + enabled + ", pushApi=" + pushApi
+		return "ServiceExchangeProperties [exchange=" + exchange + ", enabled=" + enabled + ", pushApi=" + pushApi
 				+ ", snapshotApi=" + snapshotApi + ", tradingApi=" + tradingApi + ", subscriptionMode="
 				+ subscriptionMode + ", pollingInterval=" + pollingInterval + ", maxTransPerSecond=" + maxTransPerSecond
-				+ ", maxLevels=" + maxLevels
-				+ ", skipHearbeats=" + skipHearbeats + ", snapshotBaseline=" + snapshotBaseline
-				+ ", snapshotBaselineSequence=" + snapshotBaselineSequence + ", apiKeyLoc=" + apiKeyLoc
-				+ ", apiSecretLoc=" + apiSecretLoc + ", currencyPairs=" + currencyPairs + "]";
+				+ ", maxLevels=" + maxLevels + ", skipHearbeats=" + skipHearbeats + ", snapshotBaseline="
+				+ snapshotBaseline + ", snapshotBaselineSequence=" + snapshotBaselineSequence + ", apiKeyLoc="
+				+ apiKeyLoc + ", apiSecretLoc=" + apiSecretLoc + ", apiPassphraseLoc=" + apiPassphraseLoc
+				+ ", currencyPairs=" + currencyPairs + ", pairs=" + pairs + "]";
 	}
+
 	
 }

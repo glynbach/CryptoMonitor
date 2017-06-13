@@ -4,14 +4,16 @@ import java.util.List;
 
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.exchange.BaseExchangeService;
+import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
+import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 
 public class GdaxService extends BaseExchangeService {
 
-	public GdaxService(GdaxServiceConfig serviceProperties) {
-		super(serviceProperties);
+	public GdaxService(GdaxServiceConfig serviceProperties, ServiceSecurityModule securityModule) {
+		super(serviceProperties, securityModule);
 		if (serviceProperties == null)
 			throw new IllegalArgumentException("serviceProperties can not be null");
 	}
@@ -45,4 +47,10 @@ public class GdaxService extends BaseExchangeService {
 		return GdaxOrderBookResponse.class;
 	}
 
+	@Override
+	protected Class<? extends AccountsResponse> getAccountsResponseClazz() {
+		return GdaxAccountsResponse.class;
+	}
+
+	
 }

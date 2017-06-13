@@ -16,5 +16,9 @@ public interface IExchangeService {
 	boolean isEnabled();
 
 	String getName();
+
+	boolean isTradingLocked();
+
+	boolean unlockTrading(String secretKey);
 	
 }

@@ -2,62 +2,33 @@
 
 .top-small-buffer { margin-top:5px; }
 
+.bottom-small-buffer { margin-bottom:5px; }
+
 .padded { padding: 5px; }
 
 .table-condensed { font-size: 10px; }
 
-/* Echo out a label */
-.echo-label:after {
-	content: "Label";
-	position: absolute;
-	top: -1px;
-	left: -1px;
-	padding: 3px 7px;
-	font-size: 12px;
-	font-weight: bold;
-	background-color: #f5f5f5;
-	border: 1px solid #ddd;
-	color: #9da0a4;
-	-webkit-border-radius: 4px 0 4px 0;
-	-moz-border-radius: 4px 0 4px 0;
-	border-radius: 4px 0 4px 0;
-	margin-bottom: 200px;
+.exchange-container
+{
+    border-radius: .2em;
+    border: 1px solid #cccccc;
+	margin-bottom: .5em;
+
+    -webkit-transition: border linear .2s, box-shadow linear .2s;
+    -moz-transition: border linear .2s, box-shadow linear .2s;
+    -o-transition: border linear .2s, box-shadow linear .2s;
+    transition: border linear .2s, box-shadow linear .2s;
 }
 
-.echo-label {
-	position: relative;
-	margin: 15px 0;
-	padding: 39px 19px 14px;
-	background-color: #fff;
-	border: 1px solid #ddd;
-	-webkit-border-radius: 4px;
-	-moz-border-radius: 4px;
-	border-radius: 4px;
-}
-
-.rounded-border {
-	position: relative;
-	margin: 15px 0;
-	padding: 39px 19px 14px;
-	background-color: #fff;
-	border: 1px solid #ddd;
-	-webkit-border-radius: 4px;
-	-moz-border-radius: 4px;
-	border-radius: 4px;
-}
-
-.label-container {
-	position: absolute;
-	top: -1px;
-	left: -1px;
-	padding: 3px 7px;
-	font-size: 12px;
-	font-weight: bold;
-	background-color: #f5f5f5;
-	border: 1px solid #ddd;
-	color: #8080ff;
-	-webkit-border-radius: 4px 0 4px 0;
-	-moz-border-radius: 4px 0 4px 0;
-	border-radius: 4px 0 4px 0;
-	margin-bottom: 200px;
+.borded-padded-container
+{
+    border-radius: .2em;
+    border: 1px solid #cccccc;
+	margin-right: .4em;
+	margin-bottom: .2em;
+	
+    -webkit-transition: border linear .2s, box-shadow linear .2s;
+    -moz-transition: border linear .2s, box-shadow linear .2s;
+    -o-transition: border linear .2s, box-shadow linear .2s;
+    transition: border linear .2s, box-shadow linear .2s;
 }

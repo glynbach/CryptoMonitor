@@ -5,15 +5,40 @@
 </head>
 <body>
 
-<div class="container">
+<div class="container-fluid">
     <div th:fragment="header">
         <nav class="navbar navbar-default">
             <div class="container-fluid">
                 <div class="navbar-header">
-                    <a class="navbar-brand" href="#" th:href="@{/}">Home</a>
+                    <a class="navbar-brand" href="#" th:href="@{/}">Order Books</a>
+                    <a class="navbar-brand" href="#" onClick="$('#unlockTrading').dialog('open');">Unlock Trading</a>
                 </div>
             </div>
         </nav>
+       	<div id="unlockTrading" style="display:none" title="Unlock Trading">
+			<form th:action="@{/unlockTrading}" method="post">
+				<div class="input-group span4">
+					<span class="input-group-addon">Key</span>
+					<input type="password" class="form-control" name="secretKey" id="secretKey"/>
+					<span class="input-group-addon"><button type="submit" class="btn btn-default">Unlock Trading</button></span>
+				</div>
+			</form>
+		</div>
+		<script>
+			$( document ).ready(function() {
+				$("#unlockTrading").dialog({
+				    autoOpen: false,
+				    show: 'slide',
+				    resizable: false,
+				    position: 'center',
+				    stack: true,
+				    height: 'auto',
+				    width: '500px',
+				    modal: true
+				});
+			});
+		</script>
+		
     </div>
 </div>
 

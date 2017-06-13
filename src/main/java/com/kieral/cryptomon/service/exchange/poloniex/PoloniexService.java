@@ -14,6 +14,8 @@ import com.kieral.cryptomon.model.orderbook.OrderBookAction;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.BaseExchangeService;
+import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
+import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
@@ -31,8 +33,8 @@ public class PoloniexService extends BaseExchangeService {
 
 	private AtomicLong lastSequence = new AtomicLong(-1);
 	
-	public PoloniexService(PoloniexServiceConfig serviceProperties) {
-		super(serviceProperties);
+	public PoloniexService(PoloniexServiceConfig serviceProperties, ServiceSecurityModule securityModule) {
+		super(serviceProperties, securityModule);
 		if (serviceProperties == null)
 			throw new IllegalArgumentException("serviceProperties can not be null");
 		streamingProperties = new StreamingProperties.Builder()
@@ -137,7 +139,11 @@ public class PoloniexService extends BaseExchangeService {
 	@Override
 	protected void unsubscribeMarketDataTopics() {
 		// TODO Auto-generated method stub
-		
+	}
+
+	@Override
+	protected Class<? extends AccountsResponse> getAccountsResponseClazz() {
+		return PoloniexAccountsResponse.class;
 	}
 
 }
