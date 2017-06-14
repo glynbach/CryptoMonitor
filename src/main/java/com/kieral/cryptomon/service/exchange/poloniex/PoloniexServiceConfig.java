@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.accounting.TradingFeeType;
 import com.kieral.cryptomon.model.general.ApiRequest;
+import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 
@@ -39,7 +40,7 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 
 	@Override
 	public ApiRequest getAccountsQuery() {
-		ApiRequest apiRequest = new ApiRequest(snapshotApi, "", Method.POST);
+		ApiRequest apiRequest = new ApiRequest(tradingApi, "", Method.POST, BodyType.URLENCODED);
 		apiRequest.addPostParameter("command", ACCOUNTS_QUERY);
 		return apiRequest;
 	}

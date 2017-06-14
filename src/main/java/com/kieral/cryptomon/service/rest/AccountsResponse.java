@@ -1,5 +1,9 @@
 package com.kieral.cryptomon.service.rest;
 
-public abstract class AccountsResponse {
+import java.util.List;
 
+public interface AccountsResponse {
+
+	public abstract List<? extends AccountResponse> getAccountResponses();
+	
 }

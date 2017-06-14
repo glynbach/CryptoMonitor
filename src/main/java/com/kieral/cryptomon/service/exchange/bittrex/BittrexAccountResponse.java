@@ -4,9 +4,11 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kieral.cryptomon.model.general.Currency;
+import com.kieral.cryptomon.service.rest.AccountResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class BittrexAccountResponse {
+public class BittrexAccountResponse implements AccountResponse {
 
 	private String cryptoAddress;
 	private String currency;
@@ -63,6 +65,31 @@ public class BittrexAccountResponse {
 	public String toString() {
 		return "BittrexAccountResponse [cryptoAddress=" + cryptoAddress + ", currency=" + currency + ", balance="
 				+ balance + ", available=" + available + ", pending=" + pending + "]";
+	}
+
+	@Override
+	public String getAccountId() {
+		return cryptoAddress;
+	}
+
+	@Override
+	public String getAccountAddress() {
+		return cryptoAddress;
+	}
+
+	@Override
+	public Currency getAccountCuurency() {
+		return Currency.valueOf(currency);
+	}
+
+	@Override
+	public BigDecimal getAvailableBalance() {
+		return available;
+	}
+
+	@Override
+	public BigDecimal getPendingBalance() {
+		return pending;
 	}
 	
 }

@@ -1,7 +1,5 @@
 package com.kieral.cryptomon;
 
-import java.math.BigDecimal;
-
 import javax.annotation.PostConstruct;
 
 import org.apache.catalina.connector.Connector;
@@ -14,12 +12,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
-import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.service.BalanceHandler;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbMonitorService;
@@ -114,12 +112,12 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	BalanceHandler balanceHandler() {
 		BalanceHandler balanceHandler = new BalanceHandler();
 		// TODO: implement - adding some now for testing
-		balanceHandler.setConfirmedBalance("poloniex", Currency.BTC, new BigDecimal(1), true);
-		balanceHandler.setConfirmedBalance("poloniex", Currency.LTC, new BigDecimal(50), true);
-		balanceHandler.setConfirmedBalance("poloniex", Currency.ETH, new BigDecimal(10), true);
-		balanceHandler.setConfirmedBalance("bittrex", Currency.BTC, new BigDecimal(1), true);
-		balanceHandler.setConfirmedBalance("bittrex", Currency.LTC, new BigDecimal(50), true);
-		balanceHandler.setConfirmedBalance("bittrex", Currency.ETH, new BigDecimal(10), true);
+//		balanceHandler.setConfirmedBalance("poloniex", Currency.BTC, new BigDecimal(1), true);
+//		balanceHandler.setConfirmedBalance("poloniex", Currency.LTC, new BigDecimal(50), true);
+//		balanceHandler.setConfirmedBalance("poloniex", Currency.ETH, new BigDecimal(10), true);
+//		balanceHandler.setConfirmedBalance("bittrex", Currency.BTC, new BigDecimal(1), true);
+//		balanceHandler.setConfirmedBalance("bittrex", Currency.LTC, new BigDecimal(50), true);
+//		balanceHandler.setConfirmedBalance("bittrex", Currency.ETH, new BigDecimal(10), true);
 //		balanceHandler.setConfirmedBalance("gdax", Currency.BTC, new BigDecimal(1), true);
 //		balanceHandler.setConfirmedBalance("gdax", Currency.LTC, new BigDecimal(50), true);
 //		balanceHandler.setConfirmedBalance("gdax", Currency.ETH, new BigDecimal(10), true);
@@ -170,7 +168,7 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 
 	@Bean
 	public RestTemplate restTemplate(RestTemplateBuilder builder) {
-		return builder.build();
+		return builder.detectRequestFactory(true).build();
 	}
 	
 	@Bean
@@ -197,5 +195,10 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	    }
 
 	    return tomcat;
+	}
+	
+	@Bean
+	public HttpComponentsClientHttpRequestFactory httpComponentsClientHttpRequestFactory() {
+		return new HttpComponentsClientHttpRequestFactory();
 	}
 }

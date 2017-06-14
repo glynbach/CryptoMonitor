@@ -1,9 +1,10 @@
 package com.kieral.cryptomon.service.exchange;
 
 import java.io.File;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,8 @@ public abstract class ServiceSecurityModule {
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
 	private final AtomicBoolean tradingLocked = new AtomicBoolean(true);
-	protected static final AtomicInteger nonce = new AtomicInteger((int)System.currentTimeMillis()/1000);
+	protected static final AtomicLong secondsNonce = new AtomicLong(Instant.now().getEpochSecond());
+	protected static final AtomicLong millisNonce = new AtomicLong(System.currentTimeMillis());
 	
 	protected final ServiceExchangeProperties properties;
 	

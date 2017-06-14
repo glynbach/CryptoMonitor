@@ -15,7 +15,7 @@ import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 public class GdaxServiceConfig extends ServiceExchangeProperties {
 
 	private static final String SNAPSHOT_QUERY = "/products/%s/book?level=2";
-	private static final String ACCOUNTS_QUERY = "/products/%s/book?level=2";
+	private static final String ACCOUNTS_QUERY = "/accounts";
 
 	@Override
 	protected String[] splitPair(String topicStr) {

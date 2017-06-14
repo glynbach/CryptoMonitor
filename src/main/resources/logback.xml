@@ -54,8 +54,10 @@
 	</logger>
 
 	<!--
-	<logger name="com.kieral.cryptomon.service.arb.ArbMonitorService" level="DEBUG" />
+	<logger name="org.apache.http.wire" level="DEBUG" />
+	<logger name="org.apache.http.headers" level="DEBUG" />
 	<logger name="com.kieral.cryptomon.service.exchange.bittrex" level="DEBUG" />
+	<logger name="com.kieral.cryptomon.service.arb.ArbMonitorService" level="DEBUG" />
 	<logger name="com.kieral.cryptomon.service.liquidity.OrderBookManager" level="DEBUG" />
 	-->
 		

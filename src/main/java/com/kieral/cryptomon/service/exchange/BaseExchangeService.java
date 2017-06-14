@@ -1,7 +1,5 @@
 package com.kieral.cryptomon.service.exchange;
 
-import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,12 +24,14 @@ import org.springframework.web.client.RestTemplate;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.ApiRequest;
+import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.BalanceHandler;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.exception.BalanceRequestException;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.SubscriptionMode;
 import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
@@ -316,40 +316,56 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 		return securityModule.unLock(secretKey);
 	}
 
+	@Override
+	public void requestBalance(boolean overrideWorkingBalance) throws BalanceRequestException {
+		try {
+			AccountsResponse response = getAccountsResponse();
+			if (response == null)
+				throw new BalanceRequestException("No balances returned from exchange");
+			if (response.getAccountResponses() != null) {
+				response.getAccountResponses().forEach(account -> {
+					if (account.getAvailableBalance() != null) {
+						balanceHandler.setConfirmedBalance(getName(), account.getAccountCuurency(), account.getAvailableBalance(), overrideWorkingBalance);
+					} else {
+						logger.warn("No balance returned from exchange for {}", account.getAccountCuurency());
+					}
+				});
+			} 
+		} catch (Exception e) {
+			throw new BalanceRequestException("Error trying to request balances", e);
+		}
+	}
+
 	protected abstract Class<? extends AccountsResponse> getAccountsResponseClazz();
 
 	protected AccountsResponse getAccountsResponse() throws Exception {
 		ApiRequest apiRequest = serviceProperties.getAccountsQuery();
 		if (apiRequest.getMethod() == Method.GET)
 			return getTradingResponseForGet(apiRequest, "accounts", getAccountsResponseClazz());
-		else
+		else {
 			return getTradingResponseForPut(apiRequest, "accounts", getAccountsResponseClazz());
+		}
 	}
 	
 	protected <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
 		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
-		if (logger.isDebugEnabled())
-			logger.debug("Requesting {} from POST {}", descr, apiRequest);
-		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.POST, apiRequest.getRequestPath(), apiRequest.getPostParametersAsQueryString());
-		HttpEntity<?> entity = new HttpEntity<>(apiRequest.getPostParameters(), headers);
+		logger.info("Requesting {} from POST {}", descr, apiRequest);
+		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.POST, apiRequest.getRequestPath(), apiRequest.getBodyAsString());
+		HttpEntity<?> entity = new HttpEntity<>(apiRequest.getBodyType() == BodyType.URLENCODED ? apiRequest.getBodyAsString() : apiRequest.getPostParameters(), headers);
 		ResponseEntity<? extends T> response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
-		if (logger.isDebugEnabled())
-			logger.debug("{} response {}", descr, response.getBody());
-		LoggingUtils.logRawData(String.format("%s: descr: %s", getName(), response.getBody()));
+		logger.info("{} response {}", descr, response.getBody());
+		LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
 		return response.getBody();
 	}
 	
 	protected <T> T getTradingResponseForGet(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
 		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), Method.GET);
-		if (logger.isDebugEnabled())
-			logger.debug("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
+		logger.info("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.GET, securityEnrichedUrl.getRequestPath(), null);
 		HttpEntity<?> entity = new HttpEntity<>(headers);
-		URI uri = new URL(apiRequest.getUrl()).toURI();
-		ResponseEntity<? extends T> response = restTemplate.exchange(uri, HttpMethod.GET, entity, clazz);
-		if (logger.isDebugEnabled())
-			logger.debug("{} response {}", descr, response.getBody());
-		LoggingUtils.logRawData(String.format("%s: descr: %s", getName(), response.getBody()));
+		ResponseEntity<? extends T> response = restTemplate.exchange(securityEnrichedUrl.getUrl(), HttpMethod.GET, entity, clazz);
+		logger.info("{} response {}", descr, response.getBody());
+		LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
 		return response.getBody();
 	}
 }
