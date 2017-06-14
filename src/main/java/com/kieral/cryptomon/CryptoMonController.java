@@ -1,5 +1,9 @@
 package com.kieral.cryptomon;
 
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,6 +15,8 @@ import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 @Controller
 public class CryptoMonController {
 
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+	
 	@Autowired
 	ExchangeManagerService exchangeManagerService;
 	
@@ -21,9 +27,9 @@ public class CryptoMonController {
 
     @RequestMapping("/unlockTrading")
     public String secretKey(@RequestParam(value="secretKey", required=true) String secretKey, Model model) {
-    	exchangeManagerService.getEnabledExchanges().forEach(service -> {
-    		service.unlockTrading(secretKey);
-    	});
+    	logger.info("Received request to unlock trading");
+    	List<String> errors = exchangeManagerService.unlockTradingAll(secretKey);
+    	logger.info("Trading unlock response {}", errors);
     	return "home";
     }
 

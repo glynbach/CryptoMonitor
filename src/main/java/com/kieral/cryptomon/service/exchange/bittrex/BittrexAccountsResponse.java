@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class BittrexAccountsResponse extends AccountsResponse {
+public class BittrexAccountsResponse implements AccountsResponse {
 
 	private boolean success;
 	private String message;

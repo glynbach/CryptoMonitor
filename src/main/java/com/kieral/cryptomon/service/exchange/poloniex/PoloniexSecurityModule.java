@@ -7,6 +7,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.crypto.codec.Hex;
 
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
@@ -38,14 +39,15 @@ public class PoloniexSecurityModule extends ServiceSecurityModule {
 	public void appendApiPostParameterEntries(Map<String, String> postParameters) {
 		if (postParameters == null)
 			throw new IllegalStateException("postParameters can not be null");
-		postParameters.put("nonce", String.valueOf(nonce.incrementAndGet()));
+		postParameters.put("nonce", String.valueOf(millisNonce.incrementAndGet()));
 	}
 
 	@Override
 	public HttpHeaders sign(long timestamp, Method method, String requestPath, String body) throws Exception {
 		HttpHeaders headers = new HttpHeaders();
 		headers.add("Key", apiKey);
-		headers.add("Sign", new String(mac.doFinal((body).getBytes())));
+		headers.add("Sign", new String(Hex.encode(mac.doFinal((body).getBytes()))));
+		headers.add("Content-Type", "application/x-www-form-urlencoded");
 		return headers;
 	}
 

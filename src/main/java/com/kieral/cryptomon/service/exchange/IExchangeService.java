@@ -1,6 +1,7 @@
 package com.kieral.cryptomon.service.exchange;
 
 import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.exception.BalanceRequestException;
 import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
 
 public interface IExchangeService {
@@ -19,6 +20,12 @@ public interface IExchangeService {
 
 	boolean isTradingLocked();
 
+	/**
+	 * @param secretKey
+	 * @returns false if trading is unlocked
+	 */
 	boolean unlockTrading(String secretKey);
-	
+
+	void requestBalance(boolean overrideWorkingBalance) throws BalanceRequestException;
+
 }

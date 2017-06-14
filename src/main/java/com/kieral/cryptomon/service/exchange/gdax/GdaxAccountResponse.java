@@ -3,9 +3,11 @@ package com.kieral.cryptomon.service.exchange.gdax;
 import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.kieral.cryptomon.model.general.Currency;
+import com.kieral.cryptomon.service.rest.AccountResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class GdaxAccountResponse {
+public class GdaxAccountResponse implements AccountResponse {
 
 	private String id;
 	private String currency;
@@ -57,6 +59,31 @@ public class GdaxAccountResponse {
 	public String toString() {
 		return "GdaxAccountResponse [id=" + id + ", currency=" + currency + ", balance=" + balance + ", available="
 				+ available + ", hold=" + hold + "]";
+	}
+
+	@Override
+	public String getAccountId() {
+		return id;
+	}
+
+	@Override
+	public String getAccountAddress() {
+		return id;
+	}
+
+	@Override
+	public Currency getAccountCuurency() {
+		return Currency.valueOf(currency);
+	}
+
+	@Override
+	public BigDecimal getAvailableBalance() {
+		return available;
+	}
+
+	@Override
+	public BigDecimal getPendingBalance() {
+		return hold;
 	}
 	
 }

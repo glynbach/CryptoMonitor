@@ -7,6 +7,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.crypto.codec.Hex;
 
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
@@ -32,7 +33,7 @@ public class BittrexSecurityModule extends ServiceSecurityModule {
 	@Override
 	public HttpHeaders sign(long timestamp, Method method, String requestPath, String body) throws Exception {
 		HttpHeaders headers = new HttpHeaders();
-		headers.add("apisign", new String(mac.doFinal((properties.getTradingApi() + requestPath).getBytes())));
+		headers.add("apisign", new String(Hex.encode(mac.doFinal((properties.getTradingApi() + requestPath).getBytes()))));
 		return headers;
 	}
 
@@ -44,7 +45,7 @@ public class BittrexSecurityModule extends ServiceSecurityModule {
 		else
 			sb.append("&");
 		sb.append("apiKey=").append(apiKey);
-		sb.append("&nonce").append(nonce.incrementAndGet());
+		sb.append("&nonce=").append(secondsNonce.incrementAndGet());
 		return sb.toString();
 	}
 
