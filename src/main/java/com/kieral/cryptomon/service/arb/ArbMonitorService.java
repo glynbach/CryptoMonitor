@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
-import com.kieral.cryptomon.service.BalanceHandler;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
@@ -27,11 +27,11 @@ public class ArbMonitorService {
 	@Autowired
 	ExchangeManagerService exchangeManager;
 	@Autowired
-	BalanceHandler balanceHandler;
+	BalanceService balanceHandler;
 	@Autowired
-	IArbExaminer arbExaminer;
+	ArbExaminer arbExaminer;
 	@Autowired
-	IArbInstructionHandler arbInstructionHandler;
+	ArbInstructionHandler arbInstructionHandler;
 	
 	private final ConcurrentMap<String, ConcurrentMap<String, OrderBook>> books = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBook>>();
 	final ConcurrentMap<String, List<String>> comparedBooks = new ConcurrentHashMap<String, List<String>>();

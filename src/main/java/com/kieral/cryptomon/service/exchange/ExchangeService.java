@@ -1,18 +1,18 @@
 package com.kieral.cryptomon.service.exchange;
 
-import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
-import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
+import com.kieral.cryptomon.service.liquidity.OrderBookListener;
 
-public interface IExchangeService {
+public interface ExchangeService {
 
 	void connect() throws InterruptedException;
 	
 	void disconnect();
 	
-	void registerOrderBookListener(IOrderBookListener orderBookListener);
+	void registerOrderBookListener(OrderBookListener orderBookListener);
 	
-	void registerStatusListener(IStatusListener statusListener);
+	void registerStatusListener(ConnectionStatusListener statusListener);
 
 	boolean isEnabled();
 

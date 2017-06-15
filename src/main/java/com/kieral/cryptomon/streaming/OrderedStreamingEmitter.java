@@ -32,7 +32,7 @@ public class OrderedStreamingEmitter {
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	private final static long MAX_WAIT_ON_MISSING_SEQ = 1000;
 	
-	private final IOrderedStreamingListener listener;
+	private final OrderedStreamingListener listener;
 	private final boolean snapshotRequired;
 	private final boolean useSnapshotSequence;
 	private final ConcurrentMap<String, AtomicBoolean> snapshotsReceived = new ConcurrentHashMap<String, AtomicBoolean>();
@@ -42,7 +42,7 @@ public class OrderedStreamingEmitter {
 
 	private ConcurrentMap<String, PayloadPark> payloads = new ConcurrentHashMap<String, PayloadPark>();
 	
-	public OrderedStreamingEmitter(String market, IOrderedStreamingListener listener, boolean snapshotRequired,
+	public OrderedStreamingEmitter(String market, OrderedStreamingListener listener, boolean snapshotRequired,
 			boolean useSnapshotSequence, int processorPoolSize) {
 		this.stickyThreadPool = new StickyThreadPool(market, processorPoolSize);
 		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new ThreadFactory() {

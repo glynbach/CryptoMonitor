@@ -18,10 +18,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
 import com.kieral.cryptomon.model.accounting.Balance;
-import com.kieral.cryptomon.service.BalanceHandler;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
-import com.kieral.cryptomon.service.exchange.IExchangeService;
+import com.kieral.cryptomon.service.exchange.ExchangeService;
 
 @Controller
 @EnableScheduling
@@ -47,9 +47,9 @@ public class ClientMessagingController {
 	@Autowired 
 	ExchangeManagerService exchangeManager;
 	@Autowired
-	BalanceHandler balanceHandler;
+	BalanceService balanceHandler;
 
-	private List<IExchangeService> exchanges = new ArrayList<IExchangeService>();
+	private List<ExchangeService> exchanges = new ArrayList<ExchangeService>();
 	private ConcurrentMap<String, ConcurrentMap<String, OrderBookMessage>> orderBooks = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBookMessage>>();
 	private ConcurrentMap<String, ConnectionStatus> statuses = new ConcurrentHashMap<String, ConnectionStatus>();
 	private List<String> subscriptions = Collections.synchronizedList(new ArrayList<String>());

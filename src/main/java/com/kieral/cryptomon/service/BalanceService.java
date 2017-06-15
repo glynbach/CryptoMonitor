@@ -17,7 +17,7 @@ import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.service.exception.BalanceUnavailableException;
 import com.kieral.cryptomon.service.exception.NotEnoughFundsException;
 
-public class BalanceHandler {
+public class BalanceService {
 
 	private final Comparator<Balance> byMarket = Comparator.comparing(balance -> balance.getMarket());
 	private final Comparator<Balance> byCurrency = Comparator.comparing(balance -> balance.getCurrency());

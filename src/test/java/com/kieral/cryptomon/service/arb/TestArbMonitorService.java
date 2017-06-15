@@ -19,11 +19,11 @@ import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
-import com.kieral.cryptomon.service.BalanceHandler;
-import com.kieral.cryptomon.service.connection.IStatusListener;
-import com.kieral.cryptomon.service.exchange.IExchangeService;
+import com.kieral.cryptomon.service.BalanceService;
+import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
+import com.kieral.cryptomon.service.exchange.ExchangeService;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
-import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
+import com.kieral.cryptomon.service.liquidity.OrderBookListener;
 import com.kieral.cryptomon.test.utlil.TestUtils;
 
 public class TestArbMonitorService {
@@ -36,16 +36,16 @@ public class TestArbMonitorService {
 	final static BidAskAmount amounts = new BidAskAmount(BigDecimal.ONE, BigDecimal.ONE);
 	
 	ExchangeManagerService exchangeManager;
-	BalanceHandler balanceHandler;
-	IArbExaminer arbExaminer;
-	IArbInstructionHandler instructionHandler;
+	BalanceService balanceHandler;
+	ArbExaminer arbExaminer;
+	ArbInstructionHandler instructionHandler;
 	
-	IOrderBookListener obListener1;
-	IOrderBookListener obListener2;
-	IOrderBookListener obListener3;
-	IStatusListener statusListener1;
-	IStatusListener statusListener2;
-	IStatusListener statusListener3;
+	OrderBookListener obListener1;
+	OrderBookListener obListener2;
+	OrderBookListener obListener3;
+	ConnectionStatusListener statusListener1;
+	ConnectionStatusListener statusListener2;
+	ConnectionStatusListener statusListener3;
 	List<ArbInstruction> arbInstructions;
 	
 	ArbMonitorService arbMonitorService;
@@ -130,50 +130,50 @@ public class TestArbMonitorService {
 
 	@Before
 	public void setUp() {
-		balanceHandler = new BalanceHandler();
+		balanceHandler = new BalanceService();
 		exchangeManager = Mockito.mock(ExchangeManagerService.class);
-		IExchangeService exchange1 = Mockito.mock(IExchangeService.class);
-		IExchangeService exchange2 = Mockito.mock(IExchangeService.class);
-		IExchangeService exchange3 = Mockito.mock(IExchangeService.class);
+		ExchangeService exchange1 = Mockito.mock(ExchangeService.class);
+		ExchangeService exchange2 = Mockito.mock(ExchangeService.class);
+		ExchangeService exchange3 = Mockito.mock(ExchangeService.class);
 		Mockito.when(exchangeManager.getEnabledExchanges()).thenReturn(
-				Arrays.asList(new IExchangeService[]{exchange1, exchange2, exchange3}));
+				Arrays.asList(new ExchangeService[]{exchange1, exchange2, exchange3}));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				obListener1 = (IOrderBookListener)invocation.getArgument(0);
+				obListener1 = (OrderBookListener)invocation.getArgument(0);
 				return null;
-			}}).when(exchange1).registerOrderBookListener(Mockito.any(IOrderBookListener.class));
+			}}).when(exchange1).registerOrderBookListener(Mockito.any(OrderBookListener.class));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				obListener2 = (IOrderBookListener)invocation.getArgument(0);
+				obListener2 = (OrderBookListener)invocation.getArgument(0);
 				return null;
-			}}).when(exchange2).registerOrderBookListener(Mockito.any(IOrderBookListener.class));
+			}}).when(exchange2).registerOrderBookListener(Mockito.any(OrderBookListener.class));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				obListener3 = (IOrderBookListener)invocation.getArgument(0);
+				obListener3 = (OrderBookListener)invocation.getArgument(0);
 				return null;
-			}}).when(exchange3).registerOrderBookListener(Mockito.any(IOrderBookListener.class));
+			}}).when(exchange3).registerOrderBookListener(Mockito.any(OrderBookListener.class));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				statusListener1 = (IStatusListener)invocation.getArgument(0);
+				statusListener1 = (ConnectionStatusListener)invocation.getArgument(0);
 				return null;
-			}}).when(exchange1).registerStatusListener(Mockito.any(IStatusListener.class));
+			}}).when(exchange1).registerStatusListener(Mockito.any(ConnectionStatusListener.class));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				statusListener2 = (IStatusListener)invocation.getArgument(0);
+				statusListener2 = (ConnectionStatusListener)invocation.getArgument(0);
 				return null;
-			}}).when(exchange2).registerStatusListener(Mockito.any(IStatusListener.class));
+			}}).when(exchange2).registerStatusListener(Mockito.any(ConnectionStatusListener.class));
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
-				statusListener3 = (IStatusListener)invocation.getArgument(0);
+				statusListener3 = (ConnectionStatusListener)invocation.getArgument(0);
 				return null;
-			}}).when(exchange3).registerStatusListener(Mockito.any(IStatusListener.class));
-		arbExaminer = Mockito.mock(IArbExaminer.class);
+			}}).when(exchange3).registerStatusListener(Mockito.any(ConnectionStatusListener.class));
+		arbExaminer = Mockito.mock(ArbExaminer.class);
 		Mockito.doAnswer(new Answer<ArbInstruction>() {
 			@Override
 			public ArbInstruction answer(InvocationOnMock invocation) throws Throwable {
@@ -203,7 +203,7 @@ public class TestArbMonitorService {
 				return ArbInstructionFactory.createNoArbInstruction("");
 			}}).when(arbExaminer).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		arbInstructions = new ArrayList<ArbInstruction>();
-		instructionHandler = Mockito.mock(IArbInstructionHandler.class);
+		instructionHandler = Mockito.mock(ArbInstructionHandler.class);
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 import com.kieral.cryptomon.model.general.Side;
 
-public interface IOrderBookEntry {
+public interface OrderBookEntry {
 
 	Side getSide();
 	BigDecimal getPrice();

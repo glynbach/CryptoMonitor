@@ -30,6 +30,7 @@ public class CryptoMonController {
     	logger.info("Received request to unlock trading");
     	List<String> errors = exchangeManagerService.unlockTradingAll(secretKey);
     	logger.info("Trading unlock response {}", errors);
+    	//TODO: redirect this back to home
     	return "home";
     }
 

@@ -28,22 +28,22 @@ import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
-import com.kieral.cryptomon.service.BalanceHandler;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
-import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.SubscriptionMode;
-import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
+import com.kieral.cryptomon.service.liquidity.OrderBookListener;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.service.util.LoggingUtils;
-import com.kieral.cryptomon.streaming.IOrderedStreamingListener;
+import com.kieral.cryptomon.streaming.OrderedStreamingListener;
 import com.kieral.cryptomon.streaming.OrderedStreamingEmitter;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 
-public abstract class BaseExchangeService implements IExchangeService, IOrderedStreamingListener {
+public abstract class BaseExchangeService implements ExchangeService, OrderedStreamingListener {
 
 	protected Logger logger = LoggerFactory.getLogger(this.getClass());
 	
@@ -55,13 +55,13 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 			return thread;
 		}});
 	private ScheduledFuture<?> marketDataPoller;
-	private final List<IStatusListener> statusListeners = new CopyOnWriteArrayList<IStatusListener>();
-	private final List<IOrderBookListener> orderBookListeners = new CopyOnWriteArrayList<IOrderBookListener>();
+	private final List<ConnectionStatusListener> statusListeners = new CopyOnWriteArrayList<ConnectionStatusListener>();
+	private final List<OrderBookListener> orderBookListeners = new CopyOnWriteArrayList<OrderBookListener>();
 
 	@Autowired
 	protected OrderBookManager orderBookManager;
 	@Autowired
-	protected BalanceHandler balanceHandler;
+	protected BalanceService balanceHandler;
 	@Autowired
 	protected RestTemplate restTemplate;
 
@@ -147,7 +147,7 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 			this.status.set(status);
 		
 		if (statusListeners != null) {
-			for (IStatusListener listener : statusListeners) {
+			for (ConnectionStatusListener listener : statusListeners) {
 				try {
 					listener.onStatusChange(status);
 				} catch (Exception e) {
@@ -158,13 +158,13 @@ public abstract class BaseExchangeService implements IExchangeService, IOrderedS
 	}
 	
 	@Override
-	public void registerOrderBookListener(IOrderBookListener orderBookListener) {
+	public void registerOrderBookListener(OrderBookListener orderBookListener) {
 		if (!orderBookListeners.contains(orderBookListener))
 			orderBookListeners.add(orderBookListener);
 	}
 
 	@Override
-	public void registerStatusListener(IStatusListener statusListener) {
+	public void registerStatusListener(ConnectionStatusListener statusListener) {
 		if (!statusListeners.contains(statusListener))
 			statusListeners.add(statusListener);
 	}
