@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.kieral.cryptomon.service.BalanceHandler;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.util.CommonUtils;
@@ -18,14 +18,14 @@ import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
 
-public class BasicArbExaminer implements IArbExaminer {
+public class BasicArbExaminer implements ArbExaminer {
 
 	private final static ArbInstruction NO_ARB = ArbInstructionFactory.createNoArbInstruction(null);
 	
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
 	@Autowired
-	BalanceHandler balanceHandler;
+	BalanceService balanceHandler;
 	@Autowired
 	OrderBookManager orderBookManager;
 	@Autowired

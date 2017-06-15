@@ -11,7 +11,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
-import com.kieral.cryptomon.service.BalanceHandler;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.test.utlil.TestUtils;
@@ -20,14 +20,14 @@ public class TestBasicArbExaminer {
 
 	BasicArbExaminer arbExaminer;
 	OrderBookConfig orderBookConfig;
-	BalanceHandler balanceHandler;
+	BalanceService balanceHandler;
 	OrderBookManager orderBookManager;
 	
 	@Before
 	public void setUp() {
 		arbExaminer = new BasicArbExaminer();
 		orderBookConfig = TestUtils.obConfig();
-		balanceHandler = new BalanceHandler();
+		balanceHandler = new BalanceService();
 		orderBookManager = new OrderBookManager();
 		ReflectionTestUtils.setField(arbExaminer, "balanceHandler", balanceHandler);
 		ReflectionTestUtils.setField(arbExaminer, "orderBookManager", orderBookManager);

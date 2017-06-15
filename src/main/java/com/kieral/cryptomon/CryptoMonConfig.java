@@ -18,14 +18,14 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
-import com.kieral.cryptomon.service.BalanceHandler;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbMonitorService;
 import com.kieral.cryptomon.service.arb.BasicArbExaminer;
-import com.kieral.cryptomon.service.arb.IArbExaminer;
-import com.kieral.cryptomon.service.arb.IArbInstructionHandler;
+import com.kieral.cryptomon.service.arb.ArbExaminer;
+import com.kieral.cryptomon.service.arb.ArbInstructionHandler;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
-import com.kieral.cryptomon.service.exchange.IExchangeService;
+import com.kieral.cryptomon.service.exchange.ExchangeService;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexSecurityModule;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexService;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
@@ -40,8 +40,8 @@ import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.tickstore.TickstoreService;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.tickstore.DaoManager;
-import com.kieral.cryptomon.tickstore.IOrderBookDao;
 import com.kieral.cryptomon.tickstore.OrderBookDao;
+import com.kieral.cryptomon.tickstore.OrderBookDaoImpl;
 
 @EnableWebMvc
 @Configuration
@@ -80,23 +80,23 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	OrderBookConfig orderBookConfig;
 
 	@Bean
-	IExchangeService poloniexService() {
+	ExchangeService poloniexService() {
 		return new PoloniexService(poloniexServiceConfig, new PoloniexSecurityModule(poloniexServiceConfig));		
 	}
 
 	@Bean
-	IExchangeService bittrexService() {
+	ExchangeService bittrexService() {
 		return new BittrexService(bittrexServiceConfig, new BittrexSecurityModule(bittrexServiceConfig));		
 	}
 
 	@Bean
-	IExchangeService gdaxService() {
+	ExchangeService gdaxService() {
 		return new GdaxService(gdaxServiceConfig, new GdaxSecurityModule(gdaxServiceConfig));		
 	}
 
 	@Bean
 	ExchangeManagerService exchangeManagerService() {
-		return new ExchangeManagerService(new IExchangeService[]{
+		return new ExchangeManagerService(new ExchangeService[]{
 				poloniexService(),
 				bittrexService(),
 				gdaxService()
@@ -109,8 +109,8 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 	
 	@Bean
-	BalanceHandler balanceHandler() {
-		BalanceHandler balanceHandler = new BalanceHandler();
+	BalanceService balanceHandler() {
+		BalanceService balanceHandler = new BalanceService();
 		// TODO: implement - adding some now for testing
 //		balanceHandler.setConfirmedBalance("poloniex", Currency.BTC, new BigDecimal(1), true);
 //		balanceHandler.setConfirmedBalance("poloniex", Currency.LTC, new BigDecimal(50), true);
@@ -130,9 +130,9 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 	
 	@Bean
-	IArbInstructionHandler arbInstructionHandler() {
+	ArbInstructionHandler arbInstructionHandler() {
 		// TODO: implement this
-		return new IArbInstructionHandler() {
+		return new ArbInstructionHandler() {
 			@Override
 			public void onArbInstruction(ArbInstruction instruction) {
 			}
@@ -153,7 +153,7 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 
 	@Bean
-	IArbExaminer arbExaminer() {
+	ArbExaminer arbExaminer() {
 		return new BasicArbExaminer();
 	}
 	/**
@@ -177,8 +177,8 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 
 	@Bean 
-	IOrderBookDao orderBookDao() {
-		return new OrderBookDao();
+	OrderBookDao orderBookDao() {
+		return new OrderBookDaoImpl();
 	}
 
 	@Bean

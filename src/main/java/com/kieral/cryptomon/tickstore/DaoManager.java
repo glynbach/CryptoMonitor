@@ -10,12 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 
-public class DaoManager implements IOrderBookDao {
+public class DaoManager implements OrderBookDao {
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
 	@Autowired
-	IOrderBookDao orderBookDao;
+	OrderBookDao orderBookDao;
 	
 	private final ExecutorService processor = Executors.newSingleThreadExecutor(new ThreadFactory() {
 		@Override

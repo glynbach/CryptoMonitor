@@ -10,7 +10,7 @@ import com.kieral.cryptomon.model.accounting.TradingFeeType;
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
-import com.kieral.cryptomon.model.orderbook.IOrderBookEntry;
+import com.kieral.cryptomon.model.orderbook.OrderBookEntry;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 
@@ -58,14 +58,14 @@ public class TestUtils {
 			String[] bids, String bidAmounts[], String[] asks, String[] askAmounts) {
 		OrderBook ob = new OrderBook(market, currency, sequenceNumber, System.currentTimeMillis());
 		if (bids != null) {
-			List<IOrderBookEntry> bidEntries = new ArrayList<IOrderBookEntry>();
+			List<OrderBookEntry> bidEntries = new ArrayList<OrderBookEntry>();
 			for (int i=0; i<bids.length; i++) {
 				bidEntries.add(new ObEntry(Side.BID, new BigDecimal(bids[i]), new BigDecimal(bidAmounts[i])));
 			}
 			ob.setBids(bidEntries);
 		}
 		if (asks != null) {
-			List<IOrderBookEntry> askEntries = new ArrayList<IOrderBookEntry>();
+			List<OrderBookEntry> askEntries = new ArrayList<OrderBookEntry>();
 			for (int i=0; i<asks.length; i++) {
 				askEntries.add(new ObEntry(Side.BID, new BigDecimal(asks[i]), new BigDecimal(askAmounts[i])));
 			}
@@ -109,7 +109,7 @@ public class TestUtils {
 	}
 
 	
-	private static class ObEntry implements IOrderBookEntry {
+	private static class ObEntry implements OrderBookEntry {
 
 		private final Side side;
 		private final BigDecimal price;

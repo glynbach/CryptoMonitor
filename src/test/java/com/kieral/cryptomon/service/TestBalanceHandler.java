@@ -21,11 +21,11 @@ public class TestBalanceHandler {
 	private static final String BIT = "bittrex";
 	private static final String GD = "gdax";
 	
-	BalanceHandler balanceHandler;
+	BalanceService balanceHandler;
 	
 	@Before
 	public void setUp() {
-		balanceHandler = new BalanceHandler();
+		balanceHandler = new BalanceService();
 		balanceHandler.setConfirmedBalance(POL, Currency.BTC, new BigDecimal(1), true);
 		balanceHandler.setConfirmedBalance(POL, Currency.LTC, new BigDecimal(50), true);
 		balanceHandler.setConfirmedBalance(POL, Currency.ETH, new BigDecimal(10), true);

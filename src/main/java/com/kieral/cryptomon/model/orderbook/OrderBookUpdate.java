@@ -6,20 +6,20 @@ import com.kieral.cryptomon.model.general.Side;
 
 public class OrderBookUpdate {
 
-	private final IOrderBookEntry entry;
+	private final OrderBookEntry entry;
 	private final OrderBookAction action;
 
 	public OrderBookUpdate(Side side, BigDecimal price, BigDecimal amount, OrderBookAction action) {
-		this.entry = new OrderBookEntry(side, price, amount == null ? BigDecimal.ZERO : amount);
+		this.entry = new OrderBookEntryImpl(side, price, amount == null ? BigDecimal.ZERO : amount);
 		this.action = action;
 	}
 
-	public OrderBookUpdate(IOrderBookEntry entry, OrderBookAction action) {
+	public OrderBookUpdate(OrderBookEntry entry, OrderBookAction action) {
 		this.entry = entry;
 		this.action = action;
 	}
 
-	public IOrderBookEntry getEntry() {
+	public OrderBookEntry getEntry() {
 		return entry;
 	}
 
@@ -60,19 +60,19 @@ public class OrderBookUpdate {
 		return "OrderBookUpdate [entry=" + entry + ", action=" + action + "]";
 	}
 
-	public static class OrderBookEntry implements IOrderBookEntry {
+	public static class OrderBookEntryImpl implements OrderBookEntry {
 
 		final Side side;
 		final BigDecimal price;
 		BigDecimal amount;
 
-		public OrderBookEntry(Side side, BigDecimal price) {
+		public OrderBookEntryImpl(Side side, BigDecimal price) {
 			super();
 			this.side = side;
 			this.price = price;
 		}
 
-		public OrderBookEntry(Side side, BigDecimal price, BigDecimal amount) {
+		public OrderBookEntryImpl(Side side, BigDecimal price, BigDecimal amount) {
 			super();
 			this.side = side;
 			this.price = price;
@@ -117,7 +117,7 @@ public class OrderBookUpdate {
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			OrderBookEntry other = (OrderBookEntry) obj;
+			OrderBookEntryImpl other = (OrderBookEntryImpl) obj;
 			if (amount == null) {
 				if (other.amount != null)
 					return false;
@@ -135,7 +135,7 @@ public class OrderBookUpdate {
 
 		@Override
 		public String toString() {
-			return "OrderBookEntry [side=" + side + ", price=" + price + ", amount=" + amount + "]";
+			return "OrderBookEntryImpl [side=" + side + ", price=" + price + ", amount=" + amount + "]";
 		}
 		
 	}

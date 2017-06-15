@@ -17,7 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.LiquidityEntry;
 import com.kieral.cryptomon.model.general.Side;
-import com.kieral.cryptomon.model.orderbook.IOrderBookEntry;
+import com.kieral.cryptomon.model.orderbook.OrderBookEntry;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookAction;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
@@ -94,8 +94,8 @@ public class OrderBookManager {
 		orderBookLocks.putIfAbsent(key, new Object());
 		Object lock = orderBookLocks.get(key);
 		synchronized(lock) {
-			List <IOrderBookEntry> bids;
-			List <IOrderBookEntry> asks;
+			List <OrderBookEntry> bids;
+			List <OrderBookEntry> asks;
 			if (updates == null || updates.size() == 0) {
 				bids = Collections.emptyList();
 				asks = Collections.emptyList();
@@ -103,17 +103,17 @@ public class OrderBookManager {
 				final AtomicBoolean actioned = new AtomicBoolean(false);
 				final AtomicBoolean hasBid = new AtomicBoolean(false);
 				final AtomicBoolean hasAsk = new AtomicBoolean(false);
-				bids = new ArrayList<IOrderBookEntry>(orderBook.getBids());
-				asks = new ArrayList<IOrderBookEntry>(orderBook.getAsks());
+				bids = new ArrayList<OrderBookEntry>(orderBook.getBids());
+				asks = new ArrayList<OrderBookEntry>(orderBook.getAsks());
 				updates.forEach(update -> {
-					IOrderBookEntry entry = update.getEntry();
+					OrderBookEntry entry = update.getEntry();
 					hasBid.compareAndSet(false, entry.getSide() == Side.BID);
 					hasAsk.compareAndSet(false, entry.getSide() == Side.ASK);
 					OrderBookAction action = update.getAction();
-					List<IOrderBookEntry> entries = entry.getSide() == Side.BID ? bids : asks;
-					Iterator<IOrderBookEntry> i = entries.iterator();
+					List<OrderBookEntry> entries = entry.getSide() == Side.BID ? bids : asks;
+					Iterator<OrderBookEntry> i = entries.iterator();
 					while (i.hasNext()) {
-						IOrderBookEntry bookEntry = i.next();
+						OrderBookEntry bookEntry = i.next();
 						if (bookEntry.getPrice().compareTo(entry.getPrice()) == 0) {
 							if (action == OrderBookAction.REMOVE)
 								i.remove();
@@ -169,7 +169,7 @@ public class OrderBookManager {
 			return null;
 		BigDecimal bidAmount = BigDecimal.ZERO;
 		BigDecimal bidPrice = null;
-		for (IOrderBookEntry entry : orderBook.getBids()) {
+		for (OrderBookEntry entry : orderBook.getBids()) {
 			bidAmount = bidAmount.add(entry.getAmount());
 			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
 				bidPrice = entry.getPrice();
@@ -181,7 +181,7 @@ public class OrderBookManager {
 		BigDecimal askAmount = BigDecimal.ZERO;
 		BigDecimal askPrice = null;
 		// TODO: write some tests around cumulating significant amounts and the best bid / ask returned 
-		for (IOrderBookEntry entry : orderBook.getAsks()) {
+		for (OrderBookEntry entry : orderBook.getAsks()) {
 			askAmount = askAmount.add(entry.getAmount());
 			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
 				askPrice = entry.getPrice();
@@ -193,7 +193,7 @@ public class OrderBookManager {
 		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(bidAmount, askAmount));
 	}
 	
-	private static final class PriceComparer implements Comparator<IOrderBookEntry> {
+	private static final class PriceComparer implements Comparator<OrderBookEntry> {
 
 		private final Side side;
 		
@@ -204,7 +204,7 @@ public class OrderBookManager {
 		}
 	
 		@Override
-		public int compare(IOrderBookEntry o1, IOrderBookEntry o2) {
+		public int compare(OrderBookEntry o1, OrderBookEntry o2) {
 			// let it NPE if a null price has got through
 			int result = o1.getPrice().compareTo(o2.getPrice());
 			if (side == Side.BID)

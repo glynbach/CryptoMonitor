@@ -11,8 +11,8 @@ public class OrderBook {
 	private final CurrencyPair currencyPair;
 	private long snapshotSequence;
 	private long snapshotReceived;
-	private List<IOrderBookEntry> bids = Collections.emptyList();
-	private List<IOrderBookEntry> asks = Collections.emptyList();
+	private List<OrderBookEntry> bids = Collections.emptyList();
+	private List<OrderBookEntry> asks = Collections.emptyList();
 	
 	public OrderBook(String market, CurrencyPair currencyPair, long sequence, long createdTime) {
 		this.market = market;
@@ -37,19 +37,19 @@ public class OrderBook {
 		this.snapshotReceived = snapshotReceived;
 	}
 
-	public List<IOrderBookEntry> getBids() {
+	public List<OrderBookEntry> getBids() {
 		return bids;
 	}
 	
-	public void setBids(List<IOrderBookEntry> bids) {
+	public void setBids(List<OrderBookEntry> bids) {
 		this.bids = bids;
 	}
 	
-	public List<IOrderBookEntry> getAsks() {
+	public List<OrderBookEntry> getAsks() {
 		return asks;
 	}
 	
-	public void setAsks(List<IOrderBookEntry> asks) {
+	public void setAsks(List<OrderBookEntry> asks) {
 		this.asks = asks;
 	}
 	

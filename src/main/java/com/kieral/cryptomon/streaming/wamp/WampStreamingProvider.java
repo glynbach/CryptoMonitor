@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
-import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 import com.kieral.cryptomon.streaming.StreamingProperties;
 import com.kieral.cryptomon.streaming.StreamingProvider;
@@ -30,7 +30,7 @@ public class WampStreamingProvider implements StreamingProvider {
 //	private WampClient client;
 
 	@Override
-	public Completable connect(final StreamingProperties connectionProperties, final IStatusListener listener) {
+	public Completable connect(final StreamingProperties connectionProperties, final ConnectionStatusListener listener) {
 		return Completable.create(completable -> {
 //			try {
 //				IWampConnectorProvider connectorProvider = new NettyWampClientConnectorProvider();

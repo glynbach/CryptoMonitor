@@ -26,7 +26,7 @@ public class TestOrderedStreamingEmitter {
 
 	CountDownLatch testLatch;
 	OrderedStreamingEmitter emitter;
-	IOrderedStreamingListener listener;
+	OrderedStreamingListener listener;
 	List<StreamingPayload> emitted;
 	List<String> errors;
 	int poolSize = 2;
@@ -34,7 +34,7 @@ public class TestOrderedStreamingEmitter {
 	@Before
 	public void setUp() {
 		LoggingUtils.setDataBufferingLoggingEnabled(true);
-		listener = Mockito.mock(IOrderedStreamingListener.class);
+		listener = Mockito.mock(OrderedStreamingListener.class);
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {

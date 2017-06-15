@@ -1,6 +1,6 @@
 package com.kieral.cryptomon.service.connection;
 
-public interface IStatusListener {
+public interface ConnectionStatusListener {
 
 	void onStatusChange(ConnectionStatus status);
 	

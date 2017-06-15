@@ -12,21 +12,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
-import com.kieral.cryptomon.service.connection.IStatusListener;
+import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
-import com.kieral.cryptomon.service.liquidity.IOrderBookListener;
+import com.kieral.cryptomon.service.liquidity.OrderBookListener;
 
 public class ExchangeManagerService {
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
-	private final List<IExchangeService> enabledExchanges = new ArrayList<IExchangeService>();
-	private final Map<String, IExchangeService> enabledExchangeMap = new HashMap<String, IExchangeService>();
+	private final List<ExchangeService> enabledExchanges = new ArrayList<ExchangeService>();
+	private final Map<String, ExchangeService> enabledExchangeMap = new HashMap<String, ExchangeService>();
 	private final ConcurrentMap<String, ConnectionStatus> exchangeStatuses = new ConcurrentHashMap<String, ConnectionStatus>();
 	
-	public ExchangeManagerService(IExchangeService... services) {
+	public ExchangeManagerService(ExchangeService... services) {
 		if (services != null) {
-			for (IExchangeService service: services) {
+			for (ExchangeService service: services) {
 				if (service.isEnabled()) {
 					enabledExchanges.add(service);
 					enabledExchangeMap.put(service.getName(), service);
@@ -38,11 +38,11 @@ public class ExchangeManagerService {
 		}
 	}
 
-	public List<IExchangeService> getEnabledExchanges() {
-		return new ArrayList<IExchangeService>(enabledExchanges);
+	public List<ExchangeService> getEnabledExchanges() {
+		return new ArrayList<ExchangeService>(enabledExchanges);
 	}
 
-	public void registerAllOrderBookListeners(IOrderBookListener listener) {
+	public void registerAllOrderBookListeners(OrderBookListener listener) {
 		if (listener == null)
 			return;
 		enabledExchanges.forEach(exchange -> {
@@ -50,7 +50,7 @@ public class ExchangeManagerService {
 		});
 	}
 	
-	public ConnectionStatus registerConnectionStatusListener(String market, IStatusListener listener) {
+	public ConnectionStatus registerConnectionStatusListener(String market, ConnectionStatusListener listener) {
 		if (market == null || listener == null)
 			return ConnectionStatus.DISCONNECTED;
 		AtomicReference<ConnectionStatus> rtnStatus = new AtomicReference<ConnectionStatus>(ConnectionStatus.DISCONNECTED); 
