@@ -19,6 +19,7 @@ import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
+import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
@@ -33,7 +34,7 @@ public class TestArbMonitorService {
 	final static BigDecimal CANCEL_MAGIC_NUMBER = new BigDecimal("999");
 	
 	final static BidAskPrice prices = new BidAskPrice(BigDecimal.ONE, BigDecimal.ONE);
-	final static BidAskAmount amounts = new BidAskAmount(BigDecimal.ONE, BigDecimal.ONE);
+	final static BidAskAmount amounts = new BidAskAmount(new TradeAmount(BigDecimal.ONE, BigDecimal.ONE), new TradeAmount(BigDecimal.ONE, BigDecimal.ONE));
 	
 	ExchangeManagerService exchangeManager;
 	BalanceService balanceHandler;

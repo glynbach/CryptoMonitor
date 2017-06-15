@@ -6,11 +6,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.kieral.cryptomon.model.accounting.TradingFeeType;
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBookEntry;
+import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 

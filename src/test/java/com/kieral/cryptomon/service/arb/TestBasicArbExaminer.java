@@ -66,11 +66,11 @@ public class TestBasicArbExaminer {
 		assertEquals(2, instruction.getLegs().size());
 		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
 		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("100", instruction.getLegs().get(0).getAmount().toPlainString());
+		assertEquals("100", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
 		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
 		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("100", instruction.getLegs().get(1).getAmount().toPlainString());
+		assertEquals("100", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
 		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.01007475")));
 	}
@@ -87,11 +87,11 @@ public class TestBasicArbExaminer {
 		assertEquals(2, instruction.getLegs().size());
 		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
 		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("50", instruction.getLegs().get(0).getAmount().toPlainString());
+		assertEquals("50", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
 		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
 		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("50", instruction.getLegs().get(1).getAmount().toPlainString());
+		assertEquals("50", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
 		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00503737")));
 	}
@@ -109,11 +109,11 @@ public class TestBasicArbExaminer {
 		assertEquals(2, instruction.getLegs().size());
 		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
 		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("20", instruction.getLegs().get(0).getAmount().toPlainString());
+		assertEquals("20", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
 		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
 		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("20", instruction.getLegs().get(1).getAmount().toPlainString());
+		assertEquals("20", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
 		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00201495")));
 	}
@@ -131,11 +131,11 @@ public class TestBasicArbExaminer {
 		assertEquals(2, instruction.getLegs().size());
 		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
 		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("51.01780521", instruction.getLegs().get(0).getAmount().toPlainString());
+		assertEquals("51.01780521", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
 		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
 		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("51.01780521", instruction.getLegs().get(1).getAmount().toPlainString());
+		assertEquals("51.01780521", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
 		assertEquals("Unexpected estimation " + instruction.getEstimatedValue(), 0
 				, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00513992")));

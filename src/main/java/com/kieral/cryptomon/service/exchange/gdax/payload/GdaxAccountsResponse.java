@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service.exchange.gdax;
+package com.kieral.cryptomon.service.exchange.gdax.payload;
 
 import java.util.ArrayList;
 import java.util.List;

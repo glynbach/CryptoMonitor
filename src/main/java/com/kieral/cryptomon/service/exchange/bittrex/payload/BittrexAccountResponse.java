@@ -1,32 +1,35 @@
-package com.kieral.cryptomon.service.exchange.gdax;
+package com.kieral.cryptomon.service.exchange.bittrex.payload;
 
 import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.service.rest.AccountResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class GdaxAccountResponse implements AccountResponse {
+public class BittrexAccountResponse implements AccountResponse {
 
-	private String id;
+	private String cryptoAddress;
 	private String currency;
 	private BigDecimal balance;
 	private BigDecimal available;
-	private BigDecimal hold;
+	private BigDecimal pending;
 	
-	public String getId() {
-		return id;
+	public String getCryptoAddress() {
+		return cryptoAddress;
 	}
 	
-	public void setId(String id) {
-		this.id = id;
+	@JsonProperty("CryptoAddress")
+	public void setCryptoAddress(String cryptoAddress) {
+		this.cryptoAddress = cryptoAddress;
 	}
 	
 	public String getCurrency() {
 		return currency;
 	}
 	
+	@JsonProperty("Currency")
 	public void setCurrency(String currency) {
 		this.currency = currency;
 	}
@@ -35,6 +38,7 @@ public class GdaxAccountResponse implements AccountResponse {
 		return balance;
 	}
 	
+	@JsonProperty("Balance")
 	public void setBalance(BigDecimal balance) {
 		this.balance = balance;
 	}
@@ -43,32 +47,34 @@ public class GdaxAccountResponse implements AccountResponse {
 		return available;
 	}
 	
+	@JsonProperty("Available")
 	public void setAvailable(BigDecimal available) {
 		this.available = available;
 	}
 	
-	public BigDecimal getHold() {
-		return hold;
+	public BigDecimal getPending() {
+		return pending;
 	}
 	
-	public void setHold(BigDecimal hold) {
-		this.hold = hold;
+	@JsonProperty("Pending")
+	public void setPending(BigDecimal pending) {
+		this.pending = pending;
 	}
 
 	@Override
 	public String toString() {
-		return "GdaxAccountResponse [id=" + id + ", currency=" + currency + ", balance=" + balance + ", available="
-				+ available + ", hold=" + hold + "]";
+		return "BittrexAccountResponse [cryptoAddress=" + cryptoAddress + ", currency=" + currency + ", balance="
+				+ balance + ", available=" + available + ", pending=" + pending + "]";
 	}
 
 	@Override
 	public String getAccountId() {
-		return id;
+		return cryptoAddress;
 	}
 
 	@Override
 	public String getAccountAddress() {
-		return id;
+		return cryptoAddress;
 	}
 
 	@Override
@@ -83,7 +89,7 @@ public class GdaxAccountResponse implements AccountResponse {
 
 	@Override
 	public BigDecimal getPendingBalance() {
-		return hold;
+		return pending;
 	}
 	
 }

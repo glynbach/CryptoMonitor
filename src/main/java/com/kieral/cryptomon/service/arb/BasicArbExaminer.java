@@ -17,6 +17,7 @@ import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
+import com.kieral.cryptomon.model.trading.TradeAmount;
 
 public class BasicArbExaminer implements ArbExaminer {
 
@@ -66,8 +67,10 @@ public class BasicArbExaminer implements ArbExaminer {
 //		logger.info("DEBUG: checking opportunity for {} and {} prices {} amd {}", buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
 		// check available balances
 		// what maximum amount can we do on both sides
-		BigDecimal commonAmount = buySide.getBidAskAmount().get(Side.ASK).compareTo(sellSide.getBidAskAmount().get(Side.BID)) > 0
-				? sellSide.getBidAskAmount().get(Side.BID) : buySide.getBidAskAmount().get(Side.ASK); 
+		BigDecimal commonAmount = buySide.getBidAskAmount().get(Side.ASK).getBaseAmount()
+				.compareTo(sellSide.getBidAskAmount().get(Side.BID).getBaseAmount()) > 0
+						? sellSide.getBidAskAmount().get(Side.BID).getBaseAmount() 
+						: buySide.getBidAskAmount().get(Side.ASK).getBaseAmount(); 
 		// check sell side first
 		// if we're selling to market we will be be a taker of their bid price and will be paying with balance from quoted currency
 		BigDecimal sellFunds = balanceHandler.getWorkingAmount(sellBook.getMarket(), sellBook.getCurrencyPair().getBaseCurrency());
@@ -109,7 +112,10 @@ public class BasicArbExaminer implements ArbExaminer {
 		if (profit.compareTo(BigDecimal.ZERO) > 0) {
 			return ArbInstructionFactory.createArbInstruction(rateIt(profit), profit, buyBook.getCurrencyPair().getQuotedCurrency(), buyBook.getCurrencyPair(),
 					new BidAskPrice(buySide.getBidAskPrice().get(Side.ASK), sellSide.getBidAskPrice().get(Side.BID)), 
-					new BidAskAmount(commonAmount, commonAmount), new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()));
+					new BidAskAmount(
+							new TradeAmount(commonAmount, buySide.getBidAskPrice().get(Side.ASK), buyBook.getCurrencyPair().getPriceScale()), 
+							new TradeAmount(commonAmount, sellSide.getBidAskPrice().get(Side.BID), buyBook.getCurrencyPair().getPriceScale())), 
+					new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()));
 		}
 		if (logger.isDebugEnabled())
 			logger.info("DEBUG: no profit in {} USD after fees for {} and {} prices {} amd {}", profit.multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP), buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);

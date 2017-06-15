@@ -80,7 +80,7 @@ public class ExchangeManagerService {
 	public String unlockTrading(String market, String secretKey) {
 		if (enabledExchangeMap.containsKey(market)) {
 			if (!enabledExchangeMap.get(market).unlockTrading(secretKey)) {
-				return requestBalance(market, true); 
+				return updateBalances(market, true); 
 			} else {
 				return String.format("Exchange %s still locked", market); 
 			}
@@ -89,11 +89,11 @@ public class ExchangeManagerService {
 		}
 	}
 	
-	public List<String> requestAllBalances(boolean overrideWorkingBalance) {
+	public List<String> updatesAllBalances(boolean overrideWorkingBalance) {
 		List<String> errors = new ArrayList<String>();
 		enabledExchanges.forEach(exchange -> {
 			try {
-				exchange.requestBalance(overrideWorkingBalance);
+				exchange.updateBalances(overrideWorkingBalance);
 			} catch (Exception e) {
 				logger.error("Error requesting balance for exchange {}", exchange.getName(), e);
 				errors.add(e.getMessage());
@@ -102,10 +102,10 @@ public class ExchangeManagerService {
 		return errors;
 	}
 
-	public String requestBalance(String market, boolean overrideWorkingBalance) {
+	public String updateBalances(String market, boolean overrideWorkingBalance) {
 		if (enabledExchangeMap.containsKey(market)) {
 			try {
-				enabledExchangeMap.get(market).requestBalance(overrideWorkingBalance);
+				enabledExchangeMap.get(market).updateBalances(overrideWorkingBalance);
 			} catch (BalanceRequestException e) {
 				logger.error("Error requesting balance for exchange {}", market, e);
 				return e.getMessage();

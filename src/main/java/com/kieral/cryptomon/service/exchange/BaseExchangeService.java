@@ -1,5 +1,6 @@
 package com.kieral.cryptomon.service.exchange;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.general.ApiRequest;
 import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
@@ -36,7 +38,11 @@ import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.Subscript
 import com.kieral.cryptomon.service.liquidity.OrderBookListener;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
+import com.kieral.cryptomon.service.rest.CancelOrderResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
+import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.rest.OrdersResponse;
+import com.kieral.cryptomon.service.rest.PlaceOrderResponse;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.streaming.OrderedStreamingListener;
 import com.kieral.cryptomon.streaming.OrderedStreamingEmitter;
@@ -210,22 +216,6 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		}
 	}
 	
-	/*
-	 * Blocks until it can return result of connection
-	 */
-	abstract protected boolean doConnect();
-	
-	/*
-	 * Blocks until it can return result of disconnection
-	 */
-	abstract protected boolean doDisconnect();
-
-	abstract protected void subscribeMarketDataTopics();
-	
-	abstract protected void unsubscribeMarketDataTopics();
-	
-	abstract protected List<OrderBookUpdate> parsePayload(StreamingPayload streamingPayload) throws ParsingPayloadException;
-
 	@Override
 	public void onOrderedStreamingPayload(StreamingPayload streamingPayload) {
 		try {
@@ -280,8 +270,6 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return response;
 	}
 
-	protected abstract Class<? extends OrderBookResponse> getOrderBookResponseClazz();
-
 	protected List<OrderBookResponse> getOrderBookResponses(List<CurrencyPair> pairs) {
 		if (pairs == null)
 			return null;
@@ -317,7 +305,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	}
 
 	@Override
-	public void requestBalance(boolean overrideWorkingBalance) throws BalanceRequestException {
+	public void updateBalances(boolean overrideWorkingBalance) throws BalanceRequestException {
 		try {
 			AccountsResponse response = getAccountsResponse();
 			if (response == null)
@@ -336,18 +324,20 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		}
 	}
 
-	protected abstract Class<? extends AccountsResponse> getAccountsResponseClazz();
-
 	protected AccountsResponse getAccountsResponse() throws Exception {
 		ApiRequest apiRequest = serviceProperties.getAccountsQuery();
+		return getTradingResponse(apiRequest, "accounts", getAccountsResponseClazz());	
+	}
+
+	private <T> T getTradingResponse(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
 		if (apiRequest.getMethod() == Method.GET)
-			return getTradingResponseForGet(apiRequest, "accounts", getAccountsResponseClazz());
+			return getTradingResponseForGet(apiRequest, descr, clazz);
 		else {
-			return getTradingResponseForPut(apiRequest, "accounts", getAccountsResponseClazz());
+			return getTradingResponseForPut(apiRequest, descr, clazz);
 		}
 	}
 	
-	protected <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
+	private <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
 		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
 		logger.info("Requesting {} from POST {}", descr, apiRequest);
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.POST, apiRequest.getRequestPath(), apiRequest.getBodyAsString());
@@ -358,7 +348,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return response.getBody();
 	}
 	
-	protected <T> T getTradingResponseForGet(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
+	private <T> T getTradingResponseForGet(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws Exception {
 		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), Method.GET);
 		logger.info("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.GET, securityEnrichedUrl.getRequestPath(), null);
@@ -368,4 +358,36 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
 		return response.getBody();
 	}
+	
+	/*
+	 * Blocks until it can return result of connection
+	 */
+	abstract protected boolean doConnect();
+	/*
+	 * Blocks until it can return result of disconnection
+	 */
+	abstract protected boolean doDisconnect();
+	/*
+	 * Subscribes to streaming market data topic
+	 */
+	abstract protected void subscribeMarketDataTopics();
+	/*
+	 * Unsubscribes from streaming market data topic
+	 */
+	abstract protected void unsubscribeMarketDataTopics();
+	/*
+	 * Parses the payload of a streaming market data topic
+	 */
+	abstract protected List<OrderBookUpdate> parsePayload(StreamingPayload streamingPayload) throws ParsingPayloadException;
+	/*
+	 * Returns POJOs for JSon responses
+	 */
+	protected abstract Class<? extends OrderBookResponse> getOrderBookResponseClazz();
+	protected abstract Class<? extends AccountsResponse> getAccountsResponseClazz();
+	protected abstract Class<? extends PlaceOrderResponse> getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, BigDecimal amount);
+	protected abstract Class<? extends CancelOrderResponse> getCancelOrderQuery(String orderId);
+	protected abstract Class<? extends OrdersResponse> getOpenOrdersQuery(CurrencyPair currencyPair);
+	protected abstract Class<? extends OrdersResponse> getOrderHistoryQuery(CurrencyPair currencyPair);
+	protected abstract Class<? extends OrderResponse> getOrderQuery(String orderId);
+
 }

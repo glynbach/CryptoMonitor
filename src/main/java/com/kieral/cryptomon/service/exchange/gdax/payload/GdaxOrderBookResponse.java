@@ -1,36 +1,27 @@
-package com.kieral.cryptomon.service.exchange.poloniex;
+package com.kieral.cryptomon.service.exchange.gdax.payload;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.kieral.cryptomon.service.rest.OrderBookResponse;
+import com.kieral.cryptomon.service.rest.BaseOrderBookResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponseEntry;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PoloniexOrderBookResponse extends OrderBookResponse {
+public class GdaxOrderBookResponse extends BaseOrderBookResponse {
 
 	private final Long createdTime = System.currentTimeMillis();
-	private long seq;
-	private String isFrozen;
+	private long sequence;
 	private List<List<String>> bids;
 	private List<List<String>> asks;
 
-	public long getSeq() {
-		return seq;
+	public long getSequence() {
+		return sequence;
 	}
 
-	public void setSeq(long seq) {
-		this.seq = seq;
-	}
-
-	public String getIsFrozen() {
-		return isFrozen;
-	}
-
-	public void setIsFrozen(String isFrozen) {
-		this.isFrozen = isFrozen;
+	public void setSequence(long sequence) {
+		this.sequence = sequence;
 	}
 
 	public List<List<String>> getBids() {
@@ -50,18 +41,18 @@ public class PoloniexOrderBookResponse extends OrderBookResponse {
 	}
 
 	@Override
+	public String toString() {
+		return "GdaxOrderBookResponse [sequence=" + sequence + ", bids=" + bids + ", asks=" + asks + "]";
+	}
+
+	@Override
 	public long getCreatedTime() {
 		return createdTime;
 	}
 
 	@Override
-	public long getSequence() {
-		return seq;
-	}
-
-	@Override
 	public boolean isValid() {
-		return "0".equals(isFrozen);
+		return true;
 	}
 
 	@Override
@@ -78,19 +69,13 @@ public class PoloniexOrderBookResponse extends OrderBookResponse {
 		List<OrderBookResponseEntry> rtn = new ArrayList<OrderBookResponseEntry>();
 		if (entries != null) {
 			entries.forEach(entrySet -> {
-				if (entrySet.size() != 2)
-					throw new IllegalStateException(String.format("Expect price,amount but got %s", entrySet));
+				if (entrySet.size() != 3)
+					throw new IllegalStateException(String.format("Expect price,amount,numOrders but got %s", entrySet));
 				rtn.add(new OrderBookResponseEntry(new BigDecimal(entrySet.get(0)), 
-						new BigDecimal(entrySet.get(1)), 0));
+						new BigDecimal(entrySet.get(1)), Integer.parseInt(entrySet.get(2))));
 			});
 		}
 		return rtn;
-	}
-
-	@Override
-	public String toString() {
-		return "PoloniexOrderBookResponse [createdTime=" + createdTime + ", seq=" + seq + ", isFrozen=" + isFrozen
-				+ ", bids=" + bids + ", asks=" + asks + "]";
 	}
 	
 }

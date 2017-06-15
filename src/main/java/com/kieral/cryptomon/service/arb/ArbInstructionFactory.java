@@ -64,4 +64,12 @@ public class ArbInstructionFactory {
 		return false;
 	}
 
+	private boolean validatePositive(BidAskAmount values) {
+		if (validate(values) && 
+				BigDecimal.ZERO.compareTo(values.get(Side.BID).getBaseAmount()) < 0 &&
+				BigDecimal.ZERO.compareTo(values.get(Side.ASK).getBaseAmount()) < 0)
+			return true;
+		return false;
+	}
+
 }

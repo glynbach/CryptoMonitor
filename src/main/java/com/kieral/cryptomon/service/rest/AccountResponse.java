@@ -6,10 +6,10 @@ import com.kieral.cryptomon.model.general.Currency;
 
 public interface AccountResponse {
 
-	public abstract String getAccountId();
-	public abstract String getAccountAddress();
-	public abstract Currency getAccountCuurency();
-	public abstract BigDecimal getAvailableBalance();
-	public abstract BigDecimal getPendingBalance();
+	String getAccountId();
+	String getAccountAddress();
+	Currency getAccountCuurency();
+	BigDecimal getAvailableBalance();
+	BigDecimal getPendingBalance();
 	
 }

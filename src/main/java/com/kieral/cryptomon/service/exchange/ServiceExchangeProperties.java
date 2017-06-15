@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.kieral.cryptomon.model.accounting.TradingFeeType;
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.TradeAmount;
+import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.general.ApiRequest;
 
 public abstract class ServiceExchangeProperties {
@@ -195,11 +197,14 @@ public abstract class ServiceExchangeProperties {
 	}
 
 	public abstract ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol);
-
 	public abstract TradingFeeType getTradingFeeType();
-
 	public abstract ApiRequest getAccountsQuery();
-
+	public abstract ApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount);
+	public abstract ApiRequest getCancelOrderQuery(String orderId);
+	public abstract ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair);
+	public abstract ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair);
+	public abstract ApiRequest getOrderQuery(String orderId);
+	
 	@Override
 	public String toString() {
 		return "ServiceExchangeProperties [exchange=" + exchange + ", enabled=" + enabled + ", pushApi=" + pushApi
@@ -210,6 +215,5 @@ public abstract class ServiceExchangeProperties {
 				+ apiKeyLoc + ", apiSecretLoc=" + apiSecretLoc + ", apiPassphraseLoc=" + apiPassphraseLoc
 				+ ", currencyPairs=" + currencyPairs + ", pairs=" + pairs + "]";
 	}
-
 	
 }
