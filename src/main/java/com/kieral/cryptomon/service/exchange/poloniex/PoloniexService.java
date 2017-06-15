@@ -15,8 +15,18 @@ import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.BaseExchangeService;
 import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexAccountsResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexActionResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderBookResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderHistoryResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderTradesResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrdersResponse;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
+import com.kieral.cryptomon.service.rest.CancelOrderResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
+import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.rest.OrdersResponse;
+import com.kieral.cryptomon.service.rest.PlaceOrderResponse;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 import com.kieral.cryptomon.streaming.StreamingProperties;
@@ -144,6 +154,32 @@ public class PoloniexService extends BaseExchangeService {
 	@Override
 	protected Class<? extends AccountsResponse> getAccountsResponseClazz() {
 		return PoloniexAccountsResponse.class;
+	}
+
+	@Override
+	protected Class<? extends PlaceOrderResponse> getPlaceOrderQuery(Side side, CurrencyPair currencyPair,
+			BigDecimal price, BigDecimal amount) {
+		return PoloniexActionResponse.class;
+	}
+
+	@Override
+	protected Class<? extends CancelOrderResponse> getCancelOrderQuery(String orderId) {
+		return PoloniexActionResponse.class;
+	}
+
+	@Override
+	protected Class<? extends OrdersResponse> getOpenOrdersQuery(CurrencyPair currencyPair) {
+		return PoloniexOrdersResponse.class;
+	}
+
+	@Override
+	protected Class<? extends OrdersResponse> getOrderHistoryQuery(CurrencyPair currencyPair) {
+		return PoloniexOrderHistoryResponse.class;
+	}
+
+	@Override
+	protected Class<? extends OrderResponse> getOrderQuery(String orderId) {
+		return PoloniexOrderTradesResponse.class;
 	}
 
 }

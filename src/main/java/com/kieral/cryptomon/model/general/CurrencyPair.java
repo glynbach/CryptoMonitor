@@ -2,7 +2,7 @@ package com.kieral.cryptomon.model.general;
 
 import java.math.BigDecimal;
 
-import com.kieral.cryptomon.model.accounting.TradingFeeType;
+import com.kieral.cryptomon.model.trading.TradingFeeType;
 
 public class CurrencyPair {
 

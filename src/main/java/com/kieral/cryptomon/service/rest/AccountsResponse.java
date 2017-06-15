@@ -4,6 +4,6 @@ import java.util.List;
 
 public interface AccountsResponse {
 
-	public abstract List<? extends AccountResponse> getAccountResponses();
+	List<? extends AccountResponse> getAccountResponses();
 	
 }

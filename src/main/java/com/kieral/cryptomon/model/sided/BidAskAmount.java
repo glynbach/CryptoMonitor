@@ -1,10 +1,10 @@
 package com.kieral.cryptomon.model.sided;
 
-import java.math.BigDecimal;
+import com.kieral.cryptomon.model.trading.TradeAmount;
 
-public class BidAskAmount extends SidedValue<BigDecimal> {
+public class BidAskAmount extends SidedValue<TradeAmount> {
 
-	public BidAskAmount(BigDecimal bidAmount, BigDecimal askAmount) {
+	public BidAskAmount(TradeAmount bidAmount, TradeAmount askAmount) {
 		super(bidAmount, askAmount);
 	}
 

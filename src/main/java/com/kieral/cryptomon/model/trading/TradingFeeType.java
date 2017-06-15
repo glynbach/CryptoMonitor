@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.model.accounting;
+package com.kieral.cryptomon.model.trading;
 
 public enum TradingFeeType {
 

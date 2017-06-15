@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service.exchange.bittrex;
+package com.kieral.cryptomon.service.exchange.bittrex.payload;
 
 import java.util.List;
 

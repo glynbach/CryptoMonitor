@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.TradeAmount;
 
 public class ArbInstruction {
 
@@ -45,9 +46,9 @@ public class ArbInstruction {
 		private final Side side;
 		private final CurrencyPair currencyPair;
 		private final BigDecimal price;
-		private final BigDecimal amount;
+		private final TradeAmount amount;
 		
-		public ArbInstructionLeg(String market, Side side, CurrencyPair currencyPair, BigDecimal price, BigDecimal amount) {
+		public ArbInstructionLeg(String market, Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
 			this.market = market;
 			this.side = side;
 			this.currencyPair = currencyPair;
@@ -71,7 +72,7 @@ public class ArbInstruction {
 			return price;
 		}
 
-		public BigDecimal getAmount() {
+		public TradeAmount getAmount() {
 			return amount;
 		}
 

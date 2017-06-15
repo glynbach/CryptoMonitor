@@ -11,7 +11,8 @@ public class ApiRequest {
 
 	public enum Method {
 		GET,
-		POST
+		POST,
+		DELETE
 	}
 
 	public enum BodyType {

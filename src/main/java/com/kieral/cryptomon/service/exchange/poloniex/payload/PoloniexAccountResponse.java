@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service.exchange.poloniex;
+package com.kieral.cryptomon.service.exchange.poloniex.payload;
 
 import java.math.BigDecimal;
 

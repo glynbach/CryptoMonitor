@@ -23,6 +23,7 @@ import com.kieral.cryptomon.model.orderbook.OrderBookAction;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
+import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponseEntry;
 
@@ -177,7 +178,7 @@ public class OrderBookManager {
 			}
 		}
 		if (logger.isDebugEnabled() && bidPrice == null)
-			logger.debug("No best bid price from orerbook {} " + orderBook);
+			logger.debug("No best bid price from orderbook {} " + orderBook);
 		BigDecimal askAmount = BigDecimal.ZERO;
 		BigDecimal askPrice = null;
 		// TODO: write some tests around cumulating significant amounts and the best bid / ask returned 
@@ -189,10 +190,11 @@ public class OrderBookManager {
 			}
 		}
 		if (logger.isDebugEnabled() && askPrice == null)
-			logger.debug("No best ask price from orerbook {} " + orderBook);
-		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(bidAmount, askAmount));
+			logger.debug("No best ask price from orderbook {} " + orderBook);
+		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(new TradeAmount(bidAmount, askPrice, orderBook.getCurrencyPair().getPriceScale())
+				, new TradeAmount(askAmount, bidPrice, orderBook.getCurrencyPair().getPriceScale())));
 	}
-	
+
 	private static final class PriceComparer implements Comparator<OrderBookEntry> {
 
 		private final Side side;

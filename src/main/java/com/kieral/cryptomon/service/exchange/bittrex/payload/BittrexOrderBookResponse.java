@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service.exchange.bittrex;
+package com.kieral.cryptomon.service.exchange.bittrex.payload;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -8,11 +8,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
-import com.kieral.cryptomon.service.rest.OrderBookResponse;
+import com.kieral.cryptomon.service.rest.BaseOrderBookResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponseEntry;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class BittrexOrderBookResponse extends OrderBookResponse {
+public class BittrexOrderBookResponse extends BaseOrderBookResponse {
 
 	private final Long createdTime = System.currentTimeMillis();
 	private boolean success;
