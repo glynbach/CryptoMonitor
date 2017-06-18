@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.messaging;
+package com.kieral.cryptomon.messaging.model;
 
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 

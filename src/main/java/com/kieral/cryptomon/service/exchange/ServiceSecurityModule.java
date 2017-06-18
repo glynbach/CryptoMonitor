@@ -11,13 +11,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 
 import com.kieral.cryptomon.model.general.ApiRequest.Method;
+import com.kieral.cryptomon.service.exception.SecurityModuleException;
 import com.kieral.cryptomon.service.util.EncryptionUtil;
 
 public abstract class ServiceSecurityModule {
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
-	private final AtomicBoolean tradingLocked = new AtomicBoolean(true);
+	private final AtomicBoolean tradingEnabled = new AtomicBoolean(false);
 	protected static final AtomicLong secondsNonce = new AtomicLong(Instant.now().getEpochSecond());
 	protected static final AtomicLong millisNonce = new AtomicLong(System.currentTimeMillis());
 	
@@ -31,14 +32,14 @@ public abstract class ServiceSecurityModule {
 		this.properties = properties;
 	}
 
-	public boolean unLock(String secretKey) {
-		if (tradingLocked.compareAndSet(true, false)) {
-			boolean locked = false;
+	public boolean enable(String secretKey) {
+		if (tradingEnabled.compareAndSet(false, true)) {
+			boolean enabled = true;
 			if (properties.getApiKeyLoc() != null ) {
 				try {
 					apiKey = EncryptionUtil.decryptValue(secretKey, new File(properties.getApiKeyLoc()));
 				} catch (Exception e) {
-					locked = true;
+					enabled = false;
 					logger.error("Error reading apiKey from {}", properties.getApiKeyLoc(), e);
 				}
 			}
@@ -46,7 +47,7 @@ public abstract class ServiceSecurityModule {
 				try {
 					apiSecret = EncryptionUtil.decryptValue(secretKey, new File(properties.getApiSecretLoc()));
 				} catch (Exception e) {
-					locked = true;
+					enabled = false;
 					logger.error("Error reading apiSecret from {}", properties.getApiKeyLoc(), e);
 				}
 			}
@@ -54,28 +55,28 @@ public abstract class ServiceSecurityModule {
 				try {
 					apiPassphrase = EncryptionUtil.decryptValue(secretKey, new File(properties.getApiPassphraseLoc()));
 				} catch (Exception e) {
-					locked = true;
+					enabled = false;
 					logger.error("Error reading apiPassphrase from {}", properties.getApiPassphraseLoc(), e);
 				}
 			}
-			if (!locked) {
+			if (enabled) {
 				try {
 					initialise();
 				} catch (Exception e) {
 					logger.error("Error initialising security module", e);
-					locked = false;
+					enabled = false;
 				}
 			}
-			tradingLocked.set(locked);
+			tradingEnabled.set(enabled);
 		}
-		return tradingLocked.get();
+		return tradingEnabled.get();
 	}
 	
-	public boolean isLocked() {
-		return tradingLocked.get();
+	public boolean isEnabled() {
+		return tradingEnabled.get();
 	}
 
-	public abstract void initialise() throws Exception;
+	public abstract void initialise() throws SecurityModuleException;
 	public abstract String appendApiRequestPathEntries(String requestPath);
 	public abstract void appendApiPostParameterEntries(Map<String, String> postParameters);
 	/**
@@ -85,6 +86,6 @@ public abstract class ServiceSecurityModule {
 	 * @param body null if the method is GET
 	 * @return
 	 */
-	public abstract HttpHeaders sign(long timestamp, Method method, String requestPath, String body) throws Exception;
+	public abstract HttpHeaders sign(long timestamp, Method method, String requestPath, String body) throws SecurityModuleException;
 	
 }

@@ -6,6 +6,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
 
@@ -17,11 +19,22 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 
+import com.kieral.cryptomon.messaging.model.ArbStatusMessage;
+import com.kieral.cryptomon.messaging.model.BalanceEntryMessage;
+import com.kieral.cryptomon.messaging.model.BalanceMessage;
+import com.kieral.cryptomon.messaging.model.ExchangeStatusMessage;
+import com.kieral.cryptomon.messaging.model.OrderBookMessage;
+import com.kieral.cryptomon.messaging.model.OrderMessage;
+import com.kieral.cryptomon.messaging.model.SubscriptionMessage;
 import com.kieral.cryptomon.model.accounting.Balance;
+import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.service.BalanceService;
+import com.kieral.cryptomon.service.OrderService;
+import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
+import com.kieral.cryptomon.service.util.FixedSizedList;
 
 @Controller
 @EnableScheduling
@@ -42,17 +55,22 @@ public class ClientMessagingController {
 		public int compare(BalanceEntryMessage o1, BalanceEntryMessage o2) {
 			return o1.getCurrency().compareTo(o2.getCurrency());
 		}
-	}; 
-
+	};
+	
 	@Autowired 
 	ExchangeManagerService exchangeManager;
 	@Autowired
 	BalanceService balanceHandler;
+	@Autowired
+	OrderService orderService;
 
-	private List<ExchangeService> exchanges = new ArrayList<ExchangeService>();
-	private ConcurrentMap<String, ConcurrentMap<String, OrderBookMessage>> orderBooks = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBookMessage>>();
-	private ConcurrentMap<String, ConnectionStatus> statuses = new ConcurrentHashMap<String, ConnectionStatus>();
-	private List<String> subscriptions = Collections.synchronizedList(new ArrayList<String>());
+	private final List<ExchangeService> exchanges = new ArrayList<ExchangeService>();
+	private final ConcurrentMap<String, ConcurrentMap<String, OrderBookMessage>> orderBooks = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBookMessage>>();
+	private final ConcurrentMap<String, ConnectionStatus> statuses = new ConcurrentHashMap<String, ConnectionStatus>();
+	private final FixedSizedList<ArbInstruction> arbInstructions = new FixedSizedList<ArbInstruction>(25);
+	private final List<String> exchangeSubscriptions = Collections.synchronizedList(new ArrayList<String>());
+	private final List<String> openOrderSubscriptions = Collections.synchronizedList(new ArrayList<String>());
+	private final List<String> arbInstructionSubscriptions = Collections.synchronizedList(new ArrayList<String>());
 
     @Autowired
     private SimpMessagingTemplate template;
@@ -72,19 +90,43 @@ public class ClientMessagingController {
     				template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(service.getName()));
     		});
     	});
+    	orderService.registerOrderListener(order -> {
+    		if (order != null && order.getMarket() != null) {
+    			template.convertAndSend("/topic/openOrders", this.getOpenOrders(order.getMarket()));
+    			template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(order.getMarket()));
+    		}
+    	});
+    	// TODO: register with arb monitor
     }
 
     @MessageMapping("/exchangeStatus")
     @SendTo("/topic/exchangeStatus")
     public List<ExchangeStatusMessage> subscribeOrderBooks(SubscriptionMessage subscription) {
-    	if (!subscriptions.contains(subscription.getMarket()))
-    		subscriptions.add(subscription.getMarket());
+    	if (!exchangeSubscriptions.contains(subscription.getMarket()))
+    		exchangeSubscriptions.add(subscription.getMarket());
         return getExchangeStatus(subscription.getMarket());
     }
 
+    @MessageMapping("/openOrders")
+    @SendTo("/topic/openOrders")
+    public List<OrderMessage> subscribeLiveOrders(SubscriptionMessage subscription) {
+    	if (!openOrderSubscriptions.contains(subscription.getMarket()))
+    		openOrderSubscriptions.add(subscription.getMarket());
+        return getOpenOrders(subscription.getMarket());
+    }
+
+    @MessageMapping("/arbInstructions")
+    @SendTo("/topic/arbInstructions")
+    public List<ArbStatusMessage> subscribeArbInstructions(SubscriptionMessage subscription) {
+    	if (!arbInstructionSubscriptions.contains(subscription.getMarket()))
+    		arbInstructionSubscriptions.add(subscription.getMarket());
+        return getArbInstructions();
+    }
+
+
     @Scheduled(fixedRate = 2000)
-    public void publishUpdates(){
-		subscriptions.forEach(market -> {
+    public void publishUpdates() {
+    	exchangeSubscriptions.forEach(market -> {
 			template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(market));
 		});
     }
@@ -99,14 +141,34 @@ public class ClientMessagingController {
     				orderBookMessages.addAll(orderBooks.get(name).values());
     			orderBookMessages.sort(obComparator);
     			boolean connected = statuses.get(name) == ConnectionStatus.CONNECTED;
-    			boolean tradingLocked = exchange.isTradingLocked();
+    			boolean tradingEnabled = exchange.isTradingEnabled();
     			BalanceMessage balances = balanceMessageFor(name, balanceHandler.getBalances(name));
-    			rtn.add(new ExchangeStatusMessage(name, connected, tradingLocked, balances, orderBookMessages));
+    			rtn.add(new ExchangeStatusMessage(name, connected, tradingEnabled, balances, orderBookMessages, 
+    					ordersFor(orderService.getOpenOrders(name)), ordersFor(orderService.getClosedOrders(name))));
     		}
     	});
     	return rtn;
     }
-    
+
+    private List<OrderMessage> getOpenOrders(String market) {
+    	List<OrderMessage> rtn = new ArrayList<OrderMessage>();
+    	exchanges.forEach(exchange -> {
+    		if ("ALL".equalsIgnoreCase(market) || market.equalsIgnoreCase(exchange.getName())) {
+    			String name = exchange.getName();
+    			rtn.addAll(ordersFor(orderService.getOpenOrders(name)));
+    		}
+    	});
+    	return rtn;
+    }
+
+    private List<ArbStatusMessage> getArbInstructions() {
+    	List<ArbStatusMessage> rtn = new ArrayList<ArbStatusMessage>();
+		if (arbInstructions.size() > 0) {
+			rtn.addAll(arbsFor(arbInstructions));
+		}
+    	return rtn;
+    }
+
     private BalanceMessage balanceMessageFor(String market, List<Balance> balances) {
     	List<BalanceEntryMessage> entries = new ArrayList<BalanceEntryMessage>();
     	if (balances != null) {
@@ -118,4 +180,33 @@ public class ClientMessagingController {
     	}
     	return new BalanceMessage(market, entries);
     }
+    
+    Function<Order, OrderMessage> orderMessageFromOrder = new Function<Order, OrderMessage>() {
+    	public OrderMessage apply(Order order) {
+    		return new OrderMessage(order);
+    	}
+    };
+    
+    private List<OrderMessage> ordersFor(List<Order> orders) {
+    	if (orders == null)
+    		return Collections.emptyList();
+    	return orders.stream()
+    			.map(orderMessageFromOrder)
+    			.collect(Collectors.<OrderMessage>toList());
+    }
+    
+    Function<ArbInstruction, ArbStatusMessage> arbMessageFromArb = new Function<ArbInstruction, ArbStatusMessage>() {
+    	public ArbStatusMessage apply(ArbInstruction arb) {
+    		return new ArbStatusMessage(arb);
+    	}
+    };
+    
+    private List<ArbStatusMessage> arbsFor(List<ArbInstruction> arbs) {
+    	if (arbs == null)
+    		return Collections.emptyList();
+    	return arbs.stream()
+    			.map(arbMessageFromArb)
+    			.collect(Collectors.<ArbStatusMessage>toList());
+    }
+
 }

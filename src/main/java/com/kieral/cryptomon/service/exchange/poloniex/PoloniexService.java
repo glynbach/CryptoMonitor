@@ -2,6 +2,7 @@ package com.kieral.cryptomon.service.exchange.poloniex;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -157,29 +158,33 @@ public class PoloniexService extends BaseExchangeService {
 	}
 
 	@Override
-	protected Class<? extends PlaceOrderResponse> getPlaceOrderQuery(Side side, CurrencyPair currencyPair,
-			BigDecimal price, BigDecimal amount) {
+	protected Class<? extends PlaceOrderResponse> getPlaceOrderResponseClazz() {
 		return PoloniexActionResponse.class;
 	}
 
 	@Override
-	protected Class<? extends CancelOrderResponse> getCancelOrderQuery(String orderId) {
+	protected Class<? extends CancelOrderResponse> getCancelOrderResponseClazz() {
 		return PoloniexActionResponse.class;
 	}
 
 	@Override
-	protected Class<? extends OrdersResponse> getOpenOrdersQuery(CurrencyPair currencyPair) {
+	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOpenOrdersResponseClazz() {
 		return PoloniexOrdersResponse.class;
 	}
 
 	@Override
-	protected Class<? extends OrdersResponse> getOrderHistoryQuery(CurrencyPair currencyPair) {
+	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOrderHistoryResponseClazz() {
 		return PoloniexOrderHistoryResponse.class;
 	}
 
 	@Override
-	protected Class<? extends OrderResponse> getOrderQuery(String orderId) {
+	protected Class<? extends OrderResponse> getOrderResponseClazz() {
 		return PoloniexOrderTradesResponse.class;
+	}
+
+	@Override
+	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_ALL);
 	}
 
 }

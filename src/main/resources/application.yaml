@@ -13,6 +13,9 @@ logging:
   dataBufferingLogging: true
   rawDataLogging: true
   tickstoreLoggingEnabled: false
+  requestLoggingEnabled: true
+  responseLoggingEnabled: true
+  requestResponseFilters: "!public,!products"
 spring:
   datasource:
     url: "jdbc:mysql://localhost:3306/cryptomon?verifyServerCertificate=false&useSSL=false&requireSSL=false"

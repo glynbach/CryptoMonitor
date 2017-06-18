@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+
+</head>
+<body>
+
+<div th:fragment="orderController">
+	<div class="order-container card openOrders" ng-controller="OpenOrderController">
+		<div class="card-header">
+			<p class="card-title">Open Orders</p>
+		</div>
+		<div class="card-text">
+			<table width="100%" class="table table-striped table-condensed">
+				<thead>
+					<tr>
+						<th>OrderId</th>
+						<th>ClientOrderId</th>
+						<th>Market</th>
+						<th>Side</th>
+						<th>Price</th>
+						<th>Amount</th>
+						<th>Status</th>
+						<th>Message</th>
+						<th>Created</th>
+						<th>Closed</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr ng-repeat="order in orders">
+						<td>{{order.orderId}}</td>
+						<td>{{order.clientOrderId}}</td>
+						<td>{{order.market}}</td>
+						<td>{{order.side}}</td>
+						<td>{{order.price}}</td>
+						<td>{{order.amount}}</td>
+						<td>{{order.orderStatus}}</td>
+						<td>{{order.message}}</td>
+						<td>{{order.createdTime}}</td>
+						<td><a class="btn btn-sm btn-primary" href="/cancelOrder/{{order.market}}/{{order.clientOrderId}}">Cancel</a></td>
+					</tr>										
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>

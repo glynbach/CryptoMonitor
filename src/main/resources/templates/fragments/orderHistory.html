@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+
+</head>
+<body>
+
+<div class="container-fluid">
+	<div th:fragment="orderHistory">
+		<div class="orders">
+			<table width="100%" class="table table-striped table-condensed">
+				<thead>
+					<tr>
+						<th>OrderId</th>
+						<th>ClientOrderId</th>
+						<th>Market</th>
+						<th>Side</th>
+						<th>Price</th>
+						<th>Amount</th>
+						<th>Status</th>
+						<th>Message</th>
+						<th>Created</th>
+						<th>Closed</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr ng-repeat="order in exchange.openOrders">
+						<td>{{order.orderId}}</td>
+						<td>{{order.clientOrderId}}</td>
+						<td>{{order.market}}</td>
+						<td>{{order.side}}</td>
+						<td>{{order.price}}</td>
+						<td>{{order.amount}}</td>
+						<td>{{order.orderStatus}}</td>
+						<td>{{order.message}}</td>
+						<td>{{order.createdTime}}</td>
+						<td>{{order.closedTime}}</td>
+					</tr>										
+					<tr ng-repeat="order in exchange.closedOrders">
+						<td>{{order.orderId}}</td>
+						<td>{{order.clientOrderId}}</td>
+						<td>{{order.market}}</td>
+						<td>{{order.side}}</td>
+						<td>{{order.price}}</td>
+						<td>{{order.amount}}</td>
+						<td>{{order.orderStatus}}</td>
+						<td>{{order.message}}</td>
+						<td>{{order.createdTime}}</td>
+						<td>{{order.closedTime}}</td>
+					</tr>										
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>

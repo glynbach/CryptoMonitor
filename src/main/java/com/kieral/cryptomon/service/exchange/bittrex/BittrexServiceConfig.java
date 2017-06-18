@@ -1,6 +1,7 @@
 package com.kieral.cryptomon.service.exchange.bittrex;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.PropertySource;
@@ -19,12 +20,14 @@ import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 @ConfigurationProperties(prefix="BITTREX")
 public class BittrexServiceConfig extends ServiceExchangeProperties {
 
+	public final static DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");;
+
 	private static final String SNAPSHOT_QUERY = "/public/getorderbook?market=%s&type=both&depth=%s";
 	private static final String ACCOUNTS_QUERY = "/account/getbalances";
 	private static final String OPEN_ORDERS_QUERY = "/market/getopenorders?market=%s";
 	private static final String ORDER_HISTORY_QUERY = "/account/getorderhistory?market=%s";
 	private static final String PLACE_ORDER_QUERY = "/market/%s?market=%s&quantity=%s&rate=%s";
-	private static final String CANCEL_ORDER_QUERY = "/market/cancel&uuid=%s";
+	private static final String CANCEL_ORDER_QUERY = "/market/cancel?uuid=%s";
 	private static final String ORDER_QUERY = "/account/getorder?uuid=%s";
 	private static final String BUY_ORDER = "buylimit";
 	private static final String SELL_ORDER = "selllimit";

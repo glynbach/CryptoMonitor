@@ -1,8 +1,24 @@
 package com.kieral.cryptomon.service.exchange.bittrex.payload;
 
-import com.kieral.cryptomon.service.rest.CancelOrderResponse;
-import com.kieral.cryptomon.service.rest.PlaceOrderResponse;
+public class BittrexActionResponse {
 
-public class BittrexActionResponse extends BittrexResponseContainer<String> implements PlaceOrderResponse, CancelOrderResponse {
+	private String uuid;
+
+	public BittrexActionResponse() {
+		super();
+	}
+
+	public String getUuid() {
+		return uuid;
+	}
+
+	public void setUuid(String uuid) {
+		this.uuid = uuid;
+	}
+
+	@Override
+	public String toString() {
+		return "BittrexActionResponse [uuid=" + uuid + "]";
+	}
 	
 }

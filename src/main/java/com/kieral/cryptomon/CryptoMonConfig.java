@@ -1,5 +1,7 @@
 package com.kieral.cryptomon;
 
+import java.util.Arrays;
+
 import javax.annotation.PostConstruct;
 
 import org.apache.catalina.connector.Connector;
@@ -12,6 +14,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
@@ -37,6 +42,7 @@ import com.kieral.cryptomon.service.exchange.poloniex.PoloniexService;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexServiceConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
+import com.kieral.cryptomon.service.rest.LoggingRequestInterceptor;
 import com.kieral.cryptomon.service.tickstore.TickstoreService;
 import com.kieral.cryptomon.service.util.LoggingUtils;
 import com.kieral.cryptomon.tickstore.DaoManager;
@@ -66,7 +72,16 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 
 	@Value("${logging.tickstoreLoggingEnabled:false}")
 	boolean tickstoreLoggingEnabled;
-	
+
+	@Value("${logging.requestLoggingEnabled:false}")
+	boolean requestLoggingEnabled;
+
+	@Value("${logging.responseLoggingEnabled:false}")
+	boolean responseLoggingEnabled;
+
+	@Value("${logging.requestResponseFilters:''}")
+	String requestResponseFilters;
+
 	@Autowired
 	PoloniexServiceConfig poloniexServiceConfig;
 
@@ -164,11 +179,21 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 		LoggingUtils.setRawDataLoggingEnabled(rawDataLoggingEnabled);
 		LoggingUtils.setDataBufferingLoggingEnabled(dataBufferingLoggingEnabled);
 		LoggingUtils.setTickstoreLoggingEnabled(tickstoreLoggingEnabled);
+		LoggingUtils.setLogRequestFilters(requestResponseFilters);
+		LoggingUtils.setLogRequestsEnabled(requestLoggingEnabled);
+		LoggingUtils.setLogResponsesEnabled(responseLoggingEnabled);
 	}
 
 	@Bean
 	public RestTemplate restTemplate(RestTemplateBuilder builder) {
-		return builder.detectRequestFactory(true).build();
+		builder.detectRequestFactory(true);
+		RestTemplate template = builder.build();
+		configureLoggingUtils();
+		if (LoggingUtils.isLogRequestsEnabled() || LoggingUtils.isLogResponsesEnabled()) {
+			template.setRequestFactory(new BufferingClientHttpRequestFactory(template.getRequestFactory()));
+			template.setInterceptors(Arrays.asList(new ClientHttpRequestInterceptor[]{loggingRequestInterceptor()}));
+		}
+		return template;
 	}
 	
 	@Bean
@@ -198,7 +223,12 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 	
 	@Bean
-	public HttpComponentsClientHttpRequestFactory httpComponentsClientHttpRequestFactory() {
+	public ClientHttpRequestInterceptor loggingRequestInterceptor() {
+		return new LoggingRequestInterceptor();
+	}
+	
+	@Bean
+	public ClientHttpRequestFactory httpComponentsClientHttpRequestFactory() {
 		return new HttpComponentsClientHttpRequestFactory();
 	}
 }
