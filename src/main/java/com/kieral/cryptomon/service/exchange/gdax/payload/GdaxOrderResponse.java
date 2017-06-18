@@ -1,9 +1,15 @@
 package com.kieral.cryptomon.service.exchange.gdax.payload;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OrderStatus;
+import com.kieral.cryptomon.service.exchange.gdax.GdaxServiceConfig;
 import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.util.TradingUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GdaxOrderResponse implements OrderResponse {
@@ -47,10 +53,6 @@ public class GdaxOrderResponse implements OrderResponse {
 
 	public void setProductId(String productId) {
 		this.productId = productId;
-	}
-
-	public String getSide() {
-		return side;
 	}
 
 	public void setSide(String side) {
@@ -161,5 +163,69 @@ public class GdaxOrderResponse implements OrderResponse {
 				+ fillFees + ", filledSize=" + filledSize + ", executedValue=" + executedValue + ", status=" + status
 				+ ", settled=" + settled + "]";
 	}
-	
+
+	@Override
+	public String getOrderId() {
+		return id;
+	}
+
+	@Override
+	public BigDecimal getQuantity() {
+		return size;
+	}
+
+	@Override
+	public BigDecimal getQuantityRemaining() {
+		return filledSize;
+	}
+
+	@Override
+	public BigDecimal getPrice() {
+		return null;
+	}
+
+	@Override
+	public boolean isOpen() {
+		return "done".equals(status) || "settled".equals(status);
+	}
+
+	@Override
+	public boolean isClosing() {
+		return false;
+	}
+
+	@Override
+	public boolean isSuccess() {
+		return id != null;
+	}
+
+	@Override
+	public OrderStatus getOrderStatus() {
+		return TradingUtils.getOrderStatus(this); 
+	}
+
+	@Override
+	public Side getSide() {
+		return side == null ? null : side.toUpperCase().contains("BUY") ? Side.BID : Side.ASK;
+	}
+
+	@Override
+	public long getCreatedTime() {
+		try {
+			return LocalDateTime.parse(createdAt, GdaxServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+		} catch (Exception e) {}
+		return System.currentTimeMillis();
+	}
+
+	@Override
+	public long getClosedTime() {
+		if (doneAt != null) {
+			try {
+				return LocalDateTime.parse(doneAt, GdaxServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+			} catch (Exception e) {}
+			return System.currentTimeMillis();
+		}
+		return 0;
+	}
+
 }

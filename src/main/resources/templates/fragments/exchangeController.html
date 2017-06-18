@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+
+</head>
+<body>
+
+<div th:fragment="exchangeController">
+	<div class="exchangeStatus" ng-controller="ExchangeController">
+		<div ng-repeat="exchange in exchanges">
+			<div class="exchange-container card">
+				<div ng-class="{'card-danger' : !exchange.connected, 'card-warning' : !exchange.tradingEnabled, 'card-success' : exchange.connected, 'card-header' : true}">
+					<p class="card-title">{{exchange.name}} <small>(connected={{exchange.connected}}; trading={{exchange.tradingEnabled}})</small></p>
+				</div>
+				<div class="card-text">
+				<!--/*/ <th:block th:include="${exchangesContainerContentLoc} :: ${exchangesContainerFragment}"></th:block> /*/-->
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>

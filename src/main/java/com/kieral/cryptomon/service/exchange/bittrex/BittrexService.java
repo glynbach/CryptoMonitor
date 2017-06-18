@@ -1,18 +1,16 @@
 package com.kieral.cryptomon.service.exchange.bittrex;
 
-import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.List;
 
-import com.kieral.cryptomon.model.general.CurrencyPair;
-import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.exchange.BaseExchangeService;
 import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
-import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexAccountsResponse;
-import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexActionResponse;
+import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexAccountsResponseContainer;
+import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexActionResponseContainer;
 import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexOrderBookResponse;
 import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexOrderResponseContainer;
-import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexOrdersResponse;
+import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexOrdersResponseContainer;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.CancelOrderResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
@@ -61,33 +59,37 @@ public class BittrexService extends BaseExchangeService {
 
 	@Override
 	protected Class<? extends AccountsResponse> getAccountsResponseClazz() {
-		return BittrexAccountsResponse.class;
+		return BittrexAccountsResponseContainer.class;
 	}
 
 	@Override
-	protected Class<? extends PlaceOrderResponse> getPlaceOrderQuery(Side side, CurrencyPair currencyPair,
-			BigDecimal price, BigDecimal amount) {
-		return BittrexActionResponse.class;
+	protected Class<? extends PlaceOrderResponse> getPlaceOrderResponseClazz() {
+		return BittrexActionResponseContainer.class;
 	}
 
 	@Override
-	protected Class<? extends CancelOrderResponse> getCancelOrderQuery(String orderId) {
-		return BittrexActionResponse.class;
+	protected Class<? extends CancelOrderResponse> getCancelOrderResponseClazz() {
+		return BittrexActionResponseContainer.class;
 	}
 
 	@Override
-	protected Class<? extends OrdersResponse> getOpenOrdersQuery(CurrencyPair currencyPair) {
-		return BittrexOrdersResponse.class;
+	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOpenOrdersResponseClazz() {
+		return BittrexOrdersResponseContainer.class;
 	}
 
 	@Override
-	protected Class<? extends OrdersResponse> getOrderHistoryQuery(CurrencyPair currencyPair) {
-		return BittrexOrdersResponse.class;
+	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOrderHistoryResponseClazz() {
+		return BittrexOrdersResponseContainer.class;
 	}
 
 	@Override
-	protected Class<? extends OrderResponse> getOrderQuery(String orderId) {
+	protected Class<? extends OrderResponse> getOrderResponseClazz() {
 		return BittrexOrderResponseContainer.class;
+	}
+
+	@Override
+	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_ALL);
 	}
 
 }

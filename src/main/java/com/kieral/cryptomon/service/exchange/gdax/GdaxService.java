@@ -1,10 +1,8 @@
 package com.kieral.cryptomon.service.exchange.gdax;
 
-import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.List;
 
-import com.kieral.cryptomon.model.general.CurrencyPair;
-import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.exchange.BaseExchangeService;
 import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
@@ -66,29 +64,33 @@ public class GdaxService extends BaseExchangeService {
 	}
 
 	@Override
-	protected Class<? extends PlaceOrderResponse> getPlaceOrderQuery(Side side, CurrencyPair currencyPair,
-			BigDecimal price, BigDecimal amount) {
+	protected Class<? extends PlaceOrderResponse> getPlaceOrderResponseClazz() {
 		return GdaxActionResponse.class;
 	}
 
 	@Override
-	protected Class<? extends CancelOrderResponse> getCancelOrderQuery(String orderId) {
+	protected Class<? extends CancelOrderResponse> getCancelOrderResponseClazz() {
 		return GdaxActionResponse.class;
 	}
 
 	@Override
-	protected Class<? extends OrdersResponse> getOpenOrdersQuery(CurrencyPair currencyPair) {
+	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOpenOrdersResponseClazz() {
 		return GdaxOrdersResponse.class;
 	}
 
 	@Override
-	protected Class<? extends OrdersResponse> getOrderHistoryQuery(CurrencyPair currencyPair) {
+	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOrderHistoryResponseClazz() {
 		return GdaxFillsResponse.class;
 	}
 
 	@Override
-	protected Class<? extends OrderResponse> getOrderQuery(String orderId) {
+	protected Class<? extends OrderResponse> getOrderResponseClazz() {
 		return GdaxOrderResponse.class;
 	}
 	
+	@Override
+	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_ALL);
+	}
+
 }

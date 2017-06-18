@@ -6,6 +6,7 @@ import java.util.Map;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.kieral.cryptomon.service.exception.ApiRequestException;
 
 public class ApiRequest {
 
@@ -69,7 +70,7 @@ public class ApiRequest {
 		return postParameters;
 	}
 	
-	public String getBodyAsString() throws JsonProcessingException {
+	public String getBodyAsString() throws ApiRequestException {
 		if (postParameters.size() == 0)
 			return "";
 		if (bodyType == BodyType.URLENCODED) {
@@ -84,7 +85,11 @@ public class ApiRequest {
 			postParameters.keySet().forEach(key -> {
 				objectNode.put(key, postParameters.get(key));
 			});
-			return objectMapper.writeValueAsString(objectNode);
+			try {
+				return objectMapper.writeValueAsString(objectNode);
+			} catch (JsonProcessingException e) {
+				throw new ApiRequestException(String.format("Exception processing {} to json", postParameters), e);
+			}
 		}
 	}
 

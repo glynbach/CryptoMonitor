@@ -1,6 +1,7 @@
 package com.kieral.cryptomon.service.exchange.gdax;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.PropertySource;
@@ -19,7 +20,9 @@ import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 @PropertySource(value = { "classpath:application.yaml" })
 @ConfigurationProperties(prefix="GDAX")
 public class GdaxServiceConfig extends ServiceExchangeProperties {
-
+	
+	public final static DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSX");;
+	
 	private static final String SNAPSHOT_QUERY = "/products/%s/book?level=2";
 	private static final String ACCOUNTS_QUERY = "/accounts";
 	private static final String ORDER_QUERY = "/orders/%s";

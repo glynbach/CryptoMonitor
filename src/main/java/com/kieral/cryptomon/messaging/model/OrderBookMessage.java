@@ -1,17 +1,16 @@
-package com.kieral.cryptomon.messaging;
+package com.kieral.cryptomon.messaging.model;
 
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.kieral.cryptomon.model.orderbook.OrderBook;
+import com.kieral.cryptomon.service.util.CommonUtils;
 
 public class OrderBookMessage {
 
 	private final static int MAX_DEPTH = 5;
-	private final static DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yy hh:mm:ss");
 	
 	private String market;
 	private String currencyPair;
@@ -28,7 +27,7 @@ public class OrderBookMessage {
 		this.market = market;
 		this.currencyPair = currencyPair;
 		this.obEntries = obEntries;
-		this.lastUpdated = dtf.format(Instant.ofEpochMilli(lastUpdated)
+		this.lastUpdated = CommonUtils.SECONDS_FORMATTER.format(Instant.ofEpochMilli(lastUpdated)
 				.atZone(ZoneId.systemDefault()).toLocalDateTime());
 		this.valid = valid;
 	}
@@ -57,7 +56,7 @@ public class OrderBookMessage {
 				if (row.getAskAmount() == null) row.setAskAmount("");
 			});
 		}
-		this.lastUpdated = dtf.format(Instant.ofEpochMilli(orderBook.getSnapshotReceived())
+		this.lastUpdated = CommonUtils.SECONDS_FORMATTER.format(Instant.ofEpochMilli(orderBook.getSnapshotReceived())
 				.atZone(ZoneId.systemDefault()).toLocalDateTime());
 		// TOOO: implement OB frozen in the model 
 		this.valid = true;

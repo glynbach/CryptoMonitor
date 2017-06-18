@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kieral.cryptomon.service.rest.OrdersResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class GdaxFillsResponse extends ArrayList<GdaxFillResponse> implements OrdersResponse {
+public class GdaxFillsResponse extends ArrayList<GdaxFillResponse> implements OrdersResponse<GdaxOrderResponse> {
 
 	private static final long serialVersionUID = 8269060090725506020L;
 
@@ -22,6 +22,18 @@ public class GdaxFillsResponse extends ArrayList<GdaxFillResponse> implements Or
 	public String toString() {
 		return "GdaxFillsResponse [getOrderResponses()=" + getOrderResponses() + ", fills=" + super.toString()
 				+ "]";
+	}
+
+	@Override
+	public boolean isSuccess() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public String getMessage() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	

@@ -7,26 +7,29 @@
 
 <div class="container-fluid">
     <div th:fragment="header">
-        <nav class="navbar navbar-default">
+        <nav class="navbar navbar-inverse bg-primary">
             <div class="container-fluid">
                 <div class="navbar-header">
                     <a class="navbar-brand" href="#" th:href="@{/}">Order Books</a>
-                    <a class="navbar-brand" href="#" onClick="$('#unlockTrading').dialog('open');">Unlock Trading</a>
+                    <a class="navbar-brand" href="#" th:href="@{/orders}">Orders</a>
+                    <a class="navbar-brand" href="#" onClick="$('#enableTrading').dialog('open');">Enable Trading</a>
                 </div>
             </div>
         </nav>
-       	<div id="unlockTrading" style="display:none" title="Unlock Trading">
-			<form th:action="@{/unlockTrading}" method="post">
-				<div class="input-group span4">
+        <hr/>
+       	<div id="enableTrading" title="Enter key for envrypted API files">
+			<form th:action="@{/enableTrading}" method="post" class="form-inline">
+				<label class="sr-only" for="secretKey"></label>
+				<div class="input-group">
 					<span class="input-group-addon">Key</span>
 					<input type="password" class="form-control" name="secretKey" id="secretKey"/>
-					<span class="input-group-addon"><button type="submit" class="btn btn-default">Unlock Trading</button></span>
+					<span class="input-group-addon"><button type="submit" class="btn btn-primary">Enable Trading</button></span>
 				</div>
 			</form>
 		</div>
 		<script>
 			$( document ).ready(function() {
-				$("#unlockTrading").dialog({
+				$("#enableTrading").dialog({
 				    autoOpen: false,
 				    show: 'slide',
 				    resizable: false,
@@ -38,7 +41,6 @@
 				});
 			});
 		</script>
-		
     </div>
 </div>
 

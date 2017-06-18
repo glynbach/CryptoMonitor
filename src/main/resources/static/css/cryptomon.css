@@ -1,10 +1,12 @@
-.top-buffer { margin-top:20px; }
+.top-buffer { margin-top:2emx; }
 
-.top-small-buffer { margin-top:5px; }
+.top-small-buffer { margin-top:1em; }
 
-.bottom-small-buffer { margin-bottom:5px; }
+.left-small-buffer { margin-left:1em; }
 
-.padded { padding: 5px; }
+.bottom-small-buffer { margin-bottom:1em; }
+
+.padded { padding: .5em; }
 
 .table-condensed { font-size: 10px; }
 
@@ -12,7 +14,19 @@
 {
     border-radius: .2em;
     border: 1px solid #cccccc;
-	margin-bottom: .5em;
+	margin-top: .5em;
+
+    -webkit-transition: border linear .2s, box-shadow linear .2s;
+    -moz-transition: border linear .2s, box-shadow linear .2s;
+    -o-transition: border linear .2s, box-shadow linear .2s;
+    transition: border linear .2s, box-shadow linear .2s;
+}
+
+.order-container
+{
+    border-radius: .2em;
+    border: 1px solid #cccccc;
+	margin-top: .5em;
 
     -webkit-transition: border linear .2s, box-shadow linear .2s;
     -moz-transition: border linear .2s, box-shadow linear .2s;
@@ -31,4 +45,12 @@
     -moz-transition: border linear .2s, box-shadow linear .2s;
     -o-transition: border linear .2s, box-shadow linear .2s;
     transition: border linear .2s, box-shadow linear .2s;
+}
+
+.table-centred
+{
+    border-radius: 5px;
+    width: 50%;
+    margin: 0px auto;
+    float: none;
 }

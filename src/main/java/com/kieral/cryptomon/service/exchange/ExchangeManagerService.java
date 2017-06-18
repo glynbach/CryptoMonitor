@@ -11,6 +11,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.Order;
+import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
@@ -67,28 +71,33 @@ public class ExchangeManagerService {
 		return exchangeStatuses.getOrDefault(market, ConnectionStatus.DISCONNECTED);
 	}
 	
-	public List<String> unlockTradingAll(String secretKey) {
+	public List<String> enableTradingAll(String secretKey) {
 		List<String> errors = new ArrayList<String>();
 		enabledExchanges.forEach(exchange -> {
-			String error = unlockTrading(exchange.getName(), secretKey);
+			String error = enableTrading(exchange.getName(), secretKey);
 			if (error != null)
 				errors.add(error);
 		});
 		return errors;
 	}
 	
-	public String unlockTrading(String market, String secretKey) {
+	public String enableTrading(String market, String secretKey) {
 		if (enabledExchangeMap.containsKey(market)) {
-			if (!enabledExchangeMap.get(market).unlockTrading(secretKey)) {
+			if (enabledExchangeMap.get(market).enableTrading(secretKey)) {
 				return updateBalances(market, true); 
 			} else {
-				return String.format("Exchange %s still locked", market); 
+				return String.format("Exchange %s trading still disabled", market); 
 			}
 		} else {
 			return String.format("Exchange %s is not enabled or does not exist", market);
 		}
 	}
-	
+
+	public boolean isTradingEnabled(String market) {
+		return !enabledExchangeMap.containsKey(market)
+				|| enabledExchangeMap.get(market).isTradingEnabled();
+	}
+
 	public List<String> updatesAllBalances(boolean overrideWorkingBalance) {
 		List<String> errors = new ArrayList<String>();
 		enabledExchanges.forEach(exchange -> {
@@ -113,6 +122,72 @@ public class ExchangeManagerService {
 		} else
 			return String.format("Exchange %s is not enabled or does not exist", market);
 		return null;
+	}
+
+	public CurrencyPair getCurrencyPair(String market, String currencyPairStr) {
+		if (enabledExchangeMap.containsKey(market)) {
+			return enabledExchangeMap.get(market).getCurrencyPair(currencyPairStr);
+		}
+		return null;
+	}
+
+	public OrderStatus placeOrder(Order order) {
+		if (checkWithMessageUpdateMarketStatus(order)) {
+			return enabledExchangeMap.get(order.getMarket()).placeOrder(order);
+		} else {
+			return OrderStatus.CANCELLED;
+		}
+	}
+
+	public OrderStatus cancelOrder(Order order) {
+		if (checkWithMessageUpdateMarketStatus(order)) {
+			return enabledExchangeMap.get(order.getMarket()).cancelOrder(order);
+		} else {
+			return order.getOrderStatus();
+		}
+	}
+
+	public OrderStatus forceCancelOrder(String market, String orderId) {
+		if (enabledExchangeMap.containsKey(market))
+			return enabledExchangeMap.get(market).cancelOrder(orderId);
+		return OrderStatus.ERROR;
+	}
+	
+	public Map<String, OpenOrderStatus> getOpenOrderStatuses(String market, List<Order> orders) {
+		if (checkMarketStatus(market)) {
+			return enabledExchangeMap.get(market).getOpenOrderStatuses(orders);
+		} else {
+			return null;
+		}
+	}
+
+	private boolean checkWithMessageUpdateMarketStatus(Order order) {
+		if (!enabledExchangeMap.containsKey(order.getMarket())) {
+			order.setMessage(String.format("Exchange %s not enabled", order.getMarket()));
+			return false;
+		}
+		if (getExchangeStatus(order.getMarket()) != ConnectionStatus.CONNECTED) {
+			order.setMessage(String.format("Exchange %s not connected", order.getMarket()));
+			return false;
+		}
+		if (!isTradingEnabled(order.getMarket())) {
+			order.setMessage(String.format("Trading not enabled for Exchange %s", order.getMarket()));
+			return false;
+		}
+		return true;
+	}
+
+	private boolean checkMarketStatus(String market) {
+		if (!enabledExchangeMap.containsKey(market)) {
+			return false;
+		}
+		if (getExchangeStatus(market) != ConnectionStatus.CONNECTED) {
+			return false;
+		}
+		if (!isTradingEnabled(market)) {
+			return false;
+		}
+		return true;
 	}
 
 }

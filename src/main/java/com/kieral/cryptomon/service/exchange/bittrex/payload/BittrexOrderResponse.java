@@ -1,10 +1,16 @@
 package com.kieral.cryptomon.service.exchange.bittrex.payload;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OrderStatus;
+import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
 import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.util.TradingUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BittrexOrderResponse implements OrderResponse {
@@ -23,6 +29,7 @@ public class BittrexOrderResponse implements OrderResponse {
 	private BigDecimal pricePerUnit;
 	private String opened;
 	private String closed;
+	private boolean openWasSet;
 	private boolean open;
 	private boolean cancelInitiated;
 	private boolean immediateOrCancel;
@@ -121,7 +128,7 @@ public class BittrexOrderResponse implements OrderResponse {
 	}
 
 	public BigDecimal getPrice() {
-		return price;
+		return price == null || price.compareTo(BigDecimal.ZERO) == 0 ? limit : price;
 	}
 
 	@JsonProperty("Price")
@@ -157,11 +164,15 @@ public class BittrexOrderResponse implements OrderResponse {
 	}
 
 	public boolean isOpen() {
+		if (!openWasSet) {
+			return opened != null && closed == null;
+		}
 		return open;
 	}
 
 	@JsonProperty("IsOpen")
 	public void setOpen(boolean open) {
+		this.openWasSet = true;
 		this.open = open;
 	}
 
@@ -221,5 +232,48 @@ public class BittrexOrderResponse implements OrderResponse {
 				+ "]";
 	}
 
+	@Override
+	public String getOrderId() {
+		return orderUuid;
+	}
+
+	@Override
+	public boolean isClosing() {
+		return cancelInitiated;
+	}
+
+	@Override
+	public boolean isSuccess() {
+		return orderUuid != null;
+	}
+
+	@Override
+	public OrderStatus getOrderStatus() {
+		return TradingUtils.getOrderStatus(this); 
+	}
+
+	@Override
+	public Side getSide() {
+		return orderType == null ? null : orderType.toUpperCase().contains("SELL") ? Side.ASK : Side.BID;
+	}
+
+	@Override
+	public long getCreatedTime() {
+		try {
+			return LocalDateTime.parse(opened, BittrexServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+		} catch (Exception e) {}
+		return System.currentTimeMillis();
+	}
+
+	@Override
+	public long getClosedTime() {
+		if (closed != null) {
+			try {
+				return LocalDateTime.parse(closed, BittrexServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+			} catch (Exception e) {}
+			return System.currentTimeMillis();
+		}
+		return 0;
+	}
 	
 }

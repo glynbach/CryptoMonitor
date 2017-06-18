@@ -3,7 +3,10 @@ package com.kieral.cryptomon.service.exchange.poloniex.payload;
 import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.util.TradingUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PoloniexOrderResponse implements OrderResponse {
@@ -59,5 +62,64 @@ public class PoloniexOrderResponse implements OrderResponse {
 		return "PoloniexOrderResponse [orderNumber=" + orderNumber + ", type=" + type + ", rate=" + rate + ", amount="
 				+ amount + ", total=" + total + "]";
 	}
+
+	@Override
+	public String getOrderId() {
+		return orderNumber;
+	}
+
+	@Override
+	public BigDecimal getQuantity() {
+		return amount;
+	}
+
+	@Override
+	public BigDecimal getQuantityRemaining() {
+		return amount;
+	}
+
+	@Override
+	public BigDecimal getPrice() {
+		return rate;
+	}
+
+	@Override
+	public boolean isOpen() {
+		return true;
+	}
+
+	@Override
+	public boolean isClosing() {
+		return false;
+	}
+
+	@Override
+	public boolean isSuccess() {
+		return true;
+	}
+	
+	@Override
+	public OrderStatus getOrderStatus() {
+		return TradingUtils.getOrderStatus(this); 
+	}
+
+	@Override
+	public Side getSide() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public long getCreatedTime() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public long getClosedTime() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
 	
 }
