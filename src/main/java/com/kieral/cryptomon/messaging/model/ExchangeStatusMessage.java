@@ -42,12 +42,20 @@ public class ExchangeStatusMessage {
 		return connected;
 	}
 
+	public String getConnectedStatus() {
+		return connected ? "Connected" : "Disconnected";
+	}
+	
 	public void setConnected(boolean connected) {
 		this.connected = connected;
 	}
 
 	public boolean isTradingEnabled() {
 		return tradingEnabled;
+	}
+
+	public String getTradingStatus() {
+		return tradingEnabled ? "Trading Enabled" : "Trading Disabled";
 	}
 
 	public void setTradingEnabled(boolean tradingEnabled) {

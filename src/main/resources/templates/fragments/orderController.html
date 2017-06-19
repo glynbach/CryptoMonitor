@@ -37,7 +37,11 @@
 						<td>{{order.orderStatus}}</td>
 						<td>{{order.message}}</td>
 						<td>{{order.createdTime}}</td>
-						<td><a class="btn btn-sm btn-primary" href="/cancelOrder/{{order.market}}/{{order.clientOrderId}}">Cancel</a></td>
+						<td>
+							<a class="btn btn-sm btn-primary" href="/cancelOrder/{{order.market}}/{{order.clientOrderId}}">Cancel</a>
+							&nbsp;
+							<a class="btn btn-sm btn-primary" href="/checkOrderStatus/{{order.market}}/{{order.clientOrderId}}">Check</a>
+						</td>
 					</tr>										
 				</tbody>
 			</table>

@@ -11,6 +11,7 @@ public class Order {
 	private String currencyPairStr;
 	private CurrencyPair currencyPair;
 	private BigDecimal amount;
+	private BigDecimal amountRemaining;
 	private BigDecimal price;
 	private Side side;
 	private OrderStatus orderStatus;
@@ -30,17 +31,19 @@ public class Order {
 		this.market = market;
 		this.currencyPairStr = currencyPairStr;
 		this.amount = amount;
+		this.amountRemaining = amount;
 		this.price = price;
 		this.side = side;
 	}
 
-	public Order(String market, String currencyPairStr, CurrencyPair currencyPair, BigDecimal amount, BigDecimal price,
+	public Order(String market, String currencyPairStr, CurrencyPair currencyPair, BigDecimal amount, BigDecimal amountRemaining, BigDecimal price,
 			Side side, OrderStatus orderStatus, String clientOrderId, String orderId, long createdTime, long closedTime,
 			String message) {
 		this.market = market;
 		this.currencyPairStr = currencyPairStr;
 		this.currencyPair = currencyPair;
 		this.amount = amount;
+		this.amountRemaining = amountRemaining;
 		this.price = price;
 		this.side = side;
 		this.orderStatus = orderStatus;
@@ -96,6 +99,14 @@ public class Order {
 
 	public void setAmount(BigDecimal amount) {
 		this.amount = amount;
+	}
+
+	public BigDecimal getAmountRemaining() {
+		return amountRemaining;
+	}
+
+	public void setAmountRemaining(BigDecimal amountRemaining) {
+		this.amountRemaining = amountRemaining;
 	}
 
 	public BigDecimal getPrice() {
@@ -165,9 +176,9 @@ public class Order {
 	@Override
 	public String toString() {
 		return "Order [market=" + market + ", currencyPairStr=" + currencyPairStr + ", currencyPair=" + currencyPair
-				+ ", amount=" + amount + ", price=" + price + ", side=" + side + ", orderStatus=" + orderStatus
-				+ ", clientOrderId=" + clientOrderId + ", orderId=" + orderId + ", createdTime=" + createdTime
-				+ ", closedTime=" + closedTime + ", message=" + message + "]";
+				+ ", amount=" + amount + ", amountRemaining=" + amountRemaining + ", price=" + price + ", side=" + side
+				+ ", orderStatus=" + orderStatus + ", clientOrderId=" + clientOrderId + ", orderId=" + orderId
+				+ ", createdTime=" + createdTime + ", closedTime=" + closedTime + ", message=" + message + "]";
 	}
 
 }

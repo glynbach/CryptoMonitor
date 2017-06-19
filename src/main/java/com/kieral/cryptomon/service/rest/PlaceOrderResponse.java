@@ -6,8 +6,8 @@ public interface PlaceOrderResponse {
 
 	OrderStatus getOrderStatus(Class<?> clazz, OrderStatus currentStatus);
 
-	String getOrderId();
-
 	String getExchangeMessage();
+
+	String getOrderId();
 
 }

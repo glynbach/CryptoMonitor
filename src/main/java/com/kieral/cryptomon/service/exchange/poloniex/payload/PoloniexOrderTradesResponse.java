@@ -2,10 +2,14 @@ package com.kieral.cryptomon.service.exchange.poloniex.payload;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
+import com.kieral.cryptomon.service.exchange.poloniex.util.PoloniexUtils;
 import com.kieral.cryptomon.service.rest.OrderResponse;
 import com.kieral.cryptomon.service.util.TradingUtils;
 
@@ -14,75 +18,97 @@ public class PoloniexOrderTradesResponse extends ArrayList<PoloniexOrderTradeRes
 
 	private static final long serialVersionUID = -5575116744128597604L;
 
+	private AtomicBoolean collated = new AtomicBoolean(false);
+	private PoloniexOrderResponse orderResponse;
+	private String orderId = "unknown";
+			
 	@Override
 	public String toString() {
 		return "PoloniexOrderTradesResponse [orderTrades()=" + super.toString() + "]";
 	}
 
-	// TODO: this still needs to be collated
+	private void collate() {
+		if (collated.compareAndSet(false,  true)) {
+			doCollate(true);
+		}
+	}
+	
+	private void doCollate(boolean openOrder) {
+		collated.set(true);
+		orderResponse = PoloniexUtils.getOrderResponseFromTrades(openOrder, orderId, this.subList(0,  this.size()));
+	}
 	
 	@Override
 	public String getOrderId() {
-		// TODO Auto-generated method stub
-		return null;
+		return orderId;
 	}
 
 	@Override
-	public BigDecimal getQuantity() {
-		// TODO Auto-generated method stub
-		return null;
+	public BigDecimal getAmount() {
+		collate();
+		return orderResponse == null ? null : orderResponse.getAmount();
 	}
 
 	@Override
-	public BigDecimal getQuantityRemaining() {
-		// TODO Auto-generated method stub
-		return null;
+	public BigDecimal getAmountRemaining() {
+		collate();
+		return orderResponse == null ? null : orderResponse.getAmountRemaining();
 	}
 
 	@Override
 	public BigDecimal getPrice() {
-		// TODO Auto-generated method stub
-		return null;
+		collate();
+		return orderResponse == null ? null : orderResponse.getPrice();
 	}
 
 	@Override
 	public boolean isOpen() {
-		// TODO Auto-generated method stub
-		return false;
+		collate();
+		return orderResponse == null ? false : orderResponse.isOpen();
 	}
 
 	@Override
 	public boolean isClosing() {
-		// TODO Auto-generated method stub
-		return false;
+		return orderResponse == null ? false : orderResponse.isClosing();
 	}
 
 	@Override
 	public boolean isSuccess() {
-		return getOrderId() != null;
+		collate();
+		return orderResponse == null ? false : orderResponse.isClosing();
 	}
 
 	@Override
 	public OrderStatus getOrderStatus() {
-		return TradingUtils.getOrderStatus(this); 
+		collate();
+		throw new IllegalStateException("getOrderStatus not supported; use getOrderUpdateStatus(boolean isOpenOrderRequest, Order order)");
 	}
 
 	@Override
 	public Side getSide() {
-		// TODO Auto-generated method stub
-		return null;
+		collate();
+		return orderResponse == null || orderResponse.getType() == null ? null : orderResponse.getType().toUpperCase().contains("BUY") ? Side.BID : Side.ASK;
 	}
 
 	@Override
 	public long getCreatedTime() {
-		// TODO Auto-generated method stub
-		return 0;
+		collate();
+		return orderResponse == null ? System.currentTimeMillis() : orderResponse.getCreatedTime();
 	}
 
 	@Override
 	public long getClosedTime() {
-		// TODO Auto-generated method stub
-		return 0;
+		collate();
+		return orderResponse == null ? System.currentTimeMillis() : orderResponse.getClosedTime();
+	}
+
+	@Override
+	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
+		if (order != null)
+			orderId = order.getOrderId();
+		doCollate(isOpenOrderRequest);
+		BigDecimal amountRemaining = order.getAmount().subtract(getAmount().add(orderResponse == null || orderResponse.getFee() == null ? BigDecimal.ZERO : orderResponse.getFee()));
+		return new OpenOrderStatus(order, TradingUtils.getOrderStatus(isOpenOrderRequest, amountRemaining), amountRemaining);
 	}
 	
 }

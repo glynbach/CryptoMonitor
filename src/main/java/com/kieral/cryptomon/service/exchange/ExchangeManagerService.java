@@ -74,22 +74,17 @@ public class ExchangeManagerService {
 	public List<String> enableTradingAll(String secretKey) {
 		List<String> errors = new ArrayList<String>();
 		enabledExchanges.forEach(exchange -> {
-			String error = enableTrading(exchange.getName(), secretKey);
-			if (error != null)
-				errors.add(error);
+			if (!enableTrading(exchange.getName(), secretKey))
+				errors.add(String.format("Failed to enable trading for %s", exchange.getName()));
 		});
 		return errors;
 	}
 	
-	public String enableTrading(String market, String secretKey) {
+	public boolean enableTrading(String market, String secretKey) {
 		if (enabledExchangeMap.containsKey(market)) {
-			if (enabledExchangeMap.get(market).enableTrading(secretKey)) {
-				return updateBalances(market, true); 
-			} else {
-				return String.format("Exchange %s trading still disabled", market); 
-			}
+			 return enabledExchangeMap.get(market).enableTrading(secretKey);
 		} else {
-			return String.format("Exchange %s is not enabled or does not exist", market);
+			return false;
 		}
 	}
 
@@ -98,30 +93,24 @@ public class ExchangeManagerService {
 				|| enabledExchangeMap.get(market).isTradingEnabled();
 	}
 
-	public List<String> updatesAllBalances(boolean overrideWorkingBalance) {
-		List<String> errors = new ArrayList<String>();
+	public void updatesAllBalances(boolean overrideWorkingBalance) {
 		enabledExchanges.forEach(exchange -> {
 			try {
 				exchange.updateBalances(overrideWorkingBalance);
-			} catch (Exception e) {
+			} catch (BalanceRequestException e) {
 				logger.error("Error requesting balance for exchange {}", exchange.getName(), e);
-				errors.add(e.getMessage());
 			}
 		});
-		return errors;
 	}
 
-	public String updateBalances(String market, boolean overrideWorkingBalance) {
+	public void updateBalances(String market, boolean overrideWorkingBalance) {
 		if (enabledExchangeMap.containsKey(market)) {
 			try {
 				enabledExchangeMap.get(market).updateBalances(overrideWorkingBalance);
 			} catch (BalanceRequestException e) {
 				logger.error("Error requesting balance for exchange {}", market, e);
-				return e.getMessage();
 			}
-		} else
-			return String.format("Exchange %s is not enabled or does not exist", market);
-		return null;
+		} 
 	}
 
 	public CurrencyPair getCurrencyPair(String market, String currencyPairStr) {
@@ -160,6 +149,13 @@ public class ExchangeManagerService {
 			return null;
 		}
 	}
+	public List<Order> getOpenOrders(String market) {
+		if (checkMarketStatus(market, true)) {
+			return enabledExchangeMap.get(market).getOpenOrders();
+		} else {
+			return null;
+		}
+	}
 
 	private boolean checkWithMessageUpdateMarketStatus(Order order) {
 		if (!enabledExchangeMap.containsKey(order.getMarket())) {
@@ -178,13 +174,23 @@ public class ExchangeManagerService {
 	}
 
 	private boolean checkMarketStatus(String market) {
+		return checkMarketStatus(market, false);
+	}
+
+	private boolean checkMarketStatus(String market, boolean throwException) {
 		if (!enabledExchangeMap.containsKey(market)) {
+			if (throwException)
+				throw new IllegalStateException(String.format("%s is not enabled", market));
 			return false;
 		}
 		if (getExchangeStatus(market) != ConnectionStatus.CONNECTED) {
+			if (throwException)
+				throw new IllegalStateException(String.format("%s is not connected", market));
 			return false;
 		}
 		if (!isTradingEnabled(market)) {
+			if (throwException)
+				throw new IllegalStateException(String.format("%s is not trading enabled", market));
 			return false;
 		}
 		return true;

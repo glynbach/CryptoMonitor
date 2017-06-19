@@ -7,18 +7,15 @@
 
 <div class="container-fluid">
 	<div th:fragment="orderBook">
-		<div class="balances bottom-small-buffer">
-			<p><small>&nbsp;&nbsp;Available balances:<span ng-repeat="balance in exchange.balances.balances" class="d-inline-block">&nbsp;&nbsp;{{balance.currency}}: {{balance.amount}}</span></small></p>
-		</div>
 		<div class="orderBooks">
 			<table width="100%">
 				<tr>
 					<td width="{{100/exchange.orderBooks.length}}%" ng-repeat="orderBook in exchange.orderBooks">
 						<div class="borded-padded-container">
-							<table class="table table-striped table-condensed">
-								<thead>
+							<table ng-class="{'table' : true, 'table-striped' : true, 'table-condensed' : true, 'table-warning' : orderBook.stale, 'table-danger' : !orderBook.valid}">
+								<thead>	
 									<tr>
-										<th colspan="4">{{orderBook.currencyPair}}</th>
+										<th colspan="4">{{orderBook.currencyPair}} - {{orderBook.lastUpdated}}</th>
 									</tr>
 									<tr>
 										<th colspan="2">Asks</th>

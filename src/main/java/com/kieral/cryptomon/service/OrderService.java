@@ -3,6 +3,7 @@ package com.kieral.cryptomon.service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,6 +11,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.PostConstruct;
@@ -21,7 +26,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-//import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exception.OrderNotExistsException;
@@ -31,11 +36,21 @@ import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 @EnableScheduling
 public class OrderService {
 
-	private static final AtomicLong counter = new AtomicLong(Instant.now().getEpochSecond());
+	private static final AtomicLong orderIdCounter = new AtomicLong(Instant.now().getEpochSecond());
+	private static final AtomicInteger counter = new AtomicInteger(0);
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
 	private final List<OrderListener> listeners = new CopyOnWriteArrayList<OrderListener>();
+	private final ExecutorService asyncProcessor = Executors.newCachedThreadPool(new ThreadFactory() {
+		@Override
+		public Thread newThread(Runnable r) {
+			Thread thread = new Thread(r, "OrderServiceAsyncProcessor-" + counter.incrementAndGet());
+			thread.setDaemon(true);
+			return thread;
+		}
+		
+	});
 	
 	private final ConcurrentMap<String, Map<String, Order>> openOrders = new ConcurrentHashMap<String, Map<String, Order>>();
 	private final ConcurrentMap<String, Map<String, Order>> closedOrders = new ConcurrentHashMap<String, Map<String, Order>>();
@@ -48,12 +63,19 @@ public class OrderService {
 		exchangeManagerService.getEnabledExchanges().forEach(exchange -> {
 			exchange.registerTradingStatusListener(enabled -> {
 				if (enabled) {
-					List<Order> openOrders = exchange.getOpenOrders();
-					if (openOrders != null) {
-						openOrders.forEach(order -> {
-							updateStatus(order, order.getOrderStatus(), null);
-						});
-					}
+					asyncProcessor.submit(() -> {
+						try {
+							exchange.updateBalances(true);
+						} catch (Exception e) {
+							logger.error("Error updating balances for " + exchange.getName());
+						}
+						List<Order> openOrders = exchange.getOpenOrders();
+						if (openOrders != null) {
+							openOrders.forEach(order -> {
+								updateStatus(order, order.getOrderStatus(), null);
+							});
+						}
+					});
 				}
 			});
 		});
@@ -99,7 +121,43 @@ public class OrderService {
 		if (order.getCreatedTime() == 0)
 			order.setCreatedTime(System.currentTimeMillis());
 		updateStatus(order, order.getOrderStatus());
-		updateStatus(order, exchangeManagerService.placeOrder(order));
+		try {
+			updateStatus(order, exchangeManagerService.placeOrder(order));
+		} catch (Exception e) {
+			logger.error("Uncaught error attempting to place order {} - checking open orders to see if it has been placed", order, e);
+			// if the service could not handle the exception then we don't know the outcome of the order; check all known open orders
+			try {
+				List<Order> openOrders = exchangeManagerService.getOpenOrders(order.getMarket());
+				if (openOrders != null) {
+					for (Order openOrder : openOrders) {
+						if (!contains(this.openOrders, order.getMarket(), openOrder.getOrderId())) {
+							if (!contains(this.closedOrders, order.getMarket(), openOrder.getOrderId())) {
+								logger.info("Found open order {} we have no record of", openOrder);
+								if (openOrder.getMarket().equals(order.getMarket()) &&
+										openOrder.getSide() == order.getSide() &&
+										openOrder.getAmount().compareTo(order.getAmount()) == 0 &&
+										openOrder.getPrice().compareTo(order.getPrice()) == 0) {
+									logger.info("open order {} is a match to {}", openOrder, order);
+									order.setOrderId(openOrder.getOrderId());
+									updateStatus(order, openOrder.getOrderStatus());
+									return;
+								}
+							} 
+						}
+					}
+					// all open orders accounted for
+					logger.info("No open orders found we don't know about - marking {} as cancelled", order);
+					updateStatus(order, OrderStatus.CANCELLED);
+				}
+			} catch (Exception ex) {
+				// TODO: we need to send an SMS alert or attempt a full recovery
+				logger.error("Unable to check open orders - we now have an order {} with an unknown state", order);
+				order.setMessage("Error placing order - unknown status");
+				updateStatus(order, OrderStatus.ERROR);
+				throw ex;
+			}
+			
+		}
 	}
 
 	public void cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
@@ -145,7 +203,8 @@ public class OrderService {
 			put(closedOrders, order);
 		}
 		order.setOrderStatus(orderStatus);
-		// TODO: implement amount filled / remaining on order
+		if (amountRemaining != null)
+			order.setAmountRemaining(amountRemaining);
 		listeners.forEach( listener -> {
 			listener.onOrderStatusChange(order);
 		});
@@ -168,9 +227,42 @@ public class OrderService {
 //    		}
 //    	});
     }
+    
+	public void checkStatus(String market, String clientOrderId) throws OrderNotExistsException {
+		Order order = get(openOrders, market, clientOrderId);
+		if (order != null) {
+			checkStatuses(market, Arrays.asList(new Order[]{order}));
+		} else {
+			final Order closedOrder = get(closedOrders, market, clientOrderId);
+			if (closedOrder == null)
+				throw new OrderNotExistsException(String.format("No order found for %s on market %s", clientOrderId, market));
+			listeners.forEach( listener -> {
+				listener.onOrderStatusChange(closedOrder);
+			});
+		}
+	}
+
+	private void checkStatuses(String market, List<Order> orders) {
+		Map<String, OpenOrderStatus> statuses = exchangeManagerService.getOpenOrderStatuses(market, orders);
+		if (statuses != null) {
+			statuses.values().forEach(status -> {
+				updateStatus(status.getOrder(), status.getNewStatus(), status.getAmountRemaining());
+			});
+		}
+	}
 	
 	private boolean contains(ConcurrentMap<String, Map<String, Order>> map, Order order) {
 		return map.containsKey(order.getMarket()) && map.get(order.getMarket()).containsKey(order.getClientOrderId());
+	}
+
+	private boolean contains(ConcurrentMap<String, Map<String, Order>> map, String market, String exchangeOrderId) {
+		if (map.containsKey(market)) {
+			for (Order order : map.get(market).values()) {
+				if (order.getOrderId().equals(exchangeOrderId))
+					return true;
+			}
+		};
+		return false;
 	}
 
 	private void put(ConcurrentMap<String, Map<String, Order>> map, Order order) {
@@ -192,7 +284,8 @@ public class OrderService {
 	}
 
 	public static String generateClientOrderId() {
-		return "OrderId-" + counter.incrementAndGet();
+		return "OrderId-" + orderIdCounter.incrementAndGet();
 	}
+
 	
 }

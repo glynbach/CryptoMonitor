@@ -184,7 +184,7 @@ public class PoloniexService extends BaseExchangeService {
 
 	@Override
 	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
-		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_ALL);
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_ALL);
 	}
 
 }

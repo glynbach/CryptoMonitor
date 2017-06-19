@@ -70,7 +70,7 @@ public class PoloniexAccountResponse implements AccountResponse {
 	}
 
 	@Override
-	public Currency getAccountCuurency() {
+	public Currency getAccountCurrency() {
 		return currency;
 	}
 

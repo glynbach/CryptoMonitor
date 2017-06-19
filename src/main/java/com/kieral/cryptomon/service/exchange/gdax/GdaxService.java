@@ -7,7 +7,8 @@ import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.service.exchange.BaseExchangeService;
 import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxAccountsResponse;
-import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxActionResponse;
+import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxCancelOrderResponse;
+import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxPlaceOrderResponse;
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxFillsResponse;
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOrderBookResponse;
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOrderResponse;
@@ -65,12 +66,12 @@ public class GdaxService extends BaseExchangeService {
 
 	@Override
 	protected Class<? extends PlaceOrderResponse> getPlaceOrderResponseClazz() {
-		return GdaxActionResponse.class;
+		return GdaxPlaceOrderResponse.class;
 	}
 
 	@Override
 	protected Class<? extends CancelOrderResponse> getCancelOrderResponseClazz() {
-		return GdaxActionResponse.class;
+		return GdaxCancelOrderResponse.class;
 	}
 
 	@Override

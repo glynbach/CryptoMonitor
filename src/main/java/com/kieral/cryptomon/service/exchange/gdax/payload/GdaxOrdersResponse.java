@@ -29,5 +29,5 @@ public class GdaxOrdersResponse extends ArrayList<GdaxOrderResponse> implements 
 	public String getMessage() {
 		return null;
 	}
-	
+
 }

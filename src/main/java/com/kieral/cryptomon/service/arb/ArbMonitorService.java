@@ -13,10 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.service.BalanceService;
-import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 
@@ -38,9 +36,6 @@ public class ArbMonitorService {
 	
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-	// TODO: for testing only - remove
-	BigDecimal accumulatedProfit = BigDecimal.ZERO;
-	
 	@PostConstruct
 	public void init() {
 		exchangeManager.getEnabledExchanges().forEach(service -> {
@@ -99,46 +94,6 @@ public class ArbMonitorService {
 		if (instructions.size() > 0 && instructions.get(0).getDecision() != ArbDecision.NOTHING_THERE) {
 			BigDecimal usdValue = instructions.get(0).getEstimatedValue().multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP);
 			logger.info("Best arb decision for ~ {} {} {}", usdValue, "USD", instructions.get(0));
-//			if (new BigDecimal("2.00").compareTo(instructions.get(0).getEstimatedValue().multiply(new BigDecimal("2500"))) < 0) {
-//				/*
-//				 *
-//				 * just to test if it can go backwards and forwards
-//				 * 
-//				 */
-//				accumulatedProfit = accumulatedProfit.add(usdValue);
-//				logger.info("Executing - accumulatedProfit {}", accumulatedProfit.toPlainString());
-//				
-//				try {
-//					ArbInstructionLeg leg1 = instructions.get(0).getLegs().get(0);
-//					ArbInstructionLeg leg2 = instructions.get(0).getLegs().get(1);
-//					if (leg1.getSide() == Side.BID) {
-//						balanceHandler.adiustWorkingAmount(leg1.getMarket(), leg1.getCurrencyPair().getBaseCurrency(), leg1.getAmount());
-//						balanceHandler.adiustWorkingAmount(leg1.getMarket(), leg1.getCurrencyPair().getQuotedCurrency(), leg1.getAmount()
-//								.multiply(leg1.getPrice().multiply(new BigDecimal("-1"))).setScale(8, RoundingMode.HALF_UP));
-//						balanceHandler.adiustWorkingAmount(leg2.getMarket(), leg2.getCurrencyPair().getBaseCurrency(), leg2.getAmount().multiply(new BigDecimal("-1")));
-//						balanceHandler.adiustWorkingAmount(leg2.getMarket(), leg2.getCurrencyPair().getQuotedCurrency(), leg2.getAmount()
-//								.multiply(leg2.getPrice()).setScale(8, RoundingMode.HALF_DOWN));
-//					} else {
-//						balanceHandler.adiustWorkingAmount(leg1.getMarket(), leg1.getCurrencyPair().getBaseCurrency(), leg1.getAmount().multiply(new BigDecimal("-1")));
-//						balanceHandler.adiustWorkingAmount(leg1.getMarket(), leg1.getCurrencyPair().getQuotedCurrency(), leg1.getAmount()
-//								.multiply(leg1.getPrice()).setScale(8, RoundingMode.HALF_DOWN));
-//						balanceHandler.adiustWorkingAmount(leg2.getMarket(), leg2.getCurrencyPair().getBaseCurrency(), leg2.getAmount());
-//						balanceHandler.adiustWorkingAmount(leg2.getMarket(), leg2.getCurrencyPair().getQuotedCurrency(), leg2.getAmount()
-//								.multiply(leg2.getPrice().multiply(new BigDecimal("-1"))).setScale(8, RoundingMode.HALF_UP));
-//					}
-//					balanceHandler.getPrettyPrint(false).forEach(line -> {
-//						logger.info(line);
-//					});
-//				} catch (Exception e) {
-//					logger.error("Error adjusting the balances", e);
-//				}
-//				
-//				/*
-//				 * 
-//				 */
-//			}
-			
-			
 			// check affect of transfer fees
 			// check inflight statuses
 			// check market conditions

@@ -109,7 +109,7 @@ GDAX:
   currency-pairs: 
     - pair: "LTC-BTC"
       price-scale: 8
-      trading-fee: "0.25"
+      trading-fee: "0.3"
     - pair: "ETH-BTC"
       price-scale: 8
-      trading-fee: "0.25"
+      trading-fee: "0.3"

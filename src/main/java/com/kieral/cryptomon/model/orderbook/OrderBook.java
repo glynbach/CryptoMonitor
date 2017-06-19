@@ -11,10 +11,11 @@ public class OrderBook {
 	private final CurrencyPair currencyPair;
 	private long snapshotSequence;
 	private long snapshotReceived;
+	private boolean valid;
 	private List<OrderBookEntry> bids = Collections.emptyList();
 	private List<OrderBookEntry> asks = Collections.emptyList();
 	
-	public OrderBook(String market, CurrencyPair currencyPair, long sequence, long createdTime) {
+	public OrderBook(String market, CurrencyPair currencyPair, long sequence, long createdTime, boolean valid) {
 		this.market = market;
 		this.currencyPair = currencyPair;
 		this.snapshotSequence = sequence;
@@ -35,6 +36,18 @@ public class OrderBook {
 
 	public void setSnapshotReceived(long snapshotReceived) {
 		this.snapshotReceived = snapshotReceived;
+	}
+
+	public boolean isValid() {
+		return valid;
+	}
+
+	public void setValid(boolean valid) {
+		this.valid = valid;
+	}
+
+	public boolean isStale(long toleranceMillis) {
+		return (System.currentTimeMillis() - snapshotReceived) > toleranceMillis;
 	}
 
 	public List<OrderBookEntry> getBids() {
@@ -101,8 +114,8 @@ public class OrderBook {
 	@Override
 	public String toString() {
 		return "OrderBook [market=" + market + ", currencyPair=" + currencyPair + ", snapshotSequence="
-				+ snapshotSequence + ", snapshotReceived=" + snapshotReceived + ", bids=" + bids + ", asks=" + asks
-				+ "]";
+				+ snapshotSequence + ", snapshotReceived=" + snapshotReceived + ", valid=" + valid + ", bids=" + bids
+				+ ", asks=" + asks + "]";
 	}
 	
 }

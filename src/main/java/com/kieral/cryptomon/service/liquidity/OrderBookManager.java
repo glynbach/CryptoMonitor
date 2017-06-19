@@ -50,7 +50,7 @@ public class OrderBookManager {
 			throw new IllegalArgumentException("currencyPair can not be null");
 		clearOrderBook(market, currencyPair);
 		if (orderBookResponse == null) {
-			return updateOrderBook(market, currencyPair, null, 0, System.currentTimeMillis(), 0);
+			return updateOrderBook(market, currencyPair, null, 0, System.currentTimeMillis(), false, 0);
 		}
 		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
 		if(orderBookResponse.getBidEntries() != null) {
@@ -58,7 +58,7 @@ public class OrderBookManager {
 			updates.addAll(getUpdatesFromEntries(Side.ASK, orderBookResponse.getAskEntries()));
 		}
 		return updateOrderBook(market, currencyPair, updates, orderBookResponse.getSequence(),
-				orderBookResponse.getCreatedTime(), maxLevel);
+				orderBookResponse.getCreatedTime(), orderBookResponse.isValid(), maxLevel);
 	}
 	
 	private List<OrderBookUpdate> getUpdatesFromEntries(Side side, List<OrderBookResponseEntry> entries) {
@@ -80,7 +80,7 @@ public class OrderBookManager {
 	 * Sending a sequence number of -1 will auto-increment the orderbook sequence 
 	 */
 	public OrderBook updateOrderBook(String market, CurrencyPair currencyPair, List<OrderBookUpdate> updates, 
-			long sequenceNumber, long updatesReceiedTime, int maxLevel) {
+			long sequenceNumber, long updatesReceiedTime, boolean valid, int maxLevel) {
 		if (market == null)
 			throw new IllegalArgumentException("market can not be null");
 		if (currencyPair == null)
@@ -90,7 +90,7 @@ public class OrderBookManager {
 					market, sequenceNumber, maxLevel, updates);
 		OrderBookKey key = new OrderBookKey(market, currencyPair.getName());
 		orderBooks.putIfAbsent(key, new OrderBook(market, currencyPair, 
-				sequenceNumber == AUTO_INCREMENT_SEQUENCE ? 0 : sequenceNumber, updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime));
+				sequenceNumber == AUTO_INCREMENT_SEQUENCE ? 0 : sequenceNumber, updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime, valid));
 		OrderBook orderBook = orderBooks.get(key);
 		orderBookLocks.putIfAbsent(key, new Object());
 		Object lock = orderBookLocks.get(key);
@@ -161,6 +161,7 @@ public class OrderBookManager {
 			if (sequenceNumber == AUTO_INCREMENT_SEQUENCE)
 				sequenceNumber = orderBook.getSnapshotSequence() + 1;
 			orderBook.setSnapshotSequence(sequenceNumber);
+			orderBook.setValid(valid);
 		}
 		return orderBook;
 	}
