@@ -13,7 +13,7 @@ import javax.crypto.CipherOutputStream;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-public class EncryptionUtil {
+public class EncryptionUtils {
 
     public static void main(String[] args) {
     	if (args != null && args.length != 3) {

@@ -3,6 +3,8 @@ package com.kieral.cryptomon.service.exchange.bittrex.payload;
 import java.math.BigDecimal;
 
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.rest.OrderResponse;
 
@@ -14,13 +16,13 @@ public class BittrexOrderResponseContainer extends BittrexResponseContainer<Bitt
 	}
 
 	@Override
-	public BigDecimal getQuantity() {
-		return this.getResult() == null ? null : this.getResult().getQuantity();
+	public BigDecimal getAmount() {
+		return this.getResult() == null ? null : this.getResult().getAmount();
 	}
 
 	@Override
-	public BigDecimal getQuantityRemaining() {
-		return this.getResult() == null ? null : this.getResult().getQuantityRemaining();
+	public BigDecimal getAmountRemaining() {
+		return this.getResult() == null ? null : this.getResult().getAmountRemaining();
 	}
 
 	@Override
@@ -57,5 +59,11 @@ public class BittrexOrderResponseContainer extends BittrexResponseContainer<Bitt
 	public long getClosedTime() {
 		return this.getResult() == null ? 0 : this.getClosedTime();
 	}
+
+	@Override
+	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
+		return this.getResult() == null ? null : this.getResult().getOrderUpdateStatus(isOpenOrderRequest, order);
+	}
+
 	
 }

@@ -196,6 +196,16 @@ public abstract class ServiceExchangeProperties {
 		return pairs;
 	}
 
+	public boolean isInterestingCurrency(Currency currency) {
+		if (pairs != null) {
+			for (CurrencyPair pair : pairs) {
+				if (pair.getBaseCurrency() == currency || pair.getQuotedCurrency() == currency)
+					return true;
+			}
+		}
+		return false;
+	}
+
 	public abstract ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol);
 	public abstract TradingFeeType getTradingFeeType();
 	public abstract ApiRequest getAccountsQuery();

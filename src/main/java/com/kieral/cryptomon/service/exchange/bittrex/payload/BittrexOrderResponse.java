@@ -7,6 +7,8 @@ import java.time.ZoneId;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
 import com.kieral.cryptomon.service.rest.OrderResponse;
@@ -275,5 +277,21 @@ public class BittrexOrderResponse implements OrderResponse {
 		}
 		return 0;
 	}
+
+	@Override
+	public BigDecimal getAmount() {
+		return quantity;
+	}
+
+	@Override
+	public BigDecimal getAmountRemaining() {
+		return quantityRemaining;
+	}
+
+	@Override
+	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
+		return new OpenOrderStatus(order, getOrderStatus(), getAmountRemaining());
+	}
+
 	
 }

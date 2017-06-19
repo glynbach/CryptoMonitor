@@ -3,6 +3,7 @@ package com.kieral.cryptomon.service.exchange.gdax.payload;
 import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GdaxFillResponse {
@@ -22,6 +23,7 @@ public class GdaxFillResponse {
 		return tradeId;
 	}
 
+	@JsonProperty("trade_id")
 	public void setTradeId(String tradeId) {
 		this.tradeId = tradeId;
 	}
@@ -30,6 +32,7 @@ public class GdaxFillResponse {
 		return productId;
 	}
 
+	@JsonProperty("product_id")
 	public void setProductId(String productId) {
 		this.productId = productId;
 	}
@@ -54,6 +57,7 @@ public class GdaxFillResponse {
 		return orderId;
 	}
 
+	@JsonProperty("order_id")
 	public void setOrderId(String orderId) {
 		this.orderId = orderId;
 	}
@@ -62,6 +66,7 @@ public class GdaxFillResponse {
 		return createdAt;
 	}
 
+	@JsonProperty("created_at")
 	public void setCreatedAt(String createdAt) {
 		this.createdAt = createdAt;
 	}

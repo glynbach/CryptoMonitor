@@ -8,8 +8,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 
-import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exception.SecurityModuleException;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 import com.kieral.cryptomon.service.exchange.ServiceSecurityModule;
@@ -36,7 +36,7 @@ public class GdaxSecurityModule extends ServiceSecurityModule {
 	}
 
 	@Override
-	public HttpHeaders sign(long timestamp, Method method, String requestPath, String body) throws SecurityModuleException {
+	public HttpHeaders sign(long timestamp, HttpMethod method, String requestPath, String body) throws SecurityModuleException {
 		String data = (timestamp / 1000) + method.name() + requestPath + (body == null ? "" : body); 
 		try {
 			HttpHeaders headers = new HttpHeaders();

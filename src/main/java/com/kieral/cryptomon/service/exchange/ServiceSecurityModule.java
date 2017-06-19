@@ -9,10 +9,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 
-import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.service.exception.SecurityModuleException;
-import com.kieral.cryptomon.service.util.EncryptionUtil;
+import com.kieral.cryptomon.service.util.EncryptionUtils;
 
 public abstract class ServiceSecurityModule {
 
@@ -37,7 +37,7 @@ public abstract class ServiceSecurityModule {
 			boolean enabled = true;
 			if (properties.getApiKeyLoc() != null ) {
 				try {
-					apiKey = EncryptionUtil.decryptValue(secretKey, new File(properties.getApiKeyLoc()));
+					apiKey = EncryptionUtils.decryptValue(secretKey, new File(properties.getApiKeyLoc()));
 				} catch (Exception e) {
 					enabled = false;
 					logger.error("Error reading apiKey from {}", properties.getApiKeyLoc(), e);
@@ -45,7 +45,7 @@ public abstract class ServiceSecurityModule {
 			}
 			if (properties.getApiSecretLoc() != null ) {
 				try {
-					apiSecret = EncryptionUtil.decryptValue(secretKey, new File(properties.getApiSecretLoc()));
+					apiSecret = EncryptionUtils.decryptValue(secretKey, new File(properties.getApiSecretLoc()));
 				} catch (Exception e) {
 					enabled = false;
 					logger.error("Error reading apiSecret from {}", properties.getApiKeyLoc(), e);
@@ -53,7 +53,7 @@ public abstract class ServiceSecurityModule {
 			}
 			if (properties.getApiPassphraseLoc() != null ) {
 				try {
-					apiPassphrase = EncryptionUtil.decryptValue(secretKey, new File(properties.getApiPassphraseLoc()));
+					apiPassphrase = EncryptionUtils.decryptValue(secretKey, new File(properties.getApiPassphraseLoc()));
 				} catch (Exception e) {
 					enabled = false;
 					logger.error("Error reading apiPassphrase from {}", properties.getApiPassphraseLoc(), e);
@@ -86,6 +86,6 @@ public abstract class ServiceSecurityModule {
 	 * @param body null if the method is GET
 	 * @return
 	 */
-	public abstract HttpHeaders sign(long timestamp, Method method, String requestPath, String body) throws SecurityModuleException;
+	public abstract HttpHeaders sign(long timestamp, HttpMethod method, String requestPath, String body) throws SecurityModuleException;
 	
 }

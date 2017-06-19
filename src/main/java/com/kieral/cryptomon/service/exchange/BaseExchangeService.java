@@ -26,12 +26,12 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.ApiRequest;
 import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
-import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.model.trading.OpenOrderStatus;
@@ -246,7 +246,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			List<OrderBookUpdate> updates = parsePayload(streamingPayload);
 			if (updates != null)
 				this.onOrderBookUpdate(streamingPayload.getCurrencyPair(), updates, 
-						streamingPayload.getSequenceNumber(), streamingPayload.getTimeReceived());
+						streamingPayload.getSequenceNumber(), streamingPayload.getTimeReceived(), true);
 		} catch (ParsingPayloadException e) {
 			logger.error("Error parsing payload", e);
 			// TODO: resubscribe topic instead
@@ -306,10 +306,10 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return orderBookResponses;
 	}
 
-	protected void onOrderBookUpdate(CurrencyPair currencyPair, List<OrderBookUpdate> updates, long sequenceNumber, long updatesReceived) {
+	protected void onOrderBookUpdate(CurrencyPair currencyPair, List<OrderBookUpdate> updates, long sequenceNumber, long updatesReceived, boolean valid) {
 		if (orderBookManager != null) {
 			OrderBook orderBook = orderBookManager.updateOrderBook(getName(), currencyPair, updates, 
-					sequenceNumber, updatesReceived, serviceProperties.getMaxLevels());
+					sequenceNumber, updatesReceived, valid, serviceProperties.getMaxLevels());
 			if (orderBookListeners != null) {
 				orderBookListeners.forEach(listener -> {
 					listener.onOrderBookUpdate(orderBook);
@@ -341,9 +341,10 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			if (response.getAccountResponses() != null) {
 				response.getAccountResponses().forEach(account -> {
 					if (account.getAvailableBalance() != null) {
-						balanceHandler.setConfirmedBalance(getName(), account.getAccountCuurency(), account.getAvailableBalance(), overrideWorkingBalance);
+						if (serviceProperties.isInterestingCurrency(account.getAccountCurrency()))
+							balanceHandler.setConfirmedBalance(getName(), account.getAccountCurrency(), account.getAvailableBalance(), overrideWorkingBalance);
 					} else {
-						logger.warn("No balance returned from exchange for {}", account.getAccountCuurency());
+						logger.warn("No balance returned from exchange for {}", account.getAccountCurrency());
 					}
 				});
 			} 
@@ -357,9 +358,6 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	public OrderStatus placeOrder(Order order) {
 		if (order == null)
 			throw new IllegalArgumentException("order can not be null");
-		// TODO: remove this - temp for debugging
-		if (!order.getMarket().equals("bittrex"))
-			throw new IllegalStateException(order.getMarket() + " not ready for orders yet");
 		ApiRequest apiRequest = null;
 		try {
 			apiRequest = serviceProperties.getPlaceOrderQuery(order.getSide(), order.getCurrencyPair(), 
@@ -406,9 +404,6 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	public OrderStatus cancelOrder(Order order) {
 		if (order == null)
 			throw new IllegalArgumentException("order can not be null");
-		// TODO: remove this - temp for debugging
-		if (!order.getMarket().equals("bittrex"))
-			throw new IllegalStateException(order.getMarket() + " not ready for orders yet");
 		AtomicReference<String> message = new AtomicReference<String>();
 		OrderStatus newOrderStatus = cancelOrder(order.getOrderId(), order.getOrderStatus(), message);
 		if (message.get() != null)
@@ -425,7 +420,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		if (message == null)
 			message = new AtomicReference<String>();
 		if (orderId == null) {
-			logger.error("Been asked to cance an order with no orderId and current status {}", currentOrderStatus);
+			logger.error("Been asked to cancel an order with no orderId and current status {}", currentOrderStatus);
 			message.set("Cannot cancel order with no orderId");
 		}
 		ApiRequest apiRequest = null;
@@ -438,7 +433,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			return currentOrderStatus;
 		}
 		try {
-			PlaceOrderResponse response = getTradingResponse(apiRequest, "cancel order", getPlaceOrderResponseClazz());
+			CancelOrderResponse response = getTradingResponse(apiRequest, "cancel order", getCancelOrderResponseClazz());
 			OrderStatus orderStatus = response == null ? null : response.getOrderStatus(CancelOrderResponse.class, currentOrderStatus);
 			if (orderStatus == null || orderStatus == OrderStatus.ERROR) {
 				logger.error("Received an invalid order status in exchange response {} for cancel orderId {}", response, orderId);
@@ -463,19 +458,20 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	public Map<String, OpenOrderStatus> getOpenOrderStatuses(List<Order> orders) {
 		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
 		if (orders != null) {
-			List<Order> ordersForChecking = new ArrayList<Order>(orders); 
+			List<Order> ordersForChecking = new ArrayList<Order>(orders);
+			AtomicBoolean failed = new AtomicBoolean(false);
 			getOrderCheckingStrategies().forEach(strategy -> {
 				if (ordersForChecking.size() > 0) {
 					Map<String, OpenOrderStatus> statuses = null;
 					switch (strategy) {
 						case CHECK_BY_INDIVIDUAL:
-							statuses = getOpenOrderStatusesByIndividualOrder(orders);
+							statuses = getOpenOrderStatusesByIndividualOrder(orders, failed);
 							break;
 						case CHECK_BY_HISTORY:
-							statuses = getOpenOrderStatusesByHistory(orders);
+							statuses = getOpenOrderStatusesByHistory(orders, failed);
 							break;
 						case CHECK_BY_ALL:
-							statuses = getOpenOrderStatusesByAll(orders);
+							statuses = getOpenOrderStatusesByAll(orders, failed);
 							break;
 					}
 					if (statuses != null) {
@@ -490,6 +486,18 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 					}
 				}
 			});
+			if (ordersForChecking.size() > 0) {
+				if (failed.get()) {
+					logger.warn("Unable to assess the remaining orders as there was a failure in checking statuses");
+				} else {
+					// we've checked if they belong to live open orders and checked if there are any statuses associated
+					// with being filled, so can assume they have been cancelled without fills
+					logger.info("{} orders are neither in open orders list or filled order history so setting as cancelled");
+					ordersForChecking.forEach(order -> {
+						rtn.put(order.getClientOrderId(), new OpenOrderStatus(order, OrderStatus.CANCELLED, order.getAmountRemaining()));
+					});
+				}
+			}
 		}
 		return rtn;
 	}
@@ -500,7 +508,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
     	}
     };
 
-	private Map<String, OpenOrderStatus> getOpenOrderStatusesByIndividualOrder(List<Order> orders) {
+	private Map<String, OpenOrderStatus> getOpenOrderStatusesByIndividualOrder(List<Order> orders, AtomicBoolean failed) {
 		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
 		if (orders != null) {
 			orders.forEach(order -> {
@@ -512,11 +520,15 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 						try {
 							orderResponse = getOrderResponse(order);
 						} catch (Exception e) {
+							failed.set(true);
 							logger.error("Error getting order response for {}", order, e);
 						}
-						if (orderResponse != null && orderResponse.isSuccess()) {
-							rtn.put(order.getClientOrderId(), new OpenOrderStatus(order, 
-									orderResponse.getOrderStatus(), orderResponse.getQuantityRemaining()));
+						if (orderResponse != null) {
+							if (orderResponse.isSuccess())
+								rtn.put(order.getClientOrderId(), orderResponse.getOrderUpdateStatus(true, order));
+							else {
+								failed.set(true);
+							}
 						}
 					}
 				}
@@ -525,7 +537,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return rtn;
 	}
 
-	private Map<String, OpenOrderStatus> getOpenOrderStatusesByHistory(List<Order> orders) {
+	private Map<String, OpenOrderStatus> getOpenOrderStatusesByHistory(List<Order> orders, AtomicBoolean failed) {
 		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
 		if (orders != null) {
 			Map<String, Order> ordersToCheck = orders.stream().collect(Collectors.toMap(Order::getOrderId, Function.identity()));
@@ -536,18 +548,70 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				try {
 					response = getOrderHistoryResponse(pair);
 				} catch (Exception e) {
+					failed.set(true);
 					logger.error("Error getting order history response for {}", pair, e);
 				}
-				if (response != null && response.getOrderResponses() != null) {
-					response.getOrderResponses().forEach(orderResponse -> {
-						if (orderResponse.isSuccess() && ordersToCheck.containsKey(orderResponse.getOrderId())) {
-							Order order = ordersToCheck.get(orderResponse.getOrderId());
-							rtn.put(order.getClientOrderId(), new OpenOrderStatus(order, orderResponse.getOrderStatus(), orderResponse.getQuantityRemaining()));
-							ordersToCheck.remove(order.getOrderId());
+				if (response != null) {
+					if (response.isSuccess()) {
+						if (response.getOrderResponses() != null) {
+							response.getOrderResponses().forEach(orderResponse -> {
+								if (orderResponse.isSuccess() && ordersToCheck.containsKey(orderResponse.getOrderId())) {
+									Order order = ordersToCheck.get(orderResponse.getOrderId());
+									rtn.put(order.getClientOrderId(), orderResponse.getOrderUpdateStatus(false, order));
+									ordersToCheck.remove(order.getOrderId());
+								}
+							});
 						}
-					});
+					} else { 
+						failed.set(true);
+					}
 				}
 			});
+		}
+		return rtn;
+	}
+
+	private Map<String, OpenOrderStatus> getOpenOrderStatusesByAll(List<Order> orders, AtomicBoolean failed) {
+		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
+		// start with open orders
+		if (orders != null) {
+			Map<String, Order> ordersToCheck = orders.stream().collect(Collectors.toMap(Order::getOrderId, Function.identity()));
+			List<CurrencyPair> currencyPairsForChecking = new ArrayList<CurrencyPair>(
+					orders.stream().map(currencyPairFromOrder).collect(Collectors.<CurrencyPair>toSet()));
+			currencyPairsForChecking.forEach(pair -> {
+				OrdersResponse<? extends OrderResponse> response = null;
+				try {
+					response = getOpenOrdersResponse(pair);
+				} catch (Exception e) {
+					failed.set(true);
+					logger.error("Error getting open orders response for {}", pair, e);
+				}
+				if (response != null) {
+					if (response.isSuccess()) {
+						if (response.getOrderResponses() != null) {
+							response.getOrderResponses().forEach(orderResponse -> {
+								if (orderResponse.isSuccess() && ordersToCheck.containsKey(orderResponse.getOrderId())) {
+									Order order = ordersToCheck.get(orderResponse.getOrderId());
+									rtn.put(order.getClientOrderId(), orderResponse.getOrderUpdateStatus(true, order));
+									ordersToCheck.remove(order.getOrderId());
+								}
+							});
+						}
+					} else {
+						failed.set(true);
+					}
+				}
+			});
+			// check history if there are any orders still to check
+			if (ordersToCheck.size() > 0) {
+				Map<String, OpenOrderStatus> historyStatuses = getOpenOrderStatusesByHistory(new ArrayList<Order>(ordersToCheck.values()), failed);
+				if (historyStatuses != null) {
+					ordersToCheck.values().forEach(order -> {
+						if (historyStatuses.containsKey(order.getClientOrderId()))
+							rtn.put(order.getClientOrderId(), historyStatuses.get(order.getClientOrderId()));
+					});
+				}
+			}
 		}
 		return rtn;
 	}
@@ -568,7 +632,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				response.getOrderResponses().forEach(orderResponse -> {
 					if (orderResponse.isSuccess()) {
 						// create a new order from this order response
-						rtn.add(new Order(getName(), pair.getName(), pair, orderResponse.getQuantity(), orderResponse.getPrice(),
+						rtn.add(new Order(getName(), pair.getName(), pair, orderResponse.getAmount(), orderResponse.getAmount(), orderResponse.getPrice(),
 								orderResponse.getSide(), orderResponse.getOrderStatus(), OrderService.generateClientOrderId(), 
 								orderResponse.getOrderId(), orderResponse.getCreatedTime(), orderResponse.getCreatedTime(),
 								"Requested from exchange"));
@@ -576,44 +640,6 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				});
 			}
 		});
-		return rtn;
-	}
-
-	private Map<String, OpenOrderStatus> getOpenOrderStatusesByAll(List<Order> orders) {
-		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
-		// start with open orders
-		if (orders != null) {
-			Map<String, Order> ordersToCheck = orders.stream().collect(Collectors.toMap(Order::getOrderId, Function.identity()));
-			List<CurrencyPair> currencyPairsForChecking = new ArrayList<CurrencyPair>(
-					orders.stream().map(currencyPairFromOrder).collect(Collectors.<CurrencyPair>toSet()));
-			currencyPairsForChecking.forEach(pair -> {
-				OrdersResponse<? extends OrderResponse> response = null;
-				try {
-					response = getOpenOrdersResponse(pair);
-				} catch (Exception e) {
-					logger.error("Error getting open orders response for {}", pair, e);
-				}
-				if (response != null && response.getOrderResponses() != null) {
-					response.getOrderResponses().forEach(orderResponse -> {
-						if (orderResponse.isSuccess() && ordersToCheck.containsKey(orderResponse.getOrderId())) {
-							Order order = ordersToCheck.get(orderResponse.getOrderId());
-							rtn.put(order.getClientOrderId(), new OpenOrderStatus(order, orderResponse.getOrderStatus(), orderResponse.getQuantityRemaining()));
-							ordersToCheck.remove(order.getOrderId());
-						}
-					});
-				}
-			});
-			// check history if there are any orders still to check
-			if (ordersToCheck.size() > 0) {
-				Map<String, OpenOrderStatus> historyStatuses = getOpenOrderStatusesByHistory(new ArrayList<Order>(ordersToCheck.values()));
-				if (historyStatuses != null) {
-					ordersToCheck.values().forEach(order -> {
-						if (historyStatuses.containsKey(order.getClientOrderId()))
-							rtn.put(order.getClientOrderId(), historyStatuses.get(order.getClientOrderId()));
-					});
-				}
-			}
-		}
 		return rtn;
 	}
 
@@ -638,17 +664,18 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	}
 
 	private <T> T getTradingResponse(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException {
-		if (apiRequest.getMethod() == Method.GET)
-			return getTradingResponseForGet(apiRequest, descr, clazz);
-		else {
+		if (apiRequest.getMethod() == HttpMethod.POST)
 			return getTradingResponseForPut(apiRequest, descr, clazz);
+		else {
+			// this works for GET or DELETE
+			return getTradingResponseForGet(apiRequest, descr, clazz);
 		}
 	}
 	
 	private <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException {
 		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
 		logger.info("Requesting {} from POST {}", descr, apiRequest);
-		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.POST, apiRequest.getRequestPath(), apiRequest.getBodyAsString());
+		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), apiRequest.getRequestPath(), apiRequest.getBodyAsString());
 		HttpEntity<?> entity = new HttpEntity<>(apiRequest.getBodyType() == BodyType.URLENCODED ? apiRequest.getBodyAsString() : apiRequest.getPostParameters(), headers);
 		ResponseEntity<? extends T> response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
 		logger.info("{} response {}", descr, response.getBody());
@@ -657,14 +684,23 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	}
 	
 	private <T> T getTradingResponseForGet(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException {
-		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), Method.GET);
+		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), apiRequest.getMethod());
 		logger.info("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
-		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), Method.GET, securityEnrichedUrl.getRequestPath(), null);
+		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), securityEnrichedUrl.getRequestPath(), null);
 		HttpEntity<?> entity = new HttpEntity<>(headers);
-		ResponseEntity<? extends T> response = restTemplate.exchange(securityEnrichedUrl.getUrl(), HttpMethod.GET, entity, clazz);
-		logger.info("{} response {}", descr, response.getBody());
-		LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
-		return response.getBody();
+		try {
+			ResponseEntity<? extends T> response = restTemplate.exchange(securityEnrichedUrl.getUrl(), apiRequest.getMethod(), entity, clazz);
+			logger.info("{} response {}", descr, response.getBody());
+			LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
+			return response.getBody();
+		} catch (HttpClientErrorException e) {
+			if (apiRequest.isAcceptableError(e.getStatusCode())) {
+				if (logger.isDebugEnabled())
+					logger.debug("{} is accepted by apiRequest {}", e.getStatusCode(), apiRequest);
+				return null;
+			} else
+				throw e;
+		}
 	}
 	
 	@Override

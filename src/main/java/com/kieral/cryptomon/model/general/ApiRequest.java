@@ -1,7 +1,11 @@
 package com.kieral.cryptomon.model.general;
 
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,11 +14,7 @@ import com.kieral.cryptomon.service.exception.ApiRequestException;
 
 public class ApiRequest {
 
-	public enum Method {
-		GET,
-		POST,
-		DELETE
-	}
+	private static final ObjectMapper objectMapper = new ObjectMapper();
 
 	public enum BodyType {
 		JSON,
@@ -23,21 +23,25 @@ public class ApiRequest {
 	
 	private final String endPoint;
 	private final String requestPath;
-	private final Method method;
+	private final HttpMethod method;
 	private final BodyType bodyType;
 	private final Map<String, String> postParameters = new LinkedHashMap<String, String>();
+	private EnumSet<HttpStatus> acceptableErrorStatuses;
 
-	private final ObjectMapper objectMapper = new ObjectMapper();
-
-	public ApiRequest(String endPoint, String requestPath, Method method) {
+	public ApiRequest(String endPoint, String requestPath, HttpMethod method) {
 		this(endPoint, requestPath, method, BodyType.URLENCODED);
 	}
 
-	public ApiRequest(String endPoint, String requestPath, Method method, BodyType bodyType) {
+	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType) {
+		this(endPoint, requestPath, method, bodyType, null);
+	}
+
+	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType, EnumSet<HttpStatus> acceptableErrorStatuses) {
 		this.endPoint = endPoint;
 		this.requestPath = requestPath;
 		this.method = method;
 		this.bodyType = bodyType;
+		this.acceptableErrorStatuses = acceptableErrorStatuses;
 	}
 
 	public String getEndPoint() {
@@ -48,7 +52,7 @@ public class ApiRequest {
 		return requestPath;
 	}
 
-	public Method getMethod() {
+	public HttpMethod getMethod() {
 		return method;
 	}
 
@@ -93,9 +97,15 @@ public class ApiRequest {
 		}
 	}
 
+	public boolean isAcceptableError(HttpStatus statusCode) {
+		return acceptableErrorStatuses != null && acceptableErrorStatuses.contains(statusCode);
+	}
+
 	@Override
 	public String toString() {
-		return "ApiRequest [endPoint=" + endPoint + ", requestPath=" + requestPath + ", method=" + method + "]";
+		return "ApiRequest [endPoint=" + endPoint + ", requestPath=" + requestPath + ", method=" + method
+				+ ", bodyType=" + bodyType + ", postParameters=" + postParameters + ", acceptableErrorStatuses="
+				+ acceptableErrorStatuses + "]";
 	}
 	
 }

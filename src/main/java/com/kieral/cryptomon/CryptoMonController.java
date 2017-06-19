@@ -37,7 +37,7 @@ public class CryptoMonController {
 
     @RequestMapping("/")
     public String home(Model model) {
-    	return "home";
+    	return "redirect:/orders";
     }
 
     @RequestMapping("/enableTrading")
@@ -46,6 +46,11 @@ public class CryptoMonController {
     	List<String> errors = exchangeManagerService.enableTradingAll(secretKey);
     	logger.info("Trading enable response {}", errors);
     	return "redirect:/";
+    }
+
+    @RequestMapping("/orderBooks")
+    public String orderBooks(Model model) {
+    	return "orderBooks";
     }
 
     @RequestMapping("/orders")
@@ -82,6 +87,21 @@ public class CryptoMonController {
 		} catch (Exception e) {
 	    	logger.error("Error cancelling order for clientOrderId {}", clientOrderId, e);
 			model.addAttribute("error", String.format("Error cancelling order for clientOrderId %s - %s", clientOrderId, e.getMessage()));
+		}
+    	return "redirect:/orders";
+    }
+
+    @RequestMapping("/checkOrderStatus/{market}/{clientOrderId}")
+    public String checkOrderStatus(@PathVariable String market, @PathVariable String clientOrderId, Model model) {
+    	logger.info("Received check order status for clientOrderId {}", clientOrderId);
+    	try {
+			orderService.checkStatus(market, clientOrderId);
+		} catch (OrderNotExistsException e) {
+			logger.error("Received check order status {} {} for unrecognised order", market, clientOrderId);
+			model.addAttribute("error", String.format("Unrecognised clientOrderId %s for market %s", clientOrderId, market));
+		} catch (Exception e) {
+	    	logger.error("Error check order status for clientOrderId {}", clientOrderId, e);
+			model.addAttribute("error", String.format("Error checking order status for clientOrderId %s - %s", clientOrderId, e.getMessage()));
 		}
     	return "redirect:/orders";
     }

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.rest.OrderResponse;
 import com.kieral.cryptomon.service.util.TradingUtils;
@@ -15,7 +17,9 @@ public class PoloniexOrderResponse implements OrderResponse {
 	private String type;
 	private BigDecimal rate;
 	private BigDecimal amount;
+	private BigDecimal fee;
 	private BigDecimal total;
+	private long closedTime;
 	
 	public String getOrderNumber() {
 		return orderNumber;
@@ -57,10 +61,18 @@ public class PoloniexOrderResponse implements OrderResponse {
 		this.total = total;
 	}
 
+	public BigDecimal getFee() {
+		return fee;
+	}
+
+	public void setFee(BigDecimal fee) {
+		this.fee = fee;
+	}
+
 	@Override
 	public String toString() {
 		return "PoloniexOrderResponse [orderNumber=" + orderNumber + ", type=" + type + ", rate=" + rate + ", amount="
-				+ amount + ", total=" + total + "]";
+				+ amount + ", fee=" + fee + ", total=" + total + ", closedTime=" + closedTime + "]";
 	}
 
 	@Override
@@ -69,12 +81,7 @@ public class PoloniexOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public BigDecimal getQuantity() {
-		return amount;
-	}
-
-	@Override
-	public BigDecimal getQuantityRemaining() {
+	public BigDecimal getAmountRemaining() {
 		return amount;
 	}
 
@@ -85,7 +92,7 @@ public class PoloniexOrderResponse implements OrderResponse {
 
 	@Override
 	public boolean isOpen() {
-		return true;
+		return closedTime == 0;
 	}
 
 	@Override
@@ -105,21 +112,28 @@ public class PoloniexOrderResponse implements OrderResponse {
 
 	@Override
 	public Side getSide() {
-		// TODO Auto-generated method stub
-		return null;
+		return type == null ? null : type.toUpperCase().contains("SELL") ? Side.ASK : Side.BID;
 	}
 
 	@Override
 	public long getCreatedTime() {
-		// TODO Auto-generated method stub
-		return 0;
+		return System.currentTimeMillis();
 	}
 
 	@Override
 	public long getClosedTime() {
-		// TODO Auto-generated method stub
-		return 0;
+		return closedTime;
 	}
 
+	@Override
+	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
+		// Poloniex applies the fee to the base currency
+		BigDecimal amountRemaining = order.getAmount().subtract(amount.add(fee == null ? BigDecimal.ZERO : fee));
+		return new OpenOrderStatus(order, TradingUtils.getOrderStatus(isOpenOrderRequest, amountRemaining), amountRemaining);
+	}
+
+	public void setClosedTime(long closedTime) {
+		this.closedTime = closedTime;
+	}
 	
 }

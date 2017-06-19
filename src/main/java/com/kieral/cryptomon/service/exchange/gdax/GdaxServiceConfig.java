@@ -2,14 +2,16 @@ package com.kieral.cryptomon.service.exchange.gdax;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.EnumSet;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.ApiRequest;
 import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
-import com.kieral.cryptomon.model.general.ApiRequest.Method;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.general.CurrencyPair;
@@ -43,7 +45,7 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 
 	@Override
 	public ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
-		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol), Method.GET);
+		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol), HttpMethod.GET);
 	}
 
 	@Override
@@ -53,7 +55,7 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 
 	@Override
 	public ApiRequest getAccountsQuery() {
-		return new ApiRequest(tradingApi, ACCOUNTS_QUERY, Method.GET);
+		return new ApiRequest(tradingApi, ACCOUNTS_QUERY, HttpMethod.GET);
 	}
 
 	@Override
@@ -67,7 +69,7 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 		// Gdax amounts are in base currency
 		if (amount == null || amount.getBaseAmount() == null || amount.getBaseAmount().compareTo(BigDecimal.ZERO) <= 0)
 			throw new IllegalArgumentException("invalid amount " + amount);
-		ApiRequest apiRequest = new ApiRequest(tradingApi, PLACE_ORDER_QUERY, Method.POST, BodyType.JSON);
+		ApiRequest apiRequest = new ApiRequest(tradingApi, PLACE_ORDER_QUERY, HttpMethod.POST, BodyType.JSON);
 		apiRequest.addPostParameter("side", side == Side.BID ? "buy" : "sell");
 		apiRequest.addPostParameter("product_id", currencyPair.getTopic());
 		apiRequest.addPostParameter("type", "limit");
@@ -81,28 +83,29 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	public ApiRequest getCancelOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), Method.DELETE);
+		return new ApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.DELETE);
 	}
 
 	@Override
 	public ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		return new ApiRequest(tradingApi, String.format(OPEN_ORDERS_QUERY, currencyPair.getTopic()), Method.GET);
+		return new ApiRequest(tradingApi, String.format(OPEN_ORDERS_QUERY, currencyPair.getTopic()), HttpMethod.GET);
 	}
 
 	@Override
 	public ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		return new ApiRequest(tradingApi, String.format(ORDER_HISTORY_QUERY, currencyPair.getTopic()), Method.GET);
+		return new ApiRequest(tradingApi, String.format(ORDER_HISTORY_QUERY, currencyPair.getTopic()), HttpMethod.GET);
 	}
 
 	@Override
 	public ApiRequest getOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), Method.GET);
+		EnumSet<HttpStatus> noOpenOrderResult = EnumSet.of(HttpStatus.NOT_FOUND);
+		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET, BodyType.JSON, noOpenOrderResult);
 	}
 
 }

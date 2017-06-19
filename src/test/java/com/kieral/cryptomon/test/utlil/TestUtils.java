@@ -28,7 +28,7 @@ public class TestUtils {
 	}
 
 	public static OrderBook ob(String market, CurrencyPair currency, long sequenceNumber) {
-		return new OrderBook(market, currency, sequenceNumber, System.currentTimeMillis());
+		return new OrderBook(market, currency, sequenceNumber, System.currentTimeMillis(), true);
 	}
 
 	public static OrderBook ob(String market, CurrencyPair currency,
@@ -56,7 +56,7 @@ public class TestUtils {
 
 	public static OrderBook ob(String market, CurrencyPair currency, long sequenceNumber,
 			String[] bids, String bidAmounts[], String[] asks, String[] askAmounts) {
-		OrderBook ob = new OrderBook(market, currency, sequenceNumber, System.currentTimeMillis());
+		OrderBook ob = new OrderBook(market, currency, sequenceNumber, System.currentTimeMillis(), true);
 		if (bids != null) {
 			List<OrderBookEntry> bidEntries = new ArrayList<OrderBookEntry>();
 			for (int i=0; i<bids.length; i++) {

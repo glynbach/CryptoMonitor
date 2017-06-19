@@ -17,6 +17,7 @@ public class OrderBookMessage {
 	private List<OrderBookRow> obEntries = new ArrayList<OrderBookRow>();
 	private String lastUpdated;
 	private boolean valid;
+	private boolean stale;
 	
 	public OrderBookMessage() {
 	}
@@ -58,8 +59,8 @@ public class OrderBookMessage {
 		}
 		this.lastUpdated = CommonUtils.SECONDS_FORMATTER.format(Instant.ofEpochMilli(orderBook.getSnapshotReceived())
 				.atZone(ZoneId.systemDefault()).toLocalDateTime());
-		// TOOO: implement OB frozen in the model 
-		this.valid = true;
+		this.valid = orderBook.isValid();
+		this.stale = orderBook.isStale(5000);
 	}
 
 	public String getMarket() {
@@ -102,10 +103,18 @@ public class OrderBookMessage {
 		this.valid = valid;
 	}
 
+	public boolean isStale() {
+		return stale;
+	}
+
+	public void setStale(boolean stale) {
+		this.stale = stale;
+	}
+
 	@Override
 	public String toString() {
 		return "OrderBookMessage [market=" + market + ", currencyPair=" + currencyPair + ", obEntries=" + obEntries
-				+ ", lastUpdated=" + lastUpdated + ", valid=" + valid + "]";
+				+ ", lastUpdated=" + lastUpdated + ", valid=" + valid + ", stale=" + stale + "]";
 	}
-	
+
 }

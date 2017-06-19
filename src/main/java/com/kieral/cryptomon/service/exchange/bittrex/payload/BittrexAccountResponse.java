@@ -78,7 +78,7 @@ public class BittrexAccountResponse implements AccountResponse {
 	}
 
 	@Override
-	public Currency getAccountCuurency() {
+	public Currency getAccountCurrency() {
 		return Currency.valueOf(currency);
 	}
 

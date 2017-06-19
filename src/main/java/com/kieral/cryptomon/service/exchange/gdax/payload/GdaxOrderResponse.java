@@ -5,7 +5,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.trading.OpenOrderStatus;
+import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exchange.gdax.GdaxServiceConfig;
 import com.kieral.cryptomon.service.rest.OrderResponse;
@@ -15,6 +18,7 @@ import com.kieral.cryptomon.service.util.TradingUtils;
 public class GdaxOrderResponse implements OrderResponse {
 
 	private String id;
+	private BigDecimal price;
 	private BigDecimal size;
 	private String productId;
 	private String side;
@@ -39,6 +43,15 @@ public class GdaxOrderResponse implements OrderResponse {
 		this.id = id;
 	}
 
+	@Override
+	public BigDecimal getPrice() {
+		return price;
+	}
+
+	public void setPrice(BigDecimal price) {
+		this.price = price;
+	}
+
 	public BigDecimal getSize() {
 		return size;
 	}
@@ -51,6 +64,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return productId;
 	}
 
+	@JsonProperty("product_id")
 	public void setProductId(String productId) {
 		this.productId = productId;
 	}
@@ -79,6 +93,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return specifiedFunds;
 	}
 
+	@JsonProperty("specified_funds")
 	public void setSpecifiedFunds(BigDecimal specifiedFunds) {
 		this.specifiedFunds = specifiedFunds;
 	}
@@ -95,6 +110,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return createdAt;
 	}
 
+	@JsonProperty("created_at")
 	public void setCreatedAt(String createdAt) {
 		this.createdAt = createdAt;
 	}
@@ -103,6 +119,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return doneAt;
 	}
 
+	@JsonProperty("done_at")
 	public void setDoneAt(String doneAt) {
 		this.doneAt = doneAt;
 	}
@@ -111,6 +128,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return doneReason;
 	}
 
+	@JsonProperty("done_reason")
 	public void setDoneReason(String doneReason) {
 		this.doneReason = doneReason;
 	}
@@ -119,6 +137,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return fillFees;
 	}
 
+	@JsonProperty("fill_fees")
 	public void setFillFees(BigDecimal fillFees) {
 		this.fillFees = fillFees;
 	}
@@ -127,6 +146,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return filledSize;
 	}
 
+	@JsonProperty("filled_size")
 	public void setFilledSize(BigDecimal filledSize) {
 		this.filledSize = filledSize;
 	}
@@ -135,6 +155,7 @@ public class GdaxOrderResponse implements OrderResponse {
 		return executedValue;
 	}
 
+	@JsonProperty("executed_value")
 	public void setExecutedValue(BigDecimal executedValue) {
 		this.executedValue = executedValue;
 	}
@@ -157,7 +178,7 @@ public class GdaxOrderResponse implements OrderResponse {
 
 	@Override
 	public String toString() {
-		return "GdaxOrderResponse [id=" + id + ", size=" + size + ", productId=" + productId + ", side=" + side
+		return "GdaxOrderResponse [id=" + id + ", price=" + price + ", size=" + size + ", productId=" + productId + ", side=" + side
 				+ ", stp=" + stp + ", funds=" + funds + ", specifiedFunds=" + specifiedFunds + ", type=" + type
 				+ ", createdAt=" + createdAt + ", doneAt=" + doneAt + ", doneReason=" + doneReason + ", fillFees="
 				+ fillFees + ", filledSize=" + filledSize + ", executedValue=" + executedValue + ", status=" + status
@@ -170,23 +191,8 @@ public class GdaxOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public BigDecimal getQuantity() {
-		return size;
-	}
-
-	@Override
-	public BigDecimal getQuantityRemaining() {
-		return filledSize;
-	}
-
-	@Override
-	public BigDecimal getPrice() {
-		return null;
-	}
-
-	@Override
 	public boolean isOpen() {
-		return "done".equals(status) || "settled".equals(status);
+		return !("done".equals(status) || "settled".equals(status));
 	}
 
 	@Override
@@ -226,6 +232,21 @@ public class GdaxOrderResponse implements OrderResponse {
 			return System.currentTimeMillis();
 		}
 		return 0;
+	}
+
+	@Override
+	public BigDecimal getAmount() {
+		return size;
+	}
+
+	@Override
+	public BigDecimal getAmountRemaining() {
+		return size.subtract(filledSize == null ? BigDecimal.ZERO : filledSize);
+	}
+
+	@Override
+	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
+		return new OpenOrderStatus(order, getOrderStatus(), getAmountRemaining());
 	}
 
 }

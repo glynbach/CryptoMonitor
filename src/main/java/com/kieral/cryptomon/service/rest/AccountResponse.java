@@ -8,7 +8,7 @@ public interface AccountResponse {
 
 	String getAccountId();
 	String getAccountAddress();
-	Currency getAccountCuurency();
+	Currency getAccountCurrency();
 	BigDecimal getAvailableBalance();
 	BigDecimal getPendingBalance();
 	
