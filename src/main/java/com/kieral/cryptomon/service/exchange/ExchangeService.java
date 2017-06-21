@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
@@ -87,7 +86,7 @@ public interface ExchangeService {
 	/**
 	 * Returns a map of order statuses for the given orders keye by clientOrderId
 	 */
-	Map<String, OpenOrderStatus> getOpenOrderStatuses(List<Order> orders);
+	Map<String, OrderStatus> getOpenOrderStatuses(List<Order> orders);
 
 	/**
 	 * Returns a list of all open orders

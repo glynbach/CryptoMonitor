@@ -11,7 +11,7 @@ tomcat:
     enabled: true 
 logging:
   dataBufferingLogging: true
-  rawDataLogging: true
+  rawDataLogging: false
   tickstoreLoggingEnabled: false
   requestLoggingEnabled: true
   responseLoggingEnabled: true
@@ -48,7 +48,7 @@ orderbook:
           significant-amount: 0.5
 POLONIEX: 
   exchange: poloniex
-  enabled: true
+  enabled: false
   push-api: "wss://api.poloniex.com"
   snapshot-api: "https://poloniex.com/public"
   trading-api: "https://poloniex.com/tradingApi"
@@ -92,7 +92,7 @@ BITTREX:
       trading-fee: "0.25"
 GDAX: 
   exchange: gdax
-  enabled: true
+  enabled: false
   push-api: ""
   snapshot-api: "https://api.gdax.com"
   trading-api: "https://api.gdax.com"

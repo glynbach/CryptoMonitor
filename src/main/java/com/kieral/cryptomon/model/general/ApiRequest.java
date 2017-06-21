@@ -1,8 +1,9 @@
 package com.kieral.cryptomon.model.general;
 
-import java.util.EnumSet;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -21,27 +22,33 @@ public class ApiRequest {
 		URLENCODED
 	}
 	
+	public enum ResponseErrorAction {
+		CANCEL,
+		USE_PREVIOUS,
+		RAISE_EXCEPTION
+	}
+	
 	private final String endPoint;
 	private final String requestPath;
 	private final HttpMethod method;
 	private final BodyType bodyType;
 	private final Map<String, String> postParameters = new LinkedHashMap<String, String>();
-	private EnumSet<HttpStatus> acceptableErrorStatuses;
+	private final ResponseErrorChecker[] responseErrorCheckers;
 
 	public ApiRequest(String endPoint, String requestPath, HttpMethod method) {
 		this(endPoint, requestPath, method, BodyType.URLENCODED);
 	}
 
 	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType) {
-		this(endPoint, requestPath, method, bodyType, null);
+		this(endPoint, requestPath, method, bodyType, (ResponseErrorChecker[])null);
 	}
 
-	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType, EnumSet<HttpStatus> acceptableErrorStatuses) {
+	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType, ResponseErrorChecker... responseErrorCheckers) {
 		this.endPoint = endPoint;
 		this.requestPath = requestPath;
 		this.method = method;
 		this.bodyType = bodyType;
-		this.acceptableErrorStatuses = acceptableErrorStatuses;
+		this.responseErrorCheckers = responseErrorCheckers;
 	}
 
 	public String getEndPoint() {
@@ -97,15 +104,50 @@ public class ApiRequest {
 		}
 	}
 
-	public boolean isAcceptableError(HttpStatus statusCode) {
-		return acceptableErrorStatuses != null && acceptableErrorStatuses.contains(statusCode);
+	public ResponseErrorAction checkResponseError(HttpStatus statusCode, String responseBodu) {
+		if (responseErrorCheckers != null) {
+			for (ResponseErrorChecker responseErrorChecker: responseErrorCheckers) {
+				if (statusCode == responseErrorChecker.getStatus()) {
+					if (responseErrorChecker.getResponseChecker() != null) {
+						return responseErrorChecker.getResponseChecker().apply(responseBodu);
+					}
+					return ResponseErrorAction.RAISE_EXCEPTION;
+				}
+			}
+		}
+		return ResponseErrorAction.RAISE_EXCEPTION;
 	}
 
 	@Override
 	public String toString() {
 		return "ApiRequest [endPoint=" + endPoint + ", requestPath=" + requestPath + ", method=" + method
-				+ ", bodyType=" + bodyType + ", postParameters=" + postParameters + ", acceptableErrorStatuses="
-				+ acceptableErrorStatuses + "]";
+				+ ", bodyType=" + bodyType + ", postParameters=" + postParameters + ", responseErrorCheckers="
+				+ Arrays.toString(responseErrorCheckers) + "]";
+	}
+
+	public static class ResponseErrorChecker {
+		
+		private final HttpStatus status;
+		private final Function<String, ResponseErrorAction> responseChecker;
+		
+		public ResponseErrorChecker(HttpStatus status, Function<String, ResponseErrorAction> responseChecker) {
+			this.status = status;
+			this.responseChecker = responseChecker;
+		}
+
+		public HttpStatus getStatus() {
+			return status;
+		}
+
+		public Function<String, ResponseErrorAction> getResponseChecker() {
+			return responseChecker;
+		}
+
+		@Override
+		public String toString() {
+			return "AcceptableResponseStatus [status=" + status + ", responseChecker=" + responseChecker + "]";
+		}
+		
 	}
 	
 }

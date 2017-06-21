@@ -24,10 +24,24 @@
 								</thead>
 								<tbody>
 									<tr ng-repeat="obEntry in orderBook.obEntries">
-										<td>{{obEntry.askPrice}}</td>
-										<td>{{obEntry.askAmount}}</td>
-										<td>{{obEntry.bidPrice}}</td>
-										<td>{{obEntry.bidAmount}}</td>
+										<td>
+											{{obEntry.askPrice}}
+											<span ng-show="exchange.tradingEnabled">
+												&nbsp;<button type="button" class="btn btn-primary btn-mini" ng-click="placeOrder(exchange.name, orderBook.currencyPair, obEntry.askPrice, 'BID')">Buy</button>
+											</span>
+										</td>
+										<td>
+											{{obEntry.askAmount}}
+										</td>
+										<td>
+											{{obEntry.bidPrice}}
+											<span ng-show="exchange.tradingEnabled">
+												&nbsp;<button type="button" class="btn btn-primary btn-mini" ng-click="placeOrder(exchange.name, orderBook.currencyPair, obEntry.bidPrice, 'ASK')">Sell</button>
+											</span>
+										</td>
+										<td>
+											{{obEntry.bidAmount}}
+										</td>
 									</tr>
 								</tbody>										
 							</table>

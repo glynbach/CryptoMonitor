@@ -9,12 +9,12 @@ import com.kieral.cryptomon.service.exchange.poloniex.util.PoloniexUtils;
 import com.kieral.cryptomon.service.rest.OrdersResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PoloniexOrderHistoryResponse extends ArrayList<PoloniexOrderTradeResponse> implements OrdersResponse<PoloniexOrderResponse> {
+public class PoloniexOrderHistoryResponse extends ArrayList<PoloniexOrderTradeResponse> implements OrdersResponse<PoloniexFilledOrderResponse> {
 
 	private static final long serialVersionUID = 2072663639186818275L;
 
 	private AtomicBoolean collated = new AtomicBoolean(false);
-	private List<PoloniexOrderResponse> responses;
+	private List<PoloniexFilledOrderResponse> responses;
 			
 	@Override
 	public String toString() {
@@ -23,13 +23,13 @@ public class PoloniexOrderHistoryResponse extends ArrayList<PoloniexOrderTradeRe
 
 	private void collate() {
 		if (collated.compareAndSet(false,  true)) {
-			doCollate(false);
+			doCollate();
 		}
 	}
 
-	private void doCollate(boolean openOrder) {
+	private void doCollate() {
 		collated.set(true);
-		responses = PoloniexUtils.getOrderResponsesFromTrades(openOrder, this.subList(0,  this.size()));
+		responses = PoloniexUtils.getOrderResponsesFromTrades(false, this.subList(0,  this.size()));
 	}
 
 	@Override
@@ -43,7 +43,7 @@ public class PoloniexOrderHistoryResponse extends ArrayList<PoloniexOrderTradeRe
 	}
 
 	@Override
-	public List<PoloniexOrderResponse> getOrderResponses() {
+	public List<PoloniexFilledOrderResponse> getOrderResponses() {
 		collate();
 		return responses;
 	}

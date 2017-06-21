@@ -64,7 +64,6 @@ public class BasicArbExaminer implements ArbExaminer {
 	}
 
 	private ArbInstruction checkOpportunity(OrderBook buyBook, OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide) {
-//		logger.info("DEBUG: checking opportunity for {} and {} prices {} amd {}", buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
 		// check available balances
 		// what maximum amount can we do on both sides
 		BigDecimal commonAmount = buySide.getBidAskAmount().get(Side.ASK).getBaseAmount()
@@ -79,7 +78,6 @@ public class BasicArbExaminer implements ArbExaminer {
 		}
 		// is this a significant amount?
 		if (!orderBookConfig.isSignificant(sellBook.getMarket(), sellBook.getCurrencyPair().getBaseCurrency(), sellFunds)) {
-//			logger.info("DEBUG: insignificant sellFunds {} for {} and {} prices {} and {}", sellFunds, buyBook.getMarket(), sellBook.getMarket(), buySide, sellFunds);
 			return NO_ARB;
 		}
 		// now check buy side		
@@ -89,7 +87,6 @@ public class BasicArbExaminer implements ArbExaminer {
 		buyFunds = buyFunds.compareTo(buyAmountNeeded) < 0 ? buyFunds : buyAmountNeeded;
 		// is this still a significant amount?
 		if (!orderBookConfig.isSignificant(buyBook.getMarket(), buyBook.getCurrencyPair().getQuotedCurrency(), buyFunds)) {
-//			logger.info("DEBUG: insignifcant buyFunds {} for {} and {} prices {} amd {}", buyFunds, buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
 			return NO_ARB;
 		}
 		if (buyFunds.compareTo(buyAmountNeeded) != 0) {
@@ -97,7 +94,6 @@ public class BasicArbExaminer implements ArbExaminer {
 			commonAmount = buyFunds.divide(buySide.getBidAskPrice().get(Side.ASK), buyBook.getCurrencyPair().getPriceScale(), RoundingMode.HALF_DOWN);
 			// check new sell funds are significant 
 			if (!orderBookConfig.isSignificant(sellBook.getMarket(), sellBook.getCurrencyPair().getBaseCurrency(), sellFunds)) {
-//				logger.info("DEBUG: insignificant sellFunds after recalc {} for {} and {} prices {} amd {}", sellFunds, buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
 				return NO_ARB;
 			}
 		}
@@ -118,7 +114,7 @@ public class BasicArbExaminer implements ArbExaminer {
 					new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()));
 		}
 		if (logger.isDebugEnabled())
-			logger.info("DEBUG: no profit in {} USD after fees for {} and {} prices {} amd {}", profit.multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP), buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
+			logger.debug("No profit in {} USD after fees for {} and {} prices {} amd {}", profit.multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP), buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
 		return NO_ARB;	
 	}
 	

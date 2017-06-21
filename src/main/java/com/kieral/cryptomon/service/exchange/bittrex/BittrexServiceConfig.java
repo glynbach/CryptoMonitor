@@ -101,4 +101,9 @@ public class BittrexServiceConfig extends ServiceExchangeProperties {
 		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET);
 	}
 
+	@Override
+	public boolean isHasGranularTrades() {
+		return false;
+	}
+
 }

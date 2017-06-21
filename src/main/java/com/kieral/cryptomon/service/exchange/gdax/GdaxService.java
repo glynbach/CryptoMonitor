@@ -12,7 +12,7 @@ import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxPlaceOrderResponse
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxFillsResponse;
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOrderBookResponse;
 import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOrderResponse;
-import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOrdersResponse;
+import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOpenOrdersResponse;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.CancelOrderResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
@@ -76,7 +76,7 @@ public class GdaxService extends BaseExchangeService {
 
 	@Override
 	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOpenOrdersResponseClazz() {
-		return GdaxOrdersResponse.class;
+		return GdaxOpenOrdersResponse.class;
 	}
 
 	@Override
@@ -91,7 +91,7 @@ public class GdaxService extends BaseExchangeService {
 	
 	@Override
 	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
-		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_ALL);
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_OPEN_ORDERS, OrderCheckingStrategy.CHECK_BY_TRADE_HISTORY);
 	}
 
 }

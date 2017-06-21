@@ -1,0 +1,78 @@
+BITTREX
+
+FILLED TRADE 
+
+GET
+https://bittrex.com/api/v1.1/account/getorder?uuid=301c93db-3193-46c6-93c6-33f995173ac4&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497891721
+Request:  
+Response: {"success":true,"message":"","result":{"AccountId":null,"OrderUuid":"301c93db-3193-46c6-93c6-33f995173ac4","Exchange":"BTC-ETH","Type":"LIMIT_BUY","Quantity":0.01000000,"QuantityRemaining":0.01000000,"Limit":0.13750000,"Reserved":0.00137500,"ReserveRemaining":0.00137500,"CommissionReserved":0.00000343,"CommissionReserveRemaining":0.00000343,"CommissionPaid":0.00000000,"Price":0.00000000,"PricePerUnit":null,"Opened":"2017-06-19T17:02:34.577","Closed":"2017-06-19T17:04:15.81","IsOpen":false,"Sentinel":"fc99ce55-00b2-4617-b094-3aa3c9367658","CancelInitiated":true,"ImmediateOrCancel":false,"IsConditional":false,"Condition":"NONE","ConditionTarget":null}}
+
+PLACE ORDER SUCCESS
+
+GET
+https://bittrex.com/api/v1.1/market/buylimit?market=BTC-ETH&quantity=0.01&rate=0.138&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497816974
+Request: 
+Response: {"success":true,"message":"","result":{"uuid":"96eb6d8e-bc4a-4bd5-a59d-d05c603ad655"}}
+
+EMPTY OPEN ORDERS
+
+GET
+https://bittrex.com/api/v1.1/market/getopenorders?market=BTC-ETH&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497957506
+Request: 
+Response: {"success":true,"message":"","result":[]}
+
+PLACE ORDER FAILURE
+
+GET
+https://bittrex.com/api/v1.1/market/buylimit?market=BTC-ETH&quantity=0.0001&rate=0.1375&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497961853
+Request: 
+Response: {"success":false,"message":"DUST_TRADE_DISALLOWED_MIN_VALUE_50K_SAT","result":null}
+
+REQUEST OPEN ORDERS EXISTS
+
+GET
+https://bittrex.com/api/v1.1/account/getorder?uuid=96eb6d8e-bc4a-4bd5-a59d-d05c603ad655&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497820968
+Request: 
+Response: {"success":true,"message":"","result":{"AccountId":null,"OrderUuid":"96eb6d8e-bc4a-4bd5-a59d-d05c603ad655","Exchange":"BTC-ETH","Type":"LIMIT_BUY","Quantity":0.01000000,"QuantityRemaining":0.01000000,"Limit":0.13800000,"Reserved":0.00138000,"ReserveRemaining":0.00138000,"CommissionReserved":0.00000345,"CommissionReserveRemaining":0.00000345,"CommissionPaid":0.00000000,"Price":0.00000000,"PricePerUnit":null,"Opened":"2017-06-18T20:27:37.927","Closed":null,"IsOpen":true,"Sentinel":"38c82f03-a073-44e9-b3ed-bbefcc23b3e5","CancelInitiated":false,"ImmediateOrCancel":false,"IsConditional":false,"Condition":"NONE","ConditionTarget":null}}
+
+REQUEST ORDER NOT EXISTS
+
+GET
+https://bittrex.com/api/v1.1/account/getorder?uuid=e5f8058b-dc19-454c-b18e-a178c27db9d&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497966270
+Request: 
+Response: {"success":false,"message":"UUID_INVALID","result":null}
+
+REQUEST ORDER HISTORY
+
+GET
+https://bittrex.com/api/v1.1/account/getorderhistory?market=BTC-ETH&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497957643
+Request: 
+Response: {"success":true,"message":"","result":[{"OrderUuid":"e5f8058b-dc19-454c-b18e-a178c27db9d2","Exchange":"BTC-ETH","TimeStamp":"2017-06-19T18:29:41.043","OrderType":"LIMIT_BUY","Limit":0.13900100,"Quantity":0.01000000,"QuantityRemaining":0.00000000,"Commission":0.00000347,"Price":0.00139001,"PricePerUnit":0.13900100000000000000,"IsConditional":false,"Condition":"NONE","ConditionTarget":null,"ImmediateOrCancel":false,"Closed":"2017-06-19T18:30:15.67"}]}
+
+REQUEST CANCEL ORDER ALREADY CLOSED
+
+GET
+https://bittrex.com/api/v1.1/market/cancel?uuid=e5f8058b-dc19-454c-b18e-a178c27db9d2&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497965471
+Request: 
+Response: {"success":false,"message":"ORDER_NOT_OPEN","result":null}
+
+REQUEST CANCEL ORDER NOT EXISTS
+
+GET
+https://bittrex.com/api/v1.1/market/cancel?uuid=e5f8058b-dc19-454c-b18e-a178c27db9d2&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497965471
+Request: 
+Response: {"success":false,"message":"UUID_INVALID","result":null}
+
+REQUEST CANCEL SUCCESS
+
+GET
+https://bittrex.com/api/v1.1/market/cancel?uuid=96eb6d8e-bc4a-4bd5-a59d-d05c603ad655&apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497821696
+Request: 
+Response:{"success":true,"message":"","result":null}
+
+REQUEST BALANCE
+
+GET
+https://bittrex.com/api/v1.1/account/getbalances?apiKey=b327a7d68abb450381e5fe41eb84cf76&nonce=1497957504
+Request: 
+Response: {"success":true,"message":"","result":[{"Currency":"BTC","Balance":0.49860652,"Available":0.49860652,"Pending":0.00000000,"CryptoAddress":"1K4Viuf5JUMhE5WSvC3zWEqrMCyEwYDKSm"},{"Currency":"ETH","Balance":0.01000000,"Available":0.01000000,"Pending":0.00000000,"CryptoAddress":null}]}

@@ -32,7 +32,7 @@ public abstract class BittrexResponseContainer<T> {
 	
 	@Override
 	public String toString() {
-		return "BittrexResponseContainer [success=" + success + ", message=" + message + ", result=" + result + "]";
+		return getClass().getSimpleName() + " [success=" + success + ", message=" + message + ", result=" + result + "]";
 	}
 	
 }

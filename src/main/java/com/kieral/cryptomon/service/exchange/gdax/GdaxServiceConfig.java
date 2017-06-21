@@ -2,7 +2,7 @@ package com.kieral.cryptomon.service.exchange.gdax;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
-import java.util.EnumSet;
+import java.util.function.Function;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.PropertySource;
@@ -11,7 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.ApiRequest;
+import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorChecker;
 import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
+import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorAction;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.general.CurrencyPair;
@@ -32,6 +34,36 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	private static final String CANCEL_ORDER_QUERY = "/orders/%s";
 	private static final String OPEN_ORDERS_QUERY = "/orders?status=all&product_id=%s";
 	private static final String ORDER_HISTORY_QUERY = "/fills?product_id=%s";
+
+	// Response when cancelling order that can not be found
+	private final Function<String, ResponseErrorAction> messageNotFoundFunction = new Function<String, ResponseErrorAction>() {
+    	public ResponseErrorAction apply(String response) {
+			if (response != null && response.contains("\"message\"") && response.contains("Not") && response.contains("Found"))
+				return ResponseErrorAction.CANCEL;
+			return ResponseErrorAction.RAISE_EXCEPTION;
+    	}
+    };
+
+	// Response when cancelling order that has already been completed
+	private final Function<String, ResponseErrorAction> messageAlreadyDoneFunction = new Function<String, ResponseErrorAction>() {
+    	public ResponseErrorAction apply(String response) {
+			if (response != null && response.contains("\"message\"") && response.contains("already done"))
+				return ResponseErrorAction.USE_PREVIOUS;
+			return ResponseErrorAction.RAISE_EXCEPTION;
+    	}
+    };
+
+    // Multiple messages available on placing an invalid order
+	private final Function<String, ResponseErrorAction> messageExistsFunction = new Function<String, ResponseErrorAction>() {
+    	public ResponseErrorAction apply(String response) {
+			if (response != null && response.contains("\"message\"") && response.contains(":"))
+				return ResponseErrorAction.CANCEL;
+			return ResponseErrorAction.RAISE_EXCEPTION;
+    	}
+    };
+	private final ResponseErrorChecker notFoundStatus = new ResponseErrorChecker(HttpStatus.NOT_FOUND, messageNotFoundFunction);
+	private final ResponseErrorChecker alreadyDoneStatus = new ResponseErrorChecker(HttpStatus.BAD_REQUEST, messageAlreadyDoneFunction);
+	private final ResponseErrorChecker generalErrorStatus = new ResponseErrorChecker(HttpStatus.BAD_REQUEST, messageExistsFunction);
 
 	@Override
 	protected String[] splitPair(String topicStr) {
@@ -69,7 +101,7 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 		// Gdax amounts are in base currency
 		if (amount == null || amount.getBaseAmount() == null || amount.getBaseAmount().compareTo(BigDecimal.ZERO) <= 0)
 			throw new IllegalArgumentException("invalid amount " + amount);
-		ApiRequest apiRequest = new ApiRequest(tradingApi, PLACE_ORDER_QUERY, HttpMethod.POST, BodyType.JSON);
+		ApiRequest apiRequest = new ApiRequest(tradingApi, PLACE_ORDER_QUERY, HttpMethod.POST, BodyType.JSON, generalErrorStatus);
 		apiRequest.addPostParameter("side", side == Side.BID ? "buy" : "sell");
 		apiRequest.addPostParameter("product_id", currencyPair.getTopic());
 		apiRequest.addPostParameter("type", "limit");
@@ -83,7 +115,7 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	public ApiRequest getCancelOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.DELETE);
+		return new ApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.DELETE, BodyType.JSON, notFoundStatus, alreadyDoneStatus);
 	}
 
 	@Override
@@ -104,8 +136,12 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	public ApiRequest getOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		EnumSet<HttpStatus> noOpenOrderResult = EnumSet.of(HttpStatus.NOT_FOUND);
-		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET, BodyType.JSON, noOpenOrderResult);
+		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET, BodyType.JSON, notFoundStatus);
 	}
 
+	@Override
+	public boolean isHasGranularTrades() {
+		return true;
+	}
+	
 }

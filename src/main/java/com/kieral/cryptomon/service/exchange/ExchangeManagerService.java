@@ -1,18 +1,19 @@
 package com.kieral.cryptomon.service.exchange;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
@@ -44,6 +45,13 @@ public class ExchangeManagerService {
 
 	public List<ExchangeService> getEnabledExchanges() {
 		return new ArrayList<ExchangeService>(enabledExchanges);
+	}
+
+	public List<String> getEnabledExchangeNames() {
+		List<ExchangeService> enabledExchanges = getEnabledExchanges();
+		if (enabledExchanges == null || enabledExchanges.size() == 0)
+			return Collections.emptyList();
+		return enabledExchanges.stream().map(ExchangeService::getName).collect(Collectors.<String>toList());
 	}
 
 	public void registerAllOrderBookListeners(OrderBookListener listener) {
@@ -142,7 +150,7 @@ public class ExchangeManagerService {
 		return OrderStatus.ERROR;
 	}
 	
-	public Map<String, OpenOrderStatus> getOpenOrderStatuses(String market, List<Order> orders) {
+	public Map<String, OrderStatus> getOpenOrderStatuses(String market, List<Order> orders) {
 		if (checkMarketStatus(market)) {
 			return enabledExchangeMap.get(market).getOpenOrderStatuses(orders);
 		} else {

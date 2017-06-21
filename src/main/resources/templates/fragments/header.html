@@ -12,12 +12,18 @@
                 <div class="navbar-header">
                     <a class="navbar-brand" href="#" th:href="@{/orders}">Orders</a>
                     <a class="navbar-brand" href="#" th:href="@{/orderBooks}">Order Books</a>
-                    <a class="navbar-brand" href="#" onClick="$('#enableTrading').dialog('open');">Enable Trading</a>
+                    <a class="navbar-brand" href="#" onClick="$('#enableTradingDialog').dialog('open');">Enable Trading</a>
                 </div>
             </div>
         </nav>
         <hr/>
-       	<div id="enableTrading" title="Enter key for envrypted API files">
+		<div th:if="${error != null}" class="row">
+			<p><span class="left-small-buffer alert-danger" th:text="${error}"></span></p>
+		</div>
+		<div th:if="${info != null}" class="row">
+			<p><span class="left-small-buffer alert-success" th:text="${info}"></span></p>
+		</div>
+       	<div id="enableTradingDialog" class="dialog" title="Enter key for envrypted API files">
 			<form th:action="@{/enableTrading}" method="post" class="form-inline">
 				<label class="sr-only" for="secretKey"></label>
 				<div class="input-group">
@@ -27,16 +33,31 @@
 				</div>
 			</form>
 		</div>
+		<div id="placeOrderDialog" class="dialog">
+			<!--/*/ <th:block th:include="fragments/placeOrder :: placeOrder"></th:block> /*/-->
+		</div>
 		<script>
 			$( document ).ready(function() {
-				$("#enableTrading").dialog({
+				$("#enableTradingDialog").dialog({
 				    autoOpen: false,
 				    show: 'slide',
 				    resizable: false,
-				    position: 'center',
 				    stack: true,
+				    position: {my: "center top", at:"center top", of: window },
 				    height: 'auto',
 				    width: '500px',
+				    modal: true
+				});
+			});
+			$( document ).ready(function() {
+				$("#placeOrderDialog").dialog({
+				    autoOpen: false,
+				    show: 'slide',
+				    resizable: false,
+				    stack: true,
+				    position: {my: "center top", at:"center top", of: window },
+				    height: 'auto',
+				    width: 'auto',
 				    modal: true
 				});
 			});

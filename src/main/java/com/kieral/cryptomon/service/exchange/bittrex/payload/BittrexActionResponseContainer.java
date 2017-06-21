@@ -11,7 +11,7 @@ public class BittrexActionResponseContainer extends BittrexResponseContainer<Bit
 		if (clazz.isAssignableFrom(PlaceOrderResponse.class))
 			return success ? OrderStatus.OPEN : OrderStatus.CANCELLED;
 		if (clazz.isAssignableFrom(CancelOrderResponse.class))
-			return success ? OrderStatus.CANCELLED : currentStatus;
+			return success ? OrderStatus.CANCELLED : getMessage() != null && getMessage().contains("UUID_INVALID") ? OrderStatus.CANCELLED : OrderStatus.ERROR;
 		return OrderStatus.ERROR;
 	}
 

@@ -89,7 +89,7 @@ public class BittrexService extends BaseExchangeService {
 
 	@Override
 	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
-		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_ALL);
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_INDIVIDUAL, OrderCheckingStrategy.CHECK_BY_OPEN_ORDERS, OrderCheckingStrategy.CHECK_BY_TRADE_HISTORY);
 	}
 
 }

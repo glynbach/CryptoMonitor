@@ -1,17 +1,20 @@
 package com.kieral.cryptomon.service.exchange.bittrex.payload;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.util.Arrays;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kieral.cryptomon.model.general.Side;
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
+import com.kieral.cryptomon.service.rest.BaseTradeResponse;
+import com.kieral.cryptomon.service.rest.BaseTradesResponse;
 import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.rest.TradeResponse;
+import com.kieral.cryptomon.service.rest.TradesResponse;
+import com.kieral.cryptomon.service.util.CommonUtils;
 import com.kieral.cryptomon.service.util.TradingUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -27,6 +30,7 @@ public class BittrexOrderResponse implements OrderResponse {
 	private BigDecimal quantityRemaining;
 	private BigDecimal limit;
 	private BigDecimal commissionPaid;
+	private BigDecimal commissionReserved;
 	private BigDecimal price;
 	private BigDecimal pricePerUnit;
 	private String opened;
@@ -129,8 +133,13 @@ public class BittrexOrderResponse implements OrderResponse {
 		this.commissionPaid = commissionPaid;
 	}
 
-	public BigDecimal getPrice() {
-		return price == null || price.compareTo(BigDecimal.ZERO) == 0 ? limit : price;
+	public BigDecimal getCommissionReserved() {
+		return commissionReserved;
+	}
+
+	@JsonProperty("CommissionReserved")
+	public void setCommissionReserved(BigDecimal commissionReserved) {
+		this.commissionReserved = commissionReserved;
 	}
 
 	@JsonProperty("Price")
@@ -224,24 +233,8 @@ public class BittrexOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public String toString() {
-		return "BittrexOrderResponse [acountId=" + acountId + ", uuid=" + uuid + ", orderUuid=" + orderUuid
-				+ ", exchange=" + exchange + ", orderType=" + orderType + ", type=" + type + ", quantity=" + quantity
-				+ ", quantityRemaining=" + quantityRemaining + ", limit=" + limit + ", commissionPaid=" + commissionPaid
-				+ ", price=" + price + ", pricePerUnit=" + pricePerUnit + ", opened=" + opened + ", closed=" + closed
-				+ ", open=" + open + ", cancelInitiated=" + cancelInitiated + ", immediateOrCancel=" + immediateOrCancel
-				+ ", conditional=" + conditional + ", condition=" + condition + ", conditionTarget=" + conditionTarget
-				+ "]";
-	}
-
-	@Override
 	public String getOrderId() {
 		return orderUuid;
-	}
-
-	@Override
-	public boolean isClosing() {
-		return cancelInitiated;
 	}
 
 	@Override
@@ -250,30 +243,21 @@ public class BittrexOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public OrderStatus getOrderStatus() {
-		return TradingUtils.getOrderStatus(this); 
-	}
-
-	@Override
 	public Side getSide() {
-		return orderType == null ? null : orderType.toUpperCase().contains("SELL") ? Side.ASK : Side.BID;
+		return orderType == null ? 
+				type == null ? null : type.toUpperCase().contains("SELL") ? Side.ASK : Side.BID
+					: orderType.toUpperCase().contains("SELL") ? Side.ASK : Side.BID;
 	}
 
 	@Override
 	public long getCreatedTime() {
-		try {
-			return LocalDateTime.parse(opened, BittrexServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-		} catch (Exception e) {}
-		return System.currentTimeMillis();
+		return CommonUtils.getMillis(opened, BittrexServiceConfig.dateTimeFormatter, System.currentTimeMillis());
 	}
 
 	@Override
 	public long getClosedTime() {
 		if (closed != null) {
-			try {
-				return LocalDateTime.parse(closed, BittrexServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-			} catch (Exception e) {}
-			return System.currentTimeMillis();
+			return CommonUtils.getMillis(closed, BittrexServiceConfig.dateTimeFormatter, System.currentTimeMillis());
 		}
 		return 0;
 	}
@@ -283,14 +267,33 @@ public class BittrexOrderResponse implements OrderResponse {
 		return quantity;
 	}
 
-	@Override
-	public BigDecimal getAmountRemaining() {
-		return quantityRemaining;
+	public BigDecimal getPrice() {
+		return limit;
 	}
 
 	@Override
-	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
-		return new OpenOrderStatus(order, getOrderStatus(), getAmountRemaining());
+	public TradesResponse getTradeResponses() {
+		BigDecimal tradeAmount = BigDecimal.ZERO;
+		if (quantity != null && quantityRemaining != null)
+			tradeAmount = quantity.subtract(quantityRemaining);
+		return new BaseTradesResponse(Arrays.asList(new TradeResponse[]{new BaseTradeResponse(null, price, tradeAmount, 
+				CommonUtils.returnLargestOf(commissionPaid, commissionReserved), System.currentTimeMillis(), true)})); 
+	}
+
+	@Override
+	public OrderStatus getOrderStatus(RequestNature requestNature, Order originalOrder) {
+		return TradingUtils.getOrderStatus(requestNature, isOpen(), originalOrder.getAmount(), getTradeResponses());
+	}
+
+	@Override
+	public String toString() {
+		return "BittrexOrderResponse [acountId=" + acountId + ", uuid=" + uuid + ", orderUuid=" + orderUuid
+				+ ", exchange=" + exchange + ", orderType=" + orderType + ", type=" + type + ", quantity=" + quantity
+				+ ", quantityRemaining=" + quantityRemaining + ", limit=" + limit + ", commissionPaid=" + commissionPaid
+				+ ", commissionReserved=" + commissionReserved + ", price=" + price + ", pricePerUnit=" + pricePerUnit
+				+ ", opened=" + opened + ", closed=" + closed + ", open=" + open + ", cancelInitiated="
+				+ cancelInitiated + ", immediateOrCancel=" + immediateOrCancel + ", conditional=" + conditional
+				+ ", condition=" + condition + ", conditionTarget=" + conditionTarget + "]";
 	}
 
 	

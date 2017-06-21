@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kieral.cryptomon.service.rest.OrdersResponse;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PoloniexOrdersResponse extends ArrayList<PoloniexOrderResponse> implements OrdersResponse<PoloniexOrderResponse> {
+public class PoloniexOpenOrdersResponse extends ArrayList<PoloniexOpenOrderResponse> implements OrdersResponse<PoloniexOpenOrderResponse> {
 
 	private static final long serialVersionUID = -291446473018656424L;
 
@@ -27,7 +27,7 @@ public class PoloniexOrdersResponse extends ArrayList<PoloniexOrderResponse> imp
 	}
 
 	@Override
-	public List<PoloniexOrderResponse> getOrderResponses() {
+	public List<PoloniexOpenOrderResponse> getOrderResponses() {
 		return this;
 	}
 
