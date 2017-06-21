@@ -1,5 +1,7 @@
 package com.kieral.cryptomon.validator;
 
+import java.math.BigDecimal;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.Errors;
@@ -11,10 +13,14 @@ import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
+import com.kieral.cryptomon.service.util.CommonUtils;
 
 @Component
 public class OrderValidator implements Validator {
 
+	private final static BigDecimal minimumAmount = new BigDecimal("0.00001");
+	private final static BigDecimal minimumPrice = new BigDecimal("0.0000001");
+	
 	@Autowired 
 	ExchangeManagerService exchangeManagerService;
 	
@@ -31,6 +37,12 @@ public class OrderValidator implements Validator {
 		ValidationUtils.rejectIfEmpty(errors, "price", "Price is empty", "Amount is empty");
 		ValidationUtils.rejectIfEmpty(errors, "side", "Side is empty", "Side is empty");
 		Order order = (Order)target;
+		if (!CommonUtils.isAtLeast(order.getAmount(), minimumAmount)) {
+			errors.rejectValue("amount", "Amount is too low", "Amount is too low");
+		}
+		if (!CommonUtils.isAtLeast(order.getPrice(), minimumPrice)) {
+			errors.rejectValue("amount", "Price is too low", "Price is too low");
+		}
 		if (exchangeManagerService.getExchangeStatus(order.getMarket()) != ConnectionStatus.CONNECTED)
 			errors.rejectValue("market", "Market is not connected", "Market is not connected");
 		if (!exchangeManagerService.isTradingEnabled(order.getMarket()))

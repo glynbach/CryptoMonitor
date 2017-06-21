@@ -10,6 +10,11 @@
 
 .table-condensed { font-size: 10px; }
 
+.btn-mini {
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
 .exchange-container
 {
     border-radius: .2em;

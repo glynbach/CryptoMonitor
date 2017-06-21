@@ -50,6 +50,9 @@ public class CryptoMonController {
 
     @RequestMapping("/orderBooks")
     public String orderBooks(Model model) {
+    	if (!model.containsAttribute("order"))
+    		model.addAttribute("order", new Order());
+    	model.addAttribute("exchanges", exchangeManagerService.getEnabledExchangeNames());
     	return "orderBooks";
     }
 
@@ -57,6 +60,7 @@ public class CryptoMonController {
     public String orders(@ModelAttribute("order") Order order, BindingResult result, Model model) {
     	if (!model.containsAttribute("order"))
     		model.addAttribute("order", new Order());
+    	model.addAttribute("exchanges", exchangeManagerService.getEnabledExchangeNames());
     	return "orders";
     }
 
@@ -66,10 +70,13 @@ public class CryptoMonController {
 	    if(result.hasErrors()) {
 	    	return "orders";
 	    }
+    	result.rejectValue("market", "Test Mode", "Test Mode");
 	    try {
 	    	orderService.placeOrder(order);
+	    	model.addAttribute("info", String.format("Order placed for %s", order.toStringFundamentals()));
 	    } catch (Exception e) {
 	    	logger.error("Error placing order {}", order, e);
+	    	model.addAttribute("error", String.format("Failed to place order for %s", order.toStringFundamentals()));
 	    	result.rejectValue("market", "Exception", "Error placing order - " + e.getMessage());
 	    	return "orders";
 	    }

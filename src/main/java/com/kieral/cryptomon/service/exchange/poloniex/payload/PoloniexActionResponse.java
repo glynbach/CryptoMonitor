@@ -11,6 +11,7 @@ public class PoloniexActionResponse implements PlaceOrderResponse, CancelOrderRe
 
 	private int success;
 	private String orderNumber;
+	private String error;
 	
 	public int getSuccess() {
 		return success;
@@ -28,12 +29,20 @@ public class PoloniexActionResponse implements PlaceOrderResponse, CancelOrderRe
 		this.orderNumber = orderNumber;
 	}
 
+	public String getError() {
+		return error;
+	}
+
+	public void setError(String error) {
+		this.error = error;
+	}
+
 	@Override
 	public OrderStatus getOrderStatus(Class<?> clazz, OrderStatus currentStatus) {
 		if (clazz.isAssignableFrom(PlaceOrderResponse.class))
 			return !CommonUtils.isEmpty(orderNumber) ? OrderStatus.OPEN : OrderStatus.CANCELLED;
 		if (clazz.isAssignableFrom(CancelOrderResponse.class))
-			return success == 1 ? OrderStatus.CANCELLED : currentStatus;
+			return success == 1 ? OrderStatus.CANCELLED : OrderStatus.ERROR;
 		return OrderStatus.ERROR;
 	}
 
@@ -44,12 +53,12 @@ public class PoloniexActionResponse implements PlaceOrderResponse, CancelOrderRe
 
 	@Override
 	public String getExchangeMessage() {
-		return null;
+		return error;
 	}
 
 	@Override
 	public String toString() {
-		return "PoloniexActionResponse [success=" + success + ", orderNumber=" + orderNumber + "]";
+		return "PoloniexActionResponse [success=" + success + ", orderNumber=" + orderNumber + ", error=" + error + "]";
 	}
 	
 }

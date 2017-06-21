@@ -24,6 +24,13 @@ cryptoApp.run(function ($stomp, $rootScope) {
 		}
 	    $stomp.send("/app/exchangeStatus", market);
 	});
+	$rootScope.placeOrder = function placeOrder(market, pair, price, side) {
+		$('#placeOrder_market').val(market);
+		$('#placeOrder_price').val(price);
+		$('#placeOrder_currencyPairStr').val(pair);
+		$('#placeOrder_side').val(side);
+		$('#placeOrderDialog').dialog('open');
+	};
 	$rootScope.$on('$destroy', function() {
 		console.log('Scope destroy event called');
 	});

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+
+</head>
+<body>
+
+<div th:fragment="placeOrder">
+	<form class="form-inline input-sm" th:object="${order}" th:action="@{/placeOrder}" method="post">
+		<div class="row left-small-buffer">
+			<div class="form-group input-sm" th:classappend="${#fields.hasErrors('market') ? 'has-danger' : ''}">
+				<label class="sr-only" for="market">Market</label>
+				<select class="custom-select mb-2 mr-sm-2 mb-sm-0" th:classappend="${#fields.hasErrors('market') ? 'form-control-danger' : ''}" th:field="*{market}" th:id="placeOrder_market">
+					<option th:each="exchange : ${exchanges}" th:selected="${exchange.equals(order.market)}" th:value="${exchange}">
+						<span th:text="${exchange}"></span>
+					</option>
+				</select>
+				<div th:if="${#fields.hasErrors('market')}" class="form-control-feedback"><span th:errors="*{market}">Incorrect market</span>&nbsp;</div>
+			</div>
+			<div class="form-group input-sm">
+				<label class="sr-only" for="side">Side</label>
+				<select class="custom-select mb-2 mr-sm-2 mb-sm-0" th:field="*{side}" th:id="placeOrder_side">
+					<option th:selected="${order.side.name() == 'BID'}" value="BID">Buy</option>
+					<option th:selected="${order.side.name() == 'ASK'}" value="ASK">Sell</option>
+				</select>
+			</div>
+			<div class="form-group input-sm">
+				<label class="sr-only" for="currencyPairStr">Pair</label>
+				<select class="custom-select mb-2 mr-sm-2 mb-sm-0" th:field="*{currencyPairStr}" th:id="placeOrder_currencyPairStr">
+					<option th:selected="${'ETHBTC'.equals(order.currencyPairStr)}" value="ETHBTC">ETH/BTC</option>
+					<option th:selected="${'LTCBTC'.equals(order.currencyPairStr)}" value="LTCBTC">LTC/BTC</option>
+				</select>
+			</div>
+			<div class="form-group input-sm">
+				<label class="sr-only" for="price">Price</label>
+				<div class="input-group mb-2 mr-sm-2 mb-sm-0">
+					<div class="input-group-addon">@</div>
+					<input type="text" class="form-control" th:field="*{price}" th:id="placeOrder_price" placeholder="0.00"/>
+				</div>
+			</div>
+				<div class="form-group input-sm">
+				<label class="sr-only" for="amount">Amount</label>
+				<input type="text" class="form-control mb-2 mr-sm-2 mb-sm-0" th:field="*{amount}" th:id="placeOrder_amount" placeholder="0.00"/>
+			</div>
+			<div class="form-group input-sm">
+				<button type="submit" class="btn btn-primary">Place Order</button>
+			</div>
+		</div>
+	</form>
+</div>
+
+</body>
+</html>

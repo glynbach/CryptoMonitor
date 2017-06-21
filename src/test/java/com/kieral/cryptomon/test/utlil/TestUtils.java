@@ -1,10 +1,14 @@
 package com.kieral.cryptomon.test.utlil;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.junit.Assert;
 
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
@@ -108,6 +112,24 @@ public class TestUtils {
 		return rtn;
 	}
 
+	public static String readResource(String resourceName) {
+		BufferedReader reader = null;
+		StringBuffer rtn = new StringBuffer();
+		try {
+			reader = new BufferedReader(new InputStreamReader(TestUtils.class.getResourceAsStream("abc.xml")));
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				rtn.append(line + "\n");
+			}
+		} catch (Exception e) {
+			Assert.fail("Cannot open resource " + resourceName);
+		} finally {
+			try {
+				reader.close();
+			} catch (Exception ex) {}
+		}
+		return rtn.toString();
+	}
 	
 	private static class ObEntry implements OrderBookEntry {
 

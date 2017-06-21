@@ -1,6 +1,5 @@
 package com.kieral.cryptomon.service;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,6 +15,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
 
@@ -26,7 +27,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exception.OrderNotExistsException;
@@ -72,7 +72,7 @@ public class OrderService {
 						List<Order> openOrders = exchange.getOpenOrders();
 						if (openOrders != null) {
 							openOrders.forEach(order -> {
-								updateStatus(order, order.getOrderStatus(), null);
+								updateStatus(order, order.getOrderStatus());
 							});
 						}
 					});
@@ -181,10 +181,6 @@ public class OrderService {
 	}
 
 	private void updateStatus(Order order, OrderStatus orderStatus) {
-		updateStatus(order, orderStatus, null);
-	}
-
-	private void updateStatus(Order order, OrderStatus orderStatus, BigDecimal amountRemaining) {
 		if (OrderStatus.OPEN_ORDER.contains(orderStatus)) {
 			if (OrderStatus.CLOSED_ORDER.contains(order.getOrderStatus())) {
 				if (orderStatus == OrderStatus.ERROR) {
@@ -203,12 +199,9 @@ public class OrderService {
 			put(closedOrders, order);
 		}
 		order.setOrderStatus(orderStatus);
-		if (amountRemaining != null)
-			order.setAmountRemaining(amountRemaining);
 		listeners.forEach( listener -> {
 			listener.onOrderStatusChange(order);
 		});
-		logger.info("DEBUG openOrders: " + openOrders + " closedOrders: "+ closedOrders);
 	}
 	
     @Scheduled(fixedRate = 1000)
@@ -243,10 +236,12 @@ public class OrderService {
 	}
 
 	private void checkStatuses(String market, List<Order> orders) {
-		Map<String, OpenOrderStatus> statuses = exchangeManagerService.getOpenOrderStatuses(market, orders);
+		Map<String, Order> orderMap = orders.stream().collect(Collectors.toMap(Order::getClientOrderId, Function.identity()));
+		Map<String, OrderStatus> statuses = exchangeManagerService.getOpenOrderStatuses(market, orders);
 		if (statuses != null) {
-			statuses.values().forEach(status -> {
-				updateStatus(status.getOrder(), status.getNewStatus(), status.getAmountRemaining());
+			statuses.keySet().forEach(clientOrderId -> {
+				if (orderMap.containsKey(clientOrderId))
+					updateStatus(orderMap.get(clientOrderId), statuses.get(clientOrderId));
 			});
 		}
 	}
@@ -258,7 +253,7 @@ public class OrderService {
 	private boolean contains(ConcurrentMap<String, Map<String, Order>> map, String market, String exchangeOrderId) {
 		if (map.containsKey(market)) {
 			for (Order order : map.get(market).values()) {
-				if (order.getOrderId().equals(exchangeOrderId))
+				if (order.getOrderId() != null && order.getOrderId().equals(exchangeOrderId))
 					return true;
 			}
 		};

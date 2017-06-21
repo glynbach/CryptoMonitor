@@ -21,7 +21,7 @@ import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexActionResp
 import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderBookResponse;
 import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderHistoryResponse;
 import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderTradesResponse;
-import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrdersResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOpenOrdersResponse;
 import com.kieral.cryptomon.service.rest.AccountsResponse;
 import com.kieral.cryptomon.service.rest.CancelOrderResponse;
 import com.kieral.cryptomon.service.rest.OrderBookResponse;
@@ -169,7 +169,7 @@ public class PoloniexService extends BaseExchangeService {
 
 	@Override
 	protected Class<? extends OrdersResponse<? extends OrderResponse>> getOpenOrdersResponseClazz() {
-		return PoloniexOrdersResponse.class;
+		return PoloniexOpenOrdersResponse.class;
 	}
 
 	@Override
@@ -184,7 +184,7 @@ public class PoloniexService extends BaseExchangeService {
 
 	@Override
 	protected EnumSet<OrderCheckingStrategy> getOrderCheckingStrategies() {
-		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_ALL);
+		return EnumSet.of(OrderCheckingStrategy.CHECK_BY_OPEN_ORDERS, OrderCheckingStrategy.CHECK_BY_TRADE_HISTORY);
 	}
 
 }

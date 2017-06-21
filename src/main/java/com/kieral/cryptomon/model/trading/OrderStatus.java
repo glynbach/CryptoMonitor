@@ -9,10 +9,9 @@ public enum OrderStatus {
 	PARTIALLY_FILLED,
 	FILLED,
 	CANCELLED,
-	SETTLED,
 	ERROR;
 	
-	public final static EnumSet<OrderStatus> OPEN_ORDER = EnumSet.of(OrderStatus.PENDING, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED, OrderStatus.ERROR);
-	public final static EnumSet<OrderStatus> CLOSED_ORDER = EnumSet.of(OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.SETTLED);
+	public final static EnumSet<OrderStatus> OPEN_ORDER = EnumSet.of(OrderStatus.PENDING, OrderStatus.OPEN, OrderStatus.ERROR);
+	public final static EnumSet<OrderStatus> CLOSED_ORDER = EnumSet.of(OrderStatus.FILLED, OrderStatus.CANCELLED);
 	
 }

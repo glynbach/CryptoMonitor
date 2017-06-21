@@ -1,0 +1,81 @@
+GDAX
+
+FILLED TRADE 
+
+GET
+https://api.gdax.com/fills?product_id=ETH-BTC
+Request:  
+Response: [{"created_at":"2017-06-19T19:19:05.725Z","trade_id":887982,"product_id":"ETH-BTC","order_id":"bb4ef795-2be9-4d20-9f5c-549de0a5b3ec","user_id":"56e973573203d700cf0003d1","profile_id":"1d2076be-5336-476e-8e0f-f2eb41795436","liquidity":"T","price":"0.13891000","size":"0.01000000","fee":"0.0000041673000000","side":"buy","settled":true}]
+
+PLACE ORDER SUCCESS
+
+POST
+https://api.gdax.com/orders
+Request: {"side":"buy","product_id":"ETH-BTC","type":"limit","size":"0.01","price":"0.1375","time_in_force":"GTC"}
+Response: {"id":"3d0fb74e-e4b5-43b5-98cd-a79cdfb13810","price":"0.13750000","size":"0.01000000","product_id":"ETH-BTC","side":"buy","stp":"dc","type":"limit","time_in_force":"GTC","post_only":false,"created_at":"2017-06-19T14:54:06.097342Z","fill_fees":"0.0000000000000000","filled_size":"0.00000000","executed_value":"0.0000000000000000","status":"pending","settled":false}
+
+EMPTY OPEN ORDERS
+
+GET
+https://api.gdax.com/orders?status=all&product_id=ETH-BTC
+Request: 
+Response: []
+
+PLACE ORDER FAILURE
+
+POST
+https://api.gdax.com/orders
+Request: {"side":"buy","product_id":"ETH-BTC","type":"limit","size":"0.0001","price":"0.1375","time_in_force":"GTC"}
+Response Status code  : 400
+Response: {"message":"Order size is too small. Minimum size is 0.01"}
+
+REQUEST OPEN ORDERS EXISTS
+
+GET
+https://api.gdax.com/orders?status=all&product_id=ETH-BTC
+Request: 
+Response: [{"id":"3d0fb74e-e4b5-43b5-98cd-a79cdfb13810","price":"0.13750000","size":"0.01000000","product_id":"ETH-BTC","side":"buy","stp":"dc","type":"limit","time_in_force":"GTC","post_only":false,"created_at":"2017-06-19T14:54:06.097342Z","fill_fees":"0.0000000000000000","filled_size":"0.00000000","executed_value":"0.0000000000000000","status":"open","settled":false}]
+
+REQUEST ORDER NOT EXISTS
+
+GET
+https://api.gdax.com/orders/a9e59398-5033-4f5e-a2b4-0f8c16a5420d
+Request: 
+Response Status code  : 404
+Response: {"message":"NotFound"}
+
+REQUEST ORDER FILLED
+
+GET
+https://api.gdax.com/orders/bb4ef795-2be9-4d20-9f5c-549de0a5b3ec
+Request: 
+Response: {"id":"bb4ef795-2be9-4d20-9f5c-549de0a5b3ec","price":"0.13891000","size":"0.01000000","product_id":"ETH-BTC","side":"buy","stp":"dc","type":"limit","time_in_force":"GTC","post_only":false,"created_at":"2017-06-19T19:19:05.745734Z","done_at":"2017-06-19T19:19:05.725Z","done_reason":"filled","fill_fees":"0.0000041673000000","filled_size":"0.01000000","executed_value":"0.0013891000000000","status":"done","settled":true}
+
+REQUEST CANCEL ORDER ALREADY CLOSED
+
+DELETE
+https://api.gdax.com/orders/bb4ef795-2be9-4d20-9f5c-549de0a5b3ec
+Request: 
+Response Status code  : 400
+Response: {"message":"Order already done"}
+
+REQUEST CANCEL ORDER NOT EXISTS
+
+DELETE
+https://api.gdax.com/orders/3d0fb74e-e4b5-43b5-98cd-a79cdfb13810
+Request: 
+Response Status code  : 404
+Response: {"message":"NotFound"}
+
+REQUEST CANCEL SUCCESS
+
+DELETE
+Request: https://api.gdax.com/orders/3d0fb74e-e4b5-43b5-98cd-a79cdfb13810
+Response:["3d0fb74e-e4b5-43b5-98cd-a79cdfb13810"]
+
+REQUEST BALANCE
+
+GET
+https://api.gdax.com/accounts
+Request: 
+Response: [{"id":"28f2b3c1-345d-4e4a-8840-5ba5803249d4","currency":"LTC","balance":"0.0000000000000000","available":"0.0000000000000000","hold":"0.0000000000000000","profile_id":"1d2076be-5336-476e-8e0f-f2eb41795436"},{"id":"fd5ec4d0-a44a-4834-8930-f8aa09895776","currency":"GBP","balance":"0.0000000000000000","available":"0.0000000000000000","hold":"0.0000000000000000","profile_id":"1d2076be-5336-476e-8e0f-f2eb41795436"},{"id":"8b4a5d3d-b405-471b-9452-19d71bb1ff0b","currency":"EUR","balance":"0.0000000000000000","available":"0.0000000000000000","hold":"0.0000000000000000","profile_id":"1d2076be-5336-476e-8e0f-f2eb41795436"},{"id":"fca2e85c-4121-4942-8ea1-72d15dc2899b","currency":"ETH","balance":"0.0100000000000000","available":"0.0100000000000000","hold":"0.0000000000000000","profile_id":"1d2076be-5336-476e-8e0f-f2eb41795436"},{"id":"3d5aae27-ac34-4b0b-874c-9a2513083c7f","currency":"BTC","balance":"0.4986067327000000","available":"0.4986067327000000","hold":"0.0000000000000000","profile_id":"1d2076be-5336-476e-8e0f-f2eb41795436"}]

@@ -4,9 +4,12 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kieral.cryptomon.service.exchange.gdax.GdaxServiceConfig;
+import com.kieral.cryptomon.service.rest.TradeResponse;
+import com.kieral.cryptomon.service.util.CommonUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class GdaxFillResponse {
+public class GdaxFillResponse implements TradeResponse {
 
 	private String tradeId;
 	private String productId;
@@ -108,6 +111,26 @@ public class GdaxFillResponse {
 		return "GdaxFillResponse [tradeId=" + tradeId + ", productId=" + productId + ", price=" + price + ", size="
 				+ size + ", orderId=" + orderId + ", createdAt=" + createdAt + ", liquidity=" + liquidity + ", fee="
 				+ fee + ", settled=" + settled + ", side=" + side + "]";
+	}
+
+	@Override
+	public BigDecimal getRate() {
+		return price;
+	}
+
+	@Override
+	public BigDecimal getAmount() {
+		return size;
+	}
+
+	@Override
+	public boolean isFeeInQuotedCurrency() {
+		return true;
+	}
+
+	@Override
+	public long getTradeTime() {
+		return CommonUtils.getMillis(createdAt, GdaxServiceConfig.dateTimeFormatter, 0);
 	}
 	
 }

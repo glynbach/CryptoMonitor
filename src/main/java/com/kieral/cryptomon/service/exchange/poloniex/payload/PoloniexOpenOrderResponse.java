@@ -4,22 +4,23 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kieral.cryptomon.model.general.Side;
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
+import com.kieral.cryptomon.service.rest.BaseTradeResponse;
 import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.rest.PlaceholderTradesResponse;
+import com.kieral.cryptomon.service.rest.TradesResponse;
 import com.kieral.cryptomon.service.util.TradingUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PoloniexOrderResponse implements OrderResponse {
+public class PoloniexOpenOrderResponse implements OrderResponse {
 
 	private String orderNumber;
 	private String type;
 	private BigDecimal rate;
+	private BigDecimal startingAmount;
 	private BigDecimal amount;
-	private BigDecimal fee;
 	private BigDecimal total;
-	private long closedTime;
 	
 	public String getOrderNumber() {
 		return orderNumber;
@@ -45,6 +46,14 @@ public class PoloniexOrderResponse implements OrderResponse {
 		this.rate = rate;
 	}
 
+	public BigDecimal getStartingAmount() {
+		return startingAmount;
+	}
+
+	public void setStartingAmount(BigDecimal startingAmount) {
+		this.startingAmount = startingAmount;
+	}
+
 	public BigDecimal getAmount() {
 		return amount;
 	}
@@ -61,28 +70,9 @@ public class PoloniexOrderResponse implements OrderResponse {
 		this.total = total;
 	}
 
-	public BigDecimal getFee() {
-		return fee;
-	}
-
-	public void setFee(BigDecimal fee) {
-		this.fee = fee;
-	}
-
-	@Override
-	public String toString() {
-		return "PoloniexOrderResponse [orderNumber=" + orderNumber + ", type=" + type + ", rate=" + rate + ", amount="
-				+ amount + ", fee=" + fee + ", total=" + total + ", closedTime=" + closedTime + "]";
-	}
-
 	@Override
 	public String getOrderId() {
 		return orderNumber;
-	}
-
-	@Override
-	public BigDecimal getAmountRemaining() {
-		return amount;
 	}
 
 	@Override
@@ -92,12 +82,8 @@ public class PoloniexOrderResponse implements OrderResponse {
 
 	@Override
 	public boolean isOpen() {
-		return closedTime == 0;
-	}
-
-	@Override
-	public boolean isClosing() {
-		return false;
+		// use this class only for open orders
+		return true;
 	}
 
 	@Override
@@ -105,11 +91,6 @@ public class PoloniexOrderResponse implements OrderResponse {
 		return true;
 	}
 	
-	@Override
-	public OrderStatus getOrderStatus() {
-		return TradingUtils.getOrderStatus(this); 
-	}
-
 	@Override
 	public Side getSide() {
 		return type == null ? null : type.toUpperCase().contains("SELL") ? Side.ASK : Side.BID;
@@ -121,19 +102,28 @@ public class PoloniexOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public long getClosedTime() {
-		return closedTime;
+	public TradesResponse getTradeResponses() {
+		if (amount != null && startingAmount != null && amount.compareTo(startingAmount) != 0) 
+			return new PlaceholderTradesResponse(new BaseTradeResponse(null, getPrice(), getAmount(), BigDecimal.ZERO, 
+					System.currentTimeMillis(), false));
+		else
+			return new PlaceholderTradesResponse(null);
 	}
 
 	@Override
-	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
-		// Poloniex applies the fee to the base currency
-		BigDecimal amountRemaining = order.getAmount().subtract(amount.add(fee == null ? BigDecimal.ZERO : fee));
-		return new OpenOrderStatus(order, TradingUtils.getOrderStatus(isOpenOrderRequest, amountRemaining), amountRemaining);
+	public OrderStatus getOrderStatus(RequestNature requestNature, Order originalOrder) {
+		return TradingUtils.getOrderStatus(requestNature, isOpen(), originalOrder.getAmount(), getTradeResponses());
 	}
 
-	public void setClosedTime(long closedTime) {
-		this.closedTime = closedTime;
+	@Override
+	public String toString() {
+		return "PoloniexOrderResponse [orderNumber=" + orderNumber + ", type=" + type + ", rate=" + rate
+				+ ", startingAmount=" + startingAmount + ", amount=" + amount + ", total=" + total + "]";
+	}
+
+	@Override
+	public long getClosedTime() {
+		return 0;
 	}
 	
 }

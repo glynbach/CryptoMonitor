@@ -121,4 +121,9 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 		return apiRequest;
 	}
 
+	@Override
+	public boolean isHasGranularTrades() {
+		return true;
+	}
+
 }

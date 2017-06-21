@@ -196,6 +196,14 @@ public abstract class ServiceExchangeProperties {
 		return pairs;
 	}
 
+	public CurrencyPair getPair(String pairName) {
+		for (CurrencyPair pair : getPairs()) {
+			if (pair.getName().equals(pairName))
+				return pair;
+		}
+		return null;
+	}
+
 	public boolean isInterestingCurrency(Currency currency) {
 		if (pairs != null) {
 			for (CurrencyPair pair : pairs) {
@@ -214,6 +222,7 @@ public abstract class ServiceExchangeProperties {
 	public abstract ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair);
 	public abstract ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair);
 	public abstract ApiRequest getOrderQuery(String orderId);
+	public abstract boolean isHasGranularTrades();
 	
 	@Override
 	public String toString() {
@@ -225,5 +234,5 @@ public abstract class ServiceExchangeProperties {
 				+ apiKeyLoc + ", apiSecretLoc=" + apiSecretLoc + ", apiPassphraseLoc=" + apiPassphraseLoc
 				+ ", currencyPairs=" + currencyPairs + ", pairs=" + pairs + "]";
 	}
-	
+
 }

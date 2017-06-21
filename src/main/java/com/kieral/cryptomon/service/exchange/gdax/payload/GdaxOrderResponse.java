@@ -1,17 +1,18 @@
 package com.kieral.cryptomon.service.exchange.gdax.payload;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kieral.cryptomon.model.general.Side;
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exchange.gdax.GdaxServiceConfig;
+import com.kieral.cryptomon.service.rest.BaseTradeResponse;
 import com.kieral.cryptomon.service.rest.OrderResponse;
+import com.kieral.cryptomon.service.rest.PlaceholderTradesResponse;
+import com.kieral.cryptomon.service.rest.TradesResponse;
+import com.kieral.cryptomon.service.util.CommonUtils;
 import com.kieral.cryptomon.service.util.TradingUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -196,18 +197,8 @@ public class GdaxOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public boolean isClosing() {
-		return false;
-	}
-
-	@Override
 	public boolean isSuccess() {
 		return id != null;
-	}
-
-	@Override
-	public OrderStatus getOrderStatus() {
-		return TradingUtils.getOrderStatus(this); 
 	}
 
 	@Override
@@ -217,19 +208,13 @@ public class GdaxOrderResponse implements OrderResponse {
 
 	@Override
 	public long getCreatedTime() {
-		try {
-			return LocalDateTime.parse(createdAt, GdaxServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-		} catch (Exception e) {}
-		return System.currentTimeMillis();
+		return CommonUtils.getMillis(createdAt, GdaxServiceConfig.dateTimeFormatter, System.currentTimeMillis());
 	}
 
 	@Override
 	public long getClosedTime() {
 		if (doneAt != null) {
-			try {
-				return LocalDateTime.parse(doneAt, GdaxServiceConfig.dateTimeFormatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-			} catch (Exception e) {}
-			return System.currentTimeMillis();
+			return CommonUtils.getMillis(doneAt, GdaxServiceConfig.dateTimeFormatter, System.currentTimeMillis());
 		}
 		return 0;
 	}
@@ -240,13 +225,13 @@ public class GdaxOrderResponse implements OrderResponse {
 	}
 
 	@Override
-	public BigDecimal getAmountRemaining() {
-		return size.subtract(filledSize == null ? BigDecimal.ZERO : filledSize);
+	public TradesResponse getTradeResponses() {
+		return new PlaceholderTradesResponse(new BaseTradeResponse(null, price, filledSize, fillFees, getCreatedTime(), true));
 	}
 
 	@Override
-	public OpenOrderStatus getOrderUpdateStatus(boolean isOpenOrderRequest, Order order) {
-		return new OpenOrderStatus(order, getOrderStatus(), getAmountRemaining());
+	public OrderStatus getOrderStatus(RequestNature requestNature, Order originalOrder) {
+		return TradingUtils.getOrderStatus(requestNature, isOpen(), originalOrder.getAmount(), getTradeResponses());
 	}
 
 }

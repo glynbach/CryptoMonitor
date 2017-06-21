@@ -4,9 +4,12 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kieral.cryptomon.service.exchange.poloniex.PoloniexServiceConfig;
+import com.kieral.cryptomon.service.rest.TradeResponse;
+import com.kieral.cryptomon.service.util.CommonUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PoloniexOrderTradeResponse {
+public class PoloniexOrderTradeResponse implements TradeResponse {
 
 	private String globalTradeId;
 	private String tradeId;
@@ -115,6 +118,16 @@ public class PoloniexOrderTradeResponse {
 		return "PoloniexOrderTradeResponse [globalTradeId=" + globalTradeId + ", tradeId=" + tradeId + ", currencyPair="
 				+ currencyPair + ", date=" + date + ", rate=" + rate + ", amount=" + amount + ", total=" + total
 				+ ", fee=" + fee + ", orderNumber=" + orderNumber + ", type=" + type + ", category=" + category + "]";
+	}
+
+	@Override
+	public long getTradeTime() {
+		return CommonUtils.getMillis(date, PoloniexServiceConfig.dateTimeFormatter, 0);
+	}
+
+	@Override
+	public boolean isFeeInQuotedCurrency() {
+		return false;
 	}
 	
 }

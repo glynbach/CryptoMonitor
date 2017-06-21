@@ -1,6 +1,7 @@
 package com.kieral.cryptomon.service.exchange;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,11 +33,12 @@ import org.springframework.web.client.RestTemplate;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.ApiRequest;
 import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
+import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorAction;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
-import com.kieral.cryptomon.model.trading.OpenOrderStatus;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
+import com.kieral.cryptomon.model.trading.Trade;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.OrderService;
@@ -44,6 +46,7 @@ import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.ApiRequestException;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
+import com.kieral.cryptomon.service.exception.ExpectedResponseException;
 import com.kieral.cryptomon.service.exception.SecurityModuleException;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.SubscriptionMode;
 import com.kieral.cryptomon.service.liquidity.OrderBookListener;
@@ -54,7 +57,10 @@ import com.kieral.cryptomon.service.rest.OrderBookResponse;
 import com.kieral.cryptomon.service.rest.OrderResponse;
 import com.kieral.cryptomon.service.rest.OrdersResponse;
 import com.kieral.cryptomon.service.rest.PlaceOrderResponse;
+import com.kieral.cryptomon.service.rest.TradesResponse;
+import com.kieral.cryptomon.service.rest.OrderResponse.RequestNature;
 import com.kieral.cryptomon.service.util.LoggingUtils;
+import com.kieral.cryptomon.service.util.TradingUtils;
 import com.kieral.cryptomon.streaming.OrderedStreamingListener;
 import com.kieral.cryptomon.streaming.OrderedStreamingEmitter;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
@@ -66,8 +72,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 
 	protected enum OrderCheckingStrategy {
 		CHECK_BY_INDIVIDUAL,
-		CHECK_BY_HISTORY,
-		CHECK_BY_ALL
+		CHECK_BY_OPEN_ORDERS,
+		CHECK_BY_TRADE_HISTORY
 	}
 	
 	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -329,6 +335,21 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		tradingStatusListeners.forEach(listener -> {
 			listener.onTradingEnabled(enabled);
 		});
+		if (enabled) {
+			// TODO - DEBUG REMOVE THIS
+			Thread thread = new Thread() {
+				public void run() {
+					try {
+						Thread.sleep(6000);
+						if (BaseExchangeService.this.getName().equals("gdax"))
+							BaseExchangeService.this.cancelOrder("bb4ef795-2be9-4d20-9f5c-549de0a5b3ec");
+					} catch (Exception e) {
+						logger.error("Error cancelling order 3d0fb74e-e4b5-43b5-98cd-a79cdfb1381", e);
+					}
+				}
+			};
+			thread.start();
+		}
 		return enabled;
 	}
 
@@ -397,7 +418,17 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			// failure to marshal body, will not have been sent to the exchange
 			order.setMessage("Generating body exception");
 			return OrderStatus.CANCELLED;
-		}
+		} catch (ExpectedResponseException e) {
+			if (ResponseErrorAction.CANCEL == e.getAction()) {
+				logger.error("Error response {} {} when placing order {} - marking ac cancelled", e.getStatus(), e.getResponseBody(), order);
+				order.setMessage(e.getResponseBody());
+				return OrderStatus.CANCELLED;
+			} else {
+				logger.error("Error response {} {} when placing order {} - marking ac error", e.getStatus(), e.getResponseBody(), order);
+				order.setMessage(e.getResponseBody());
+				return OrderStatus.ERROR;
+			} 
+		} 
 	}
 
 	@Override
@@ -451,27 +482,40 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			// failure to marshal body, will not have been sent to the exchange
 			message.set("Generating body exception");
 			return currentOrderStatus;
+		} catch (ExpectedResponseException e) {
+			if (ResponseErrorAction.CANCEL == e.getAction()) {
+				logger.info("Response with status code {} and body {} for cancellation of {} can be marked as cancelled", e.getStatus(), e.getResponseBody(), orderId);
+				message.set(e.getResponseBody());
+				return OrderStatus.CANCELLED;
+			} else {
+				logger.info("Response with status code {} and body {} for cancellation of {} can not be cancelled", e.getStatus(), e.getResponseBody(), orderId);
+				return currentOrderStatus;
+			} 
 		}
 	}
 	
 	@Override
-	public Map<String, OpenOrderStatus> getOpenOrderStatuses(List<Order> orders) {
-		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
+	public Map<String, OrderStatus> getOpenOrderStatuses(List<Order> orders) {
+		Map<String, OrderStatus> rtn = new HashMap<String, OrderStatus>();
 		if (orders != null) {
+			logger.info("Getting open order statuses for {}", orders);
 			List<Order> ordersForChecking = new ArrayList<Order>(orders);
 			AtomicBoolean failed = new AtomicBoolean(false);
 			getOrderCheckingStrategies().forEach(strategy -> {
 				if (ordersForChecking.size() > 0) {
-					Map<String, OpenOrderStatus> statuses = null;
+					Map<String, OrderStatus> statuses = null;
 					switch (strategy) {
 						case CHECK_BY_INDIVIDUAL:
 							statuses = getOpenOrderStatusesByIndividualOrder(orders, failed);
+							logger.info("Statuses returned by checking individual order statuses {}", statuses);
 							break;
-						case CHECK_BY_HISTORY:
+						case CHECK_BY_OPEN_ORDERS:
+							statuses = this.getOpenOrderStatusesByOpenOrders(orders, failed);
+							logger.info("Statuses returned by checking open orders {}", statuses);
+							break;
+						case CHECK_BY_TRADE_HISTORY:
 							statuses = getOpenOrderStatusesByHistory(orders, failed);
-							break;
-						case CHECK_BY_ALL:
-							statuses = getOpenOrderStatusesByAll(orders, failed);
+							logger.info("Statuses returned by checking trade history {}", statuses);
 							break;
 					}
 					if (statuses != null) {
@@ -479,6 +523,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 						while (i.hasNext()) {
 							Order order = i.next();
 							if (statuses.containsKey(order.getClientOrderId())) {
+								logger.info("Order status {} resolved by strategy {}", statuses.get(order.getClientOrderId()), strategy.name());
 								rtn.put(order.getClientOrderId(), statuses.get(order.getClientOrderId()));
 								i.remove();
 							}
@@ -494,11 +539,12 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 					// with being filled, so can assume they have been cancelled without fills
 					logger.info("{} orders are neither in open orders list or filled order history so setting as cancelled");
 					ordersForChecking.forEach(order -> {
-						rtn.put(order.getClientOrderId(), new OpenOrderStatus(order, OrderStatus.CANCELLED, order.getAmountRemaining()));
+						rtn.put(order.getClientOrderId(), OrderStatus.CANCELLED);
 					});
 				}
 			}
 		}
+		logger.info("Returning resolved statuses {}", rtn);
 		return rtn;
 	}
 
@@ -508,25 +554,34 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
     	}
     };
 
-	private Map<String, OpenOrderStatus> getOpenOrderStatusesByIndividualOrder(List<Order> orders, AtomicBoolean failed) {
-		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
+	private Map<String, OrderStatus> getOpenOrderStatusesByIndividualOrder(List<Order> orders, AtomicBoolean failed) {
+		Map<String, OrderStatus> rtn = new HashMap<String, OrderStatus>();
 		if (orders != null) {
 			orders.forEach(order -> {
 				if (order != null) {
 					if (order.getOrderId() == null) {
-						rtn.put(order.getClientOrderId(), new OpenOrderStatus(order, order.getOrderStatus(), order.getAmount()));
+						// without an exchange orderId there is nothing we can do to further assess the status
+						rtn.put(order.getClientOrderId(), order.getOrderStatus());
 					} else {
 						OrderResponse orderResponse = null;
 						try {
 							orderResponse = getOrderResponse(order);
+						} catch (ExpectedResponseException e) {
+							// no action
 						} catch (Exception e) {
 							failed.set(true);
 							logger.error("Error getting order response for {}", order, e);
 						}
 						if (orderResponse != null) {
-							if (orderResponse.isSuccess())
-								rtn.put(order.getClientOrderId(), orderResponse.getOrderUpdateStatus(true, order));
-							else {
+							if (orderResponse.isSuccess()) {
+								OrderStatus orderStatus = orderResponse.getOrderStatus(RequestNature.UNKNOWN_ORDER_RESPONSES, order);
+								try {
+									merge(order, orderResponse.getTradeResponses());
+								} catch (Exception e) {
+									order.setMessage("Trade merge failed - check status");
+								}
+								rtn.put(order.getClientOrderId(), orderStatus);
+							} else {
 								failed.set(true);
 							}
 						}
@@ -537,8 +592,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return rtn;
 	}
 
-	private Map<String, OpenOrderStatus> getOpenOrderStatusesByHistory(List<Order> orders, AtomicBoolean failed) {
-		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
+	private Map<String, OrderStatus> getOpenOrderStatusesByHistory(List<Order> orders, AtomicBoolean failed) {
+		Map<String, OrderStatus> rtn = new HashMap<String, OrderStatus>();
 		if (orders != null) {
 			Map<String, Order> ordersToCheck = orders.stream().collect(Collectors.toMap(Order::getOrderId, Function.identity()));
 			List<CurrencyPair> currencyPairsForChecking = new ArrayList<CurrencyPair>(
@@ -547,6 +602,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				OrdersResponse<? extends OrderResponse> response = null;
 				try {
 					response = getOrderHistoryResponse(pair);
+				} catch (ExpectedResponseException e) {
+					// no action
 				} catch (Exception e) {
 					failed.set(true);
 					logger.error("Error getting order history response for {}", pair, e);
@@ -557,7 +614,13 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 							response.getOrderResponses().forEach(orderResponse -> {
 								if (orderResponse.isSuccess() && ordersToCheck.containsKey(orderResponse.getOrderId())) {
 									Order order = ordersToCheck.get(orderResponse.getOrderId());
-									rtn.put(order.getClientOrderId(), orderResponse.getOrderUpdateStatus(false, order));
+									OrderStatus orderStatus = orderResponse.getOrderStatus(RequestNature.CLOSED_ORDER_RESPONSE, order);
+									try {
+										merge(order, orderResponse.getTradeResponses());
+									} catch (Exception e) {
+										order.setMessage("Trade merge failed - check status");
+									}
+									rtn.put(order.getClientOrderId(), orderStatus);
 									ordersToCheck.remove(order.getOrderId());
 								}
 							});
@@ -571,9 +634,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return rtn;
 	}
 
-	private Map<String, OpenOrderStatus> getOpenOrderStatusesByAll(List<Order> orders, AtomicBoolean failed) {
-		Map<String, OpenOrderStatus> rtn = new HashMap<String, OpenOrderStatus>();
-		// start with open orders
+	private Map<String, OrderStatus> getOpenOrderStatusesByOpenOrders(List<Order> orders, AtomicBoolean failed) {
+		Map<String, OrderStatus> rtn = new HashMap<String, OrderStatus>();
 		if (orders != null) {
 			Map<String, Order> ordersToCheck = orders.stream().collect(Collectors.toMap(Order::getOrderId, Function.identity()));
 			List<CurrencyPair> currencyPairsForChecking = new ArrayList<CurrencyPair>(
@@ -582,6 +644,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				OrdersResponse<? extends OrderResponse> response = null;
 				try {
 					response = getOpenOrdersResponse(pair);
+				} catch (ExpectedResponseException e) {
+					// no action
 				} catch (Exception e) {
 					failed.set(true);
 					logger.error("Error getting open orders response for {}", pair, e);
@@ -592,7 +656,13 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 							response.getOrderResponses().forEach(orderResponse -> {
 								if (orderResponse.isSuccess() && ordersToCheck.containsKey(orderResponse.getOrderId())) {
 									Order order = ordersToCheck.get(orderResponse.getOrderId());
-									rtn.put(order.getClientOrderId(), orderResponse.getOrderUpdateStatus(true, order));
+									OrderStatus orderStatus = orderResponse.getOrderStatus(RequestNature.OPEN_ORDER_RESPONSE, order);
+									try {
+										this.merge(order, orderResponse.getTradeResponses());
+									} catch (Exception e) {
+										order.setMessage("Trade merge failed - check status");
+									}
+									rtn.put(order.getClientOrderId(), orderStatus);
 									ordersToCheck.remove(order.getOrderId());
 								}
 							});
@@ -602,20 +672,27 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 					}
 				}
 			});
-			// check history if there are any orders still to check
-			if (ordersToCheck.size() > 0) {
-				Map<String, OpenOrderStatus> historyStatuses = getOpenOrderStatusesByHistory(new ArrayList<Order>(ordersToCheck.values()), failed);
-				if (historyStatuses != null) {
-					ordersToCheck.values().forEach(order -> {
-						if (historyStatuses.containsKey(order.getClientOrderId()))
-							rtn.put(order.getClientOrderId(), historyStatuses.get(order.getClientOrderId()));
-					});
-				}
-			}
 		}
 		return rtn;
 	}
 
+	private void merge(Order order, TradesResponse tradesResponse) {
+		if (order == null || tradesResponse == null || tradesResponse.getNumTrades() == 0)
+			return;
+		if (tradesResponse.isPlaceholder() || !serviceProperties.isHasGranularTrades()) {
+			order.replaceTrades(tradesResponse.getTrades());
+		} else {
+			List<Trade> trades = tradesResponse.getTrades();
+			List<String> newTradeIds = trades.size() == 0 ? Collections.emptyList() :
+				trades.stream().map(Trade::getTradeId).collect(Collectors.<String>toList());
+			if (newTradeIds.contains(null)) {
+				logger.warn("Merge called on {} containing null tradeIds); Calling replace instead", trades);
+				order.replaceTrades(trades);
+			} else
+				order.merge(trades);
+		}
+	}
+	
 	@Override
 	public List<Order> getOpenOrders() {
 		if (serviceProperties.getPairs() == null)
@@ -632,8 +709,10 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				response.getOrderResponses().forEach(orderResponse -> {
 					if (orderResponse.isSuccess()) {
 						// create a new order from this order response
-						rtn.add(new Order(getName(), pair.getName(), pair, orderResponse.getAmount(), orderResponse.getAmount(), orderResponse.getPrice(),
-								orderResponse.getSide(), orderResponse.getOrderStatus(), OrderService.generateClientOrderId(), 
+						rtn.add(new Order(getName(), pair.getName(), pair, orderResponse.getAmount(), orderResponse.getPrice(),
+								orderResponse.getSide(), 
+								TradingUtils.getOrderStatus(RequestNature.OPEN_ORDER_RESPONSE, true, orderResponse.getAmount(), orderResponse.getTradeResponses()), 
+								OrderService.generateClientOrderId(), 
 								orderResponse.getOrderId(), orderResponse.getCreatedTime(), orderResponse.getCreatedTime(),
 								"Requested from exchange"));
 					}
@@ -663,43 +742,52 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return getTradingResponse(apiRequest, "accounts", getAccountsResponseClazz());	
 	}
 
-	private <T> T getTradingResponse(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException {
+	private <T> T getTradingResponse(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, 
+																								ApiRequestException, ExpectedResponseException {
 		if (apiRequest.getMethod() == HttpMethod.POST)
 			return getTradingResponseForPut(apiRequest, descr, clazz);
 		else {
 			// this works for GET or DELETE
-			return getTradingResponseForGet(apiRequest, descr, clazz);
+			return getTradingResponseForMethod(apiRequest, descr, clazz);
 		}
 	}
 	
-	private <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException {
+	private <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException, ExpectedResponseException {
 		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
 		logger.info("Requesting {} from POST {}", descr, apiRequest);
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), apiRequest.getRequestPath(), apiRequest.getBodyAsString());
 		HttpEntity<?> entity = new HttpEntity<>(apiRequest.getBodyType() == BodyType.URLENCODED ? apiRequest.getBodyAsString() : apiRequest.getPostParameters(), headers);
-		ResponseEntity<? extends T> response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
-		logger.info("{} response {}", descr, response.getBody());
-		LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
-		return response.getBody();
+		return processResponse(apiRequest.getUrl(), entity, apiRequest, descr, clazz);
 	}
 	
-	private <T> T getTradingResponseForGet(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException {
+	private <T> T getTradingResponseForMethod(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ExpectedResponseException {
 		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), apiRequest.getMethod());
 		logger.info("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), securityEnrichedUrl.getRequestPath(), null);
 		HttpEntity<?> entity = new HttpEntity<>(headers);
+		return processResponse(securityEnrichedUrl.getUrl(), entity, apiRequest, descr, clazz);
+	}
+	
+	private <T> T processResponse(String url, HttpEntity<?> entity, ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws ExpectedResponseException {
 		try {
-			ResponseEntity<? extends T> response = restTemplate.exchange(securityEnrichedUrl.getUrl(), apiRequest.getMethod(), entity, clazz);
+			ResponseEntity<? extends T> response = null;
+			if (HttpMethod.POST == apiRequest.getMethod())
+				response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
+			else
+				response = restTemplate.exchange(url, apiRequest.getMethod(), entity, clazz);
 			logger.info("{} response {}", descr, response.getBody());
 			LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
 			return response.getBody();
 		} catch (HttpClientErrorException e) {
-			if (apiRequest.isAcceptableError(e.getStatusCode())) {
+			ResponseErrorAction action = apiRequest.checkResponseError(e.getStatusCode(), e.getResponseBodyAsString());
+			if (action != null && action != ResponseErrorAction.RAISE_EXCEPTION) {
 				if (logger.isDebugEnabled())
-					logger.debug("{} is accepted by apiRequest {}", e.getStatusCode(), apiRequest);
-				return null;
-			} else
+					logger.debug("{} is expected by apiRequest {}", e.getStatusCode(), apiRequest);
+				throw new ExpectedResponseException(e, action, e.getStatusCode(), e.getResponseBodyAsString());
+			} else {
+				logger.error("Received rest exception with status {} and response body {}", e.getStatusCode(), e.getResponseBodyAsString());
 				throw e;
+			}
 		}
 	}
 	
