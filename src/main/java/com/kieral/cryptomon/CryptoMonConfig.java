@@ -149,7 +149,8 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 		// TODO: implement this
 		return new ArbInstructionHandler() {
 			@Override
-			public void onArbInstruction(ArbInstruction instruction) {
+			public boolean onArbInstruction(ArbInstruction instruction) {
+				return true;
 			}
 		};
 	}

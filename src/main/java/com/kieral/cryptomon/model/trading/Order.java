@@ -1,6 +1,7 @@
 package com.kieral.cryptomon.model.trading;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -58,20 +59,21 @@ public class Order {
 		this.message = message;
 	}
 
-//	public Order(Order order) {
-//		this.market = order.getMarket();
-//		this.currencyPairStr = order.getCurrencyPairStr();
-//		this.currencyPair = order.getCurrencyPair();
-//		this.amount = order.getAmount();
-//		this.price = order.getPrice();
-//		this.side = order.getSide();
-//		this.orderStatus = order.getOrderStatus();
-//		this.clientOrderId = order.getClientOrderId();
-//		this.orderId = order.getOrderId();
-//		this.createdTime = order.getCreatedTime();
-//		this.closedTime = order.getClosedTime();
-//		this.message = order.getMessage();
-//	}
+	public Order(Order order) {
+		this.market = order.getMarket();
+		this.currencyPairStr = order.getCurrencyPairStr();
+		this.currencyPair = order.getCurrencyPair();
+		this.amount = order.getAmount();
+		this.price = order.getPrice();
+		this.side = order.getSide();
+		this.orderStatus = order.getOrderStatus();
+		this.clientOrderId = order.getClientOrderId();
+		this.orderId = order.getOrderId();
+		this.createdTime = order.getCreatedTime();
+		this.closedTime = order.getClosedTime();
+		this.message = order.getMessage();
+		this.trades.addAll(order.getTrades());
+	}
 
 	public String getMarket() {
 		return market;
@@ -177,7 +179,7 @@ public class Order {
 		}
 	}
 	
-	public void merge(List<Trade> trades) {
+	public void mergeTrades(List<Trade> trades) {
 		if (trades == null || trades.size() == 0)
 			return;
 		synchronized(tradeLock) {
@@ -200,6 +202,12 @@ public class Order {
 				if (!tradeIds.contains(newTrade.getTradeId()))
 					this.trades.add(newTrade);
 			}
+		}
+	}
+	
+	public List<Trade> getTrades() {
+		synchronized(tradeLock) {
+			return new ArrayList<Trade>(trades);
 		}
 	}
 

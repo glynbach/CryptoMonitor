@@ -63,6 +63,7 @@ public class OrderService {
 		exchangeManagerService.getEnabledExchanges().forEach(exchange -> {
 			exchange.registerTradingStatusListener(enabled -> {
 				if (enabled) {
+					logger.info("Exchange {} enabled for trading", exchange.getName());
 					asyncProcessor.submit(() -> {
 						try {
 							exchange.updateBalances(true);
@@ -122,7 +123,10 @@ public class OrderService {
 			order.setCreatedTime(System.currentTimeMillis());
 		updateStatus(order, order.getOrderStatus());
 		try {
-			updateStatus(order, exchangeManagerService.placeOrder(order));
+			OrderStatus status = exchangeManagerService.placeOrder(order);
+			if (order.getOrderId() == null)
+				throw new IllegalStateException("No orderId returned from placing order");
+			updateStatus(order, status);
 		} catch (Exception e) {
 			logger.error("Uncaught error attempting to place order {} - checking open orders to see if it has been placed", order, e);
 			// if the service could not handle the exception then we don't know the outcome of the order; check all known open orders
@@ -134,6 +138,7 @@ public class OrderService {
 							if (!contains(this.closedOrders, order.getMarket(), openOrder.getOrderId())) {
 								logger.info("Found open order {} we have no record of", openOrder);
 								if (openOrder.getMarket().equals(order.getMarket()) &&
+										openOrder.getCurrencyPair().getName().equals(order.getCurrencyPair().getName()) &&
 										openOrder.getSide() == order.getSide() &&
 										openOrder.getAmount().compareTo(order.getAmount()) == 0 &&
 										openOrder.getPrice().compareTo(order.getPrice()) == 0) {
@@ -181,6 +186,7 @@ public class OrderService {
 	}
 
 	private void updateStatus(Order order, OrderStatus orderStatus) {
+		logger.info("Updating order status to {} for order {}", orderStatus, order);
 		if (OrderStatus.OPEN_ORDER.contains(orderStatus)) {
 			if (OrderStatus.CLOSED_ORDER.contains(order.getOrderStatus())) {
 				if (orderStatus == OrderStatus.ERROR) {
@@ -199,6 +205,7 @@ public class OrderService {
 			put(closedOrders, order);
 		}
 		order.setOrderStatus(orderStatus);
+		logger.info("Current open orders {}", openOrders);
 		listeners.forEach( listener -> {
 			listener.onOrderStatusChange(order);
 		});

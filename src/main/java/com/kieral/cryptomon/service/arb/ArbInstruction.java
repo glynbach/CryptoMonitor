@@ -40,7 +40,7 @@ public class ArbInstruction {
 		return message;
 	}
 
-	protected static class ArbInstructionLeg {
+	public static class ArbInstructionLeg {
 		
 		private final String market;
 		private final Side side;
