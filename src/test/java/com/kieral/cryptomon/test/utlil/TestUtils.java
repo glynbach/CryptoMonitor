@@ -21,7 +21,21 @@ import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 public class TestUtils {
 
 	private final static AtomicLong counter = new AtomicLong(0);
+
+	public static List<CurrencyPair> createTestPairsList() {
+		List<CurrencyPair> pairs = new ArrayList<CurrencyPair>();
+		pairs.add(cp(Currency.ETH, Currency.BTC, new BigDecimal("0.25")));
+		pairs.add(cp(Currency.LTC, Currency.BTC, new BigDecimal("0.25")));
+		return pairs;
+	}
 	
+	public static CurrencyPair cpFor(String name) {
+		for (CurrencyPair pair : createTestPairsList()) {
+			if (pair.getName().equals(name))
+				return pair;
+		}
+		return null;
+	}
 	public static CurrencyPair cp(Currency currency1, Currency currency2, BigDecimal fee) {
 		return new CurrencyPair(currency1.name() + currency2.name(), currency1, currency2, 
 				currency1.name() + "-" + currency2.name(), 8, fee,TradingFeeType.PERCENTAGE);
@@ -129,6 +143,31 @@ public class TestUtils {
 			} catch (Exception ex) {}
 		}
 		return rtn.toString();
+	}
+
+	public static void assertEquals(String expected, BigDecimal value) {
+		if (expected == null) {
+			if (value != null)
+				Assert.fail("Expecred null but got " + value);
+		} else if (!isNumber(expected)) {
+			Assert.fail("Expected " + expected + " but got " + value);
+		} else {
+			if (value == null)
+				Assert.fail("Expecred " + expected + " but got null");
+			else {
+				if (new BigDecimal(expected).compareTo(value) != 0)
+					Assert.fail("Expected " + expected + " but got " + value);
+			}
+		}
+	}
+	
+	public static boolean isNumber(String value) {
+		try {
+			new BigDecimal(value);
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 	
 	private static class ObEntry implements OrderBookEntry {

@@ -93,4 +93,9 @@ public interface ExchangeService {
 	 */
 	List<Order> getOpenOrders();
 
+	/**
+	 * Returns the ServiceExchangeProperties
+	 */
+	ServiceExchangeProperties getProperties();
+
 }

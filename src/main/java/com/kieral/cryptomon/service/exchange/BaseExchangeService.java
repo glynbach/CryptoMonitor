@@ -689,7 +689,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				logger.warn("Merge called on {} containing null tradeIds); Calling replace instead", trades);
 				order.replaceTrades(trades);
 			} else
-				order.merge(trades);
+				order.mergeTrades(trades);
 		}
 	}
 	
@@ -800,6 +800,11 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			}
 		}
 		return null;
+	}
+
+	@Override
+	public ServiceExchangeProperties getProperties() {
+		return serviceProperties;
 	}
 
 	/*

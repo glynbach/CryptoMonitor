@@ -48,7 +48,7 @@ orderbook:
           significant-amount: 0.5
 POLONIEX: 
   exchange: poloniex
-  enabled: false
+  enabled: true
   push-api: "wss://api.poloniex.com"
   snapshot-api: "https://poloniex.com/public"
   trading-api: "https://poloniex.com/tradingApi"
@@ -92,7 +92,7 @@ BITTREX:
       trading-fee: "0.25"
 GDAX: 
   exchange: gdax
-  enabled: false
+  enabled: true
   push-api: ""
   snapshot-api: "https://api.gdax.com"
   trading-api: "https://api.gdax.com"

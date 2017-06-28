@@ -204,4 +204,8 @@ public class ExchangeManagerService {
 		return true;
 	}
 
+	public ServiceExchangeProperties getProperties(String market) {
+		return enabledExchangeMap.containsKey(market) ? enabledExchangeMap.get(market).getProperties() : null;
+	}
+
 }
