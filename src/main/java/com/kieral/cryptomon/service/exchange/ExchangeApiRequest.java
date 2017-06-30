@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.model.general;
+package com.kieral.cryptomon.service.exchange;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kieral.cryptomon.service.exception.ApiRequestException;
 
-public class ApiRequest {
+public class ExchangeApiRequest {
 
 	private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -35,15 +35,15 @@ public class ApiRequest {
 	private final Map<String, String> postParameters = new LinkedHashMap<String, String>();
 	private final ResponseErrorChecker[] responseErrorCheckers;
 
-	public ApiRequest(String endPoint, String requestPath, HttpMethod method) {
+	public ExchangeApiRequest(String endPoint, String requestPath, HttpMethod method) {
 		this(endPoint, requestPath, method, BodyType.URLENCODED);
 	}
 
-	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType) {
+	public ExchangeApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType) {
 		this(endPoint, requestPath, method, bodyType, (ResponseErrorChecker[])null);
 	}
 
-	public ApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType, ResponseErrorChecker... responseErrorCheckers) {
+	public ExchangeApiRequest(String endPoint, String requestPath, HttpMethod method, BodyType bodyType, ResponseErrorChecker... responseErrorCheckers) {
 		this.endPoint = endPoint;
 		this.requestPath = requestPath;
 		this.method = method;

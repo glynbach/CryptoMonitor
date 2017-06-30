@@ -2,10 +2,10 @@ package com.kieral.cryptomon.service.arb;
 
 import java.math.BigDecimal;
 import java.util.EnumSet;
-import java.util.List;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.sided.SidedValue;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 
 public class ArbInstruction {
@@ -14,10 +14,10 @@ public class ArbInstruction {
 			
 	private final ArbDecision decision;
 	private final BigDecimal estimatedValue;
-	private final List<ArbInstructionLeg> legs;
+	private final SidedArbInstructionLeg legs;
 	private final String message;
 
-	public ArbInstruction(ArbDecision decision, BigDecimal estimatedValue, List<ArbInstructionLeg> legs, String message) {
+	public ArbInstruction(ArbDecision decision, BigDecimal estimatedValue, SidedArbInstructionLeg legs, String message) {
 		this.decision = decision;
 		this.estimatedValue = estimatedValue;
 		this.legs = legs;
@@ -32,12 +32,29 @@ public class ArbInstruction {
 		return estimatedValue;
 	}
 
-	public List<ArbInstructionLeg> getLegs() {
+	public SidedArbInstructionLeg getLegs() {
 		return legs;
+	}
+
+	public ArbInstructionLeg getLeg(Side side) {
+		return legs.get(side);
 	}
 
 	public String getMessage() {
 		return message;
+	}
+
+	public static class SidedArbInstructionLeg extends SidedValue<ArbInstructionLeg> {
+
+		public SidedArbInstructionLeg(ArbInstructionLeg bidLeg, ArbInstructionLeg askLeg) {
+			super(bidLeg, askLeg);
+		}
+
+		@Override
+		public String toString() {
+			return "SidedArbInstructionLeg [getBidValue()=" + getBidValue() + ", getAskValue()=" + getAskValue() + "]";
+		}
+		
 	}
 
 	public static class ArbInstructionLeg {

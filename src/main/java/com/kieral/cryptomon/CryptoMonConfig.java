@@ -24,10 +24,12 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
 import com.kieral.cryptomon.service.BalanceService;
+import com.kieral.cryptomon.service.OrderService;
+import com.kieral.cryptomon.service.OrderServiceImpl;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbMonitorService;
-import com.kieral.cryptomon.service.arb.BasicArbExaminer;
-import com.kieral.cryptomon.service.arb.ArbExaminer;
+import com.kieral.cryptomon.service.arb.SimpleArbInspector;
+import com.kieral.cryptomon.service.arb.ArbInspector;
 import com.kieral.cryptomon.service.arb.ArbInstructionHandler;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
@@ -117,6 +119,11 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 				gdaxService()
 		});
 	}
+
+	@Bean
+	OrderService orderService() {
+		return new OrderServiceImpl();
+	}
 	
 	@Bean
 	TickstoreService tickstoreService() {
@@ -126,16 +133,6 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	@Bean
 	BalanceService balanceHandler() {
 		BalanceService balanceHandler = new BalanceService();
-		// TODO: implement - adding some now for testing
-//		balanceHandler.setConfirmedBalance("poloniex", Currency.BTC, new BigDecimal(1), true);
-//		balanceHandler.setConfirmedBalance("poloniex", Currency.LTC, new BigDecimal(50), true);
-//		balanceHandler.setConfirmedBalance("poloniex", Currency.ETH, new BigDecimal(10), true);
-//		balanceHandler.setConfirmedBalance("bittrex", Currency.BTC, new BigDecimal(1), true);
-//		balanceHandler.setConfirmedBalance("bittrex", Currency.LTC, new BigDecimal(50), true);
-//		balanceHandler.setConfirmedBalance("bittrex", Currency.ETH, new BigDecimal(10), true);
-//		balanceHandler.setConfirmedBalance("gdax", Currency.BTC, new BigDecimal(1), true);
-//		balanceHandler.setConfirmedBalance("gdax", Currency.LTC, new BigDecimal(50), true);
-//		balanceHandler.setConfirmedBalance("gdax", Currency.ETH, new BigDecimal(10), true);
 		return balanceHandler;
 	}
 	
@@ -169,8 +166,8 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 
 	@Bean
-	ArbExaminer arbExaminer() {
-		return new BasicArbExaminer();
+	ArbInspector arbInspector() {
+		return new SimpleArbInspector();
 	}
 	/**
 	 * Set additional logging properties

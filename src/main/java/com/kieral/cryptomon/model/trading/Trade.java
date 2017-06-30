@@ -2,7 +2,7 @@ package com.kieral.cryptomon.model.trading;
 
 import java.math.BigDecimal;
 
-public class Trade implements AmountHolder {
+public class Trade implements AmountValue {
 
 	private final String tradeId;
 	private final BigDecimal rate;

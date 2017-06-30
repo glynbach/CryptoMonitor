@@ -8,13 +8,13 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
-import com.kieral.cryptomon.model.general.ApiRequest;
-import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.BodyType;
 
 @Component
 @PropertySource(value = { "classpath:application.yaml" })
@@ -43,8 +43,8 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 	}
 	
 	@Override
-	public ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
-		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels), HttpMethod.GET);
+	public ExchangeApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
+		return new ExchangeApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels), HttpMethod.GET);
 	}
 
 	@Override
@@ -53,14 +53,14 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 	}
 
 	@Override
-	public ApiRequest getAccountsQuery() {
-		ApiRequest apiRequest = new ApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
+	public ExchangeApiRequest getAccountsQuery() {
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
 		apiRequest.addPostParameter("command", ACCOUNTS_QUERY);
 		return apiRequest;
 	}
 
 	@Override
-	public ApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
+	public ExchangeApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
 		if (side == null)
 			throw new IllegalArgumentException("side can not be null");
 		if (currencyPair == null || currencyPair.getTopic() == null)
@@ -70,7 +70,7 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 		// Poloniex amounts are in base currency
 		if (amount == null || amount.getBaseAmount() == null || amount.getBaseAmount().compareTo(BigDecimal.ZERO) <= 0)
 			throw new IllegalArgumentException("invalid amount " + amount);
-		ApiRequest apiRequest = new ApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
 		if (side == Side.BID)
 			apiRequest.addPostParameter("command", BUY_QUERY);
 		else
@@ -82,40 +82,40 @@ public class PoloniexServiceConfig extends ServiceExchangeProperties {
 	}
 
 	@Override
-	public ApiRequest getCancelOrderQuery(String orderId) {
+	public ExchangeApiRequest getCancelOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		ApiRequest apiRequest = new ApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
 		apiRequest.addPostParameter("command", CANCEL_ORDER_QUERY);
 		apiRequest.addPostParameter("orderNumber", orderId);
 		return apiRequest;
 	}
 
 	@Override
-	public ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
+	public ExchangeApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		ApiRequest apiRequest = new ApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
 		apiRequest.addPostParameter("command", OPEN_ORDERS_QUERY);
 		apiRequest.addPostParameter("currencyPair", currencyPair.getTopic());
 		return apiRequest;
 	}
 
 	@Override
-	public ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
+	public ExchangeApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		ApiRequest apiRequest = new ApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
 		apiRequest.addPostParameter("command", ORDER_HISTORY_QUERY);
 		apiRequest.addPostParameter("currencyPair", currencyPair.getTopic());
 		return apiRequest;
 	}
 
 	@Override
-	public ApiRequest getOrderQuery(String orderId) {
+	public ExchangeApiRequest getOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		ApiRequest apiRequest = new ApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, "", HttpMethod.POST, BodyType.URLENCODED);
 		apiRequest.addPostParameter("command", ORDER_QUERY);
 		apiRequest.addPostParameter("orderNumber", orderId);
 		return apiRequest;

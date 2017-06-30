@@ -8,11 +8,11 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
-import com.kieral.cryptomon.model.general.ApiRequest;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
 
 @Component
@@ -43,8 +43,8 @@ public class BittrexServiceConfig extends ServiceExchangeProperties {
 	}
 	
 	@Override
-	public ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
-		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels), HttpMethod.GET);
+	public ExchangeApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
+		return new ExchangeApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol, maxLevels), HttpMethod.GET);
 	}
 
 	@Override
@@ -53,12 +53,12 @@ public class BittrexServiceConfig extends ServiceExchangeProperties {
 	}
 
 	@Override
-	public ApiRequest getAccountsQuery() {
-		return new ApiRequest(tradingApi, ACCOUNTS_QUERY, HttpMethod.GET);
+	public ExchangeApiRequest getAccountsQuery() {
+		return new ExchangeApiRequest(tradingApi, ACCOUNTS_QUERY, HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
+	public ExchangeApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
 		if (side == null)
 			throw new IllegalArgumentException("side can not be null");
 		if (currencyPair == null || currencyPair.getTopic() == null)
@@ -68,37 +68,37 @@ public class BittrexServiceConfig extends ServiceExchangeProperties {
 		// Bittrex amounts are in base currency
 		if (amount == null || amount.getBaseAmount() == null || amount.getBaseAmount().compareTo(BigDecimal.ZERO) <= 0)
 			throw new IllegalArgumentException("invalid amount " + amount);
-		return new ApiRequest(tradingApi, String.format(PLACE_ORDER_QUERY, side == Side.BID ? BUY_ORDER : SELL_ORDER, 
+		return new ExchangeApiRequest(tradingApi, String.format(PLACE_ORDER_QUERY, side == Side.BID ? BUY_ORDER : SELL_ORDER, 
 				currencyPair.getTopic(), amount.getBaseAmount().stripTrailingZeros().toPlainString(), 
 				price.stripTrailingZeros().toPlainString()), HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getCancelOrderQuery(String orderId) {
+	public ExchangeApiRequest getCancelOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.GET);
+		return new ExchangeApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
+	public ExchangeApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		return new ApiRequest(tradingApi, String.format(OPEN_ORDERS_QUERY, currencyPair.getTopic()), HttpMethod.GET);
+		return new ExchangeApiRequest(tradingApi, String.format(OPEN_ORDERS_QUERY, currencyPair.getTopic()), HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
+	public ExchangeApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		return new ApiRequest(tradingApi, String.format(ORDER_HISTORY_QUERY, currencyPair.getTopic()), HttpMethod.GET);
+		return new ExchangeApiRequest(tradingApi, String.format(ORDER_HISTORY_QUERY, currencyPair.getTopic()), HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getOrderQuery(String orderId) {
+	public ExchangeApiRequest getOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET);
+		return new ExchangeApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET);
 	}
 
 	@Override

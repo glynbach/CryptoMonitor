@@ -1,8 +1,6 @@
 package com.kieral.cryptomon.service.arb;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.kieral.cryptomon.model.general.Currency;
@@ -13,6 +11,7 @@ import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
 import com.kieral.cryptomon.model.sided.SidedValue;
 import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
+import com.kieral.cryptomon.service.arb.ArbInstruction.SidedArbInstructionLeg;
 
 public class ArbInstructionFactory {
 
@@ -43,9 +42,9 @@ public class ArbInstructionFactory {
 				!validatePositive(amounts) || !validate(markets))
 			throw new IllegalStateException(String.format("Invalid conditions for an arb instruction %s %s %s %s %s %s",
 					decision, estimatedValue, valueCurrency, prices, amounts, markets));
-		List<ArbInstructionLeg> legs = new ArrayList<ArbInstructionLeg>();
-		legs.add(new ArbInstructionLeg(markets.get(Side.BID), Side.BID, currencyPair, prices.get(Side.BID), amounts.get(Side.BID)));
-		legs.add(new ArbInstructionLeg(markets.get(Side.ASK), Side.ASK, currencyPair, prices.get(Side.ASK), amounts.get(Side.ASK)));
+		SidedArbInstructionLeg legs = new SidedArbInstructionLeg(
+				new ArbInstructionLeg(markets.get(Side.BID), Side.BID, currencyPair, prices.get(Side.BID), amounts.get(Side.BID)),
+				new ArbInstructionLeg(markets.get(Side.ASK), Side.ASK, currencyPair, prices.get(Side.ASK), amounts.get(Side.ASK)));
 		// TODO: implement valueCurrency and message
 		return new ArbInstruction(decision, estimatedValue, legs, null);
 	}

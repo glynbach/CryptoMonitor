@@ -2,7 +2,7 @@ package com.kieral.cryptomon.service.exception;
 
 import org.springframework.http.HttpStatus;
 
-import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorAction;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.ResponseErrorAction;
 
 public class ExpectedResponseException extends Exception {
 

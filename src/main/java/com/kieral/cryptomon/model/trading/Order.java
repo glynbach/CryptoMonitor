@@ -34,6 +34,14 @@ public class Order {
 		side = Side.BID;
 	}
 
+	public Order(String market, CurrencyPair currencyPair, BigDecimal amount, BigDecimal price, Side side) {
+		this.market = market;
+		this.currencyPair = currencyPair;
+		this.amount = amount;
+		this.price = price;
+		this.side = side;
+	}
+
 	public Order(String market, String currencyPairStr, BigDecimal amount, BigDecimal price, Side side) {
 		this.market = market;
 		this.currencyPairStr = currencyPairStr;

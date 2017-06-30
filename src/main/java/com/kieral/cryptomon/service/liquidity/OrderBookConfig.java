@@ -4,7 +4,8 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.annotation.PostConstruct;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.PropertySource;
@@ -23,7 +24,6 @@ public class OrderBookConfig {
 	private List<CurrencySignificantAmount> currencies;
 	private List<MarketProperties> markets;
 
-	private AtomicBoolean initialised = new AtomicBoolean(false);
 	private final Map<String, BigDecimal> marketDefaultSignificantAmounts = new HashMap<String, BigDecimal>();
 	private final Map<String, Map<Currency, BigDecimal>> marketSignificantAmounts = new HashMap<String, Map<Currency, BigDecimal>>();
 	private final Map<Currency, BigDecimal> significantAmounts = new HashMap<Currency, BigDecimal>();
@@ -52,33 +52,31 @@ public class OrderBookConfig {
 		this.markets = markets;
 	}
 
-	private void init() {
-		if (initialised.compareAndSet(false, true)) {
-			if (defaultSignificantAmount == null)
-				defaultSignificantAmount = DEFAULT_SIGNIFICANT_AMOUNT;
-			if (currencies != null) {
-				currencies.forEach(csa -> {
-					significantAmounts.put(csa.getCurrency(), csa.getSignificantAmount());
-				});
-			}
-			if (markets != null) {
-				markets.forEach(mp -> {
-					if (mp.getDefaultSignificantAmount() != null)
-						marketDefaultSignificantAmounts.put(mp.getMarket(), mp.getDefaultSignificantAmount());
-					if (mp.getCurrencies() != null) {
-						mp.getCurrencies().forEach(csa -> {
-							if (!marketSignificantAmounts.containsKey(mp.getMarket()))
-								marketSignificantAmounts.put(mp.getMarket(), new HashMap<Currency, BigDecimal>());
-							marketSignificantAmounts.get(mp.getMarket()).put(csa.getCurrency(), csa.getSignificantAmount());
-						});
-					}
-				});
-			}
+	@PostConstruct
+	public void init() {
+		if (defaultSignificantAmount == null)
+			defaultSignificantAmount = DEFAULT_SIGNIFICANT_AMOUNT;
+		if (currencies != null) {
+			currencies.forEach(csa -> {
+				significantAmounts.put(csa.getCurrency(), csa.getSignificantAmount());
+			});
+		}
+		if (markets != null) {
+			markets.forEach(mp -> {
+				if (mp.getDefaultSignificantAmount() != null)
+					marketDefaultSignificantAmounts.put(mp.getMarket(), mp.getDefaultSignificantAmount());
+				if (mp.getCurrencies() != null) {
+					mp.getCurrencies().forEach(csa -> {
+						if (!marketSignificantAmounts.containsKey(mp.getMarket()))
+							marketSignificantAmounts.put(mp.getMarket(), new HashMap<Currency, BigDecimal>());
+						marketSignificantAmounts.get(mp.getMarket()).put(csa.getCurrency(), csa.getSignificantAmount());
+					});
+				}
+			});
 		}
 	}
 
 	public boolean isSignificant(String market, Currency currency, BigDecimal amount) {
-		init();
 		if (amount == null)
 			return false;
 		if (marketSignificantAmounts.containsKey(market)) {

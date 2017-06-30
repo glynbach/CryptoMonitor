@@ -19,7 +19,7 @@ import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 
-public class BasicArbExaminer implements ArbExaminer {
+public class SimpleArbInspector implements ArbInspector {
 
 	private final static ArbInstruction NO_ARB = ArbInstructionFactory.createNoArbInstruction(null);
 	
@@ -97,11 +97,16 @@ public class BasicArbExaminer implements ArbExaminer {
 				return NO_ARB;
 			}
 		}
+		return checkOpportunity(commonAmount, commonAmount, buyBook, sellBook, buySide, sellSide);
+	}
+	
+	private ArbInstruction checkOpportunity(BigDecimal longAmount, BigDecimal shortAmount, OrderBook buyBook, 
+			     OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide) {
 		// check opportunity after fees
-		BigDecimal amountBoughtWithFees = commonAmount.multiply(buySide.getBidAskPrice().get(Side.ASK))
+		BigDecimal amountBoughtWithFees = longAmount.multiply(buySide.getBidAskPrice().get(Side.ASK))
 				.multiply(CommonUtils.getTradingfeeMultiplier(buyBook.getCurrencyPair().getTradingFee()))
 				.setScale(buyBook.getCurrencyPair().getPriceScale(), RoundingMode.HALF_UP);
-		BigDecimal amountSoldWithFees = commonAmount.multiply(sellSide.getBidAskPrice().get(Side.BID))
+		BigDecimal amountSoldWithFees = shortAmount.multiply(sellSide.getBidAskPrice().get(Side.BID))
 				.multiply(CommonUtils.getTradingfeeMultiplier(sellBook.getCurrencyPair().getTradingFee()))
 				.setScale(sellBook.getCurrencyPair().getPriceScale(), RoundingMode.HALF_DOWN);
 		BigDecimal profit = amountSoldWithFees.subtract(amountBoughtWithFees);
@@ -109,8 +114,8 @@ public class BasicArbExaminer implements ArbExaminer {
 			return ArbInstructionFactory.createArbInstruction(rateIt(profit), profit, buyBook.getCurrencyPair().getQuotedCurrency(), buyBook.getCurrencyPair(),
 					new BidAskPrice(buySide.getBidAskPrice().get(Side.ASK), sellSide.getBidAskPrice().get(Side.BID)), 
 					new BidAskAmount(
-							new TradeAmount(commonAmount, buySide.getBidAskPrice().get(Side.ASK), buyBook.getCurrencyPair().getPriceScale()), 
-							new TradeAmount(commonAmount, sellSide.getBidAskPrice().get(Side.BID), buyBook.getCurrencyPair().getPriceScale())), 
+							new TradeAmount(longAmount, buySide.getBidAskPrice().get(Side.ASK), buyBook.getCurrencyPair().getPriceScale()), 
+							new TradeAmount(shortAmount, sellSide.getBidAskPrice().get(Side.BID), buyBook.getCurrencyPair().getPriceScale())), 
 					new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()));
 		}
 		if (logger.isDebugEnabled())
@@ -129,6 +134,16 @@ public class BasicArbExaminer implements ArbExaminer {
 			return ArbDecision.LOW;
 		else
 			return ArbDecision.HIGH;
+	}
+
+	@Override
+	public ArbInstruction resolve(OrderBook longBook, OrderBook shortBook, BigDecimal longAmountRemaining,
+			BigDecimal shortAmountRemaining) {
+		LiquidityEntry longBest = orderBookManager.getBestBidAsk(longBook, longAmountRemaining);
+		LiquidityEntry shortBest = orderBookManager.getBestBidAsk(shortBook, shortAmountRemaining);
+		if (longBest != null && shortBest != null)
+			return checkOpportunity(longAmountRemaining, shortAmountRemaining, longBook, shortBook, longBest, shortBest);
+		return NO_ARB;
 	}
 	
 }

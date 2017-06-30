@@ -2,7 +2,7 @@ package com.kieral.cryptomon.model.trading;
 
 import java.math.BigDecimal;
 
-public interface AmountHolder {
+public interface AmountValue {
 
 	BigDecimal getAmount();
 	

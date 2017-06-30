@@ -3,34 +3,19 @@ package com.kieral.cryptomon.service.liquidity;
 import static org.junit.Assert.*;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 
 import org.junit.Before;
 import org.junit.Test;
 
 import com.kieral.cryptomon.model.general.Currency;
-import com.kieral.cryptomon.test.utlil.TestUtils;
 
 public class OrderBookConfigTest {
 
-	private OrderBookConfig config;
+	private MockOrderBookConfig config;
 	
 	@Before
 	public void setUp() {
-		config = new OrderBookConfig();
-		config.setDefaultSignificantAmount(new BigDecimal("0.01"));
-		config.setCurrencies(Arrays.asList(new OrderBookConfig.CurrencySignificantAmount[] {
-				TestUtils.csa(Currency.BTC, "0.01"),
-				TestUtils.csa(Currency.LTC, "0.1"),
-				TestUtils.csa(Currency.ETC, "0.1")
-		}));
-		config.setMarkets(Arrays.asList(new OrderBookConfig.MarketProperties[] {
-				TestUtils.mp("bittrex", "0.05", new OrderBookConfig.CurrencySignificantAmount[] {
-						TestUtils.csa(Currency.BTC, "0.05"),
-						TestUtils.csa(Currency.LTC, "0.5"),
-						TestUtils.csa(Currency.ETC, "0.5")
-				})
-		}));
+		config = new MockOrderBookConfig();
 	}
 	
 	@Test
