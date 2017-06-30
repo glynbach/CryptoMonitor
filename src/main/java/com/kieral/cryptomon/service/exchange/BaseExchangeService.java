@@ -31,9 +31,6 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
-import com.kieral.cryptomon.model.general.ApiRequest;
-import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
-import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorAction;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.model.trading.Order;
@@ -41,13 +38,15 @@ import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.model.trading.Trade;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.service.BalanceService;
-import com.kieral.cryptomon.service.OrderService;
+import com.kieral.cryptomon.service.OrderServiceImpl;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.ApiRequestException;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
 import com.kieral.cryptomon.service.exception.ExpectedResponseException;
 import com.kieral.cryptomon.service.exception.SecurityModuleException;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.BodyType;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.ResponseErrorAction;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties.SubscriptionMode;
 import com.kieral.cryptomon.service.liquidity.OrderBookListener;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
@@ -289,7 +288,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	}
 
 	protected OrderBookResponse getOrderBookResponse(CurrencyPair currencyPair) {
-		ApiRequest url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
+		ExchangeApiRequest url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
 		if (logger.isDebugEnabled())
 			logger.debug("Requesting orderbook snapshot from {}", url.getUrl());
 		OrderBookResponse response = restTemplate.getForObject(url.getUrl(), getOrderBookResponseClazz());
@@ -379,7 +378,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	public OrderStatus placeOrder(Order order) {
 		if (order == null)
 			throw new IllegalArgumentException("order can not be null");
-		ApiRequest apiRequest = null;
+		ExchangeApiRequest apiRequest = null;
 		try {
 			apiRequest = serviceProperties.getPlaceOrderQuery(order.getSide(), order.getCurrencyPair(), 
 				order.getPrice(), new TradeAmount(order.getAmount(), order.getPrice(), order.getCurrencyPair().getPriceScale()));
@@ -454,7 +453,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			logger.error("Been asked to cancel an order with no orderId and current status {}", currentOrderStatus);
 			message.set("Cannot cancel order with no orderId");
 		}
-		ApiRequest apiRequest = null;
+		ExchangeApiRequest apiRequest = null;
 		try {
 			apiRequest = serviceProperties.getCancelOrderQuery(orderId);
 		} catch (Exception e) {
@@ -712,7 +711,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 						rtn.add(new Order(getName(), pair.getName(), pair, orderResponse.getAmount(), orderResponse.getPrice(),
 								orderResponse.getSide(), 
 								TradingUtils.getOrderStatus(RequestNature.OPEN_ORDER_RESPONSE, true, orderResponse.getAmount(), orderResponse.getTradeResponses()), 
-								OrderService.generateClientOrderId(), 
+								OrderServiceImpl.generateClientOrderId(), 
 								orderResponse.getOrderId(), orderResponse.getCreatedTime(), orderResponse.getCreatedTime(),
 								"Requested from exchange"));
 					}
@@ -723,26 +722,26 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	}
 
 	protected OrdersResponse<? extends OrderResponse> getOrderHistoryResponse(CurrencyPair currencyPair) throws Exception {
-		ApiRequest apiRequest = serviceProperties.getOrderHistoryQuery(currencyPair);
+		ExchangeApiRequest apiRequest = serviceProperties.getOrderHistoryQuery(currencyPair);
 		return getTradingResponse(apiRequest, "order history query", getOrderHistoryResponseClazz());	
 	}
 
 	protected OrdersResponse<? extends OrderResponse> getOpenOrdersResponse(CurrencyPair currencyPair) throws Exception {
-		ApiRequest apiRequest = serviceProperties.getOpenOrdersQuery(currencyPair);
+		ExchangeApiRequest apiRequest = serviceProperties.getOpenOrdersQuery(currencyPair);
 		return getTradingResponse(apiRequest, "open orders query", getOpenOrdersResponseClazz());	
 	}
 
 	protected OrderResponse getOrderResponse(Order order) throws Exception {
-		ApiRequest apiRequest = serviceProperties.getOrderQuery(order.getOrderId());
+		ExchangeApiRequest apiRequest = serviceProperties.getOrderQuery(order.getOrderId());
 		return getTradingResponse(apiRequest, "order query", getOrderResponseClazz());	
 	}
 
 	protected AccountsResponse getAccountsResponse() throws Exception {
-		ApiRequest apiRequest = serviceProperties.getAccountsQuery();
+		ExchangeApiRequest apiRequest = serviceProperties.getAccountsQuery();
 		return getTradingResponse(apiRequest, "accounts", getAccountsResponseClazz());	
 	}
 
-	private <T> T getTradingResponse(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, 
+	private <T> T getTradingResponse(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, 
 																								ApiRequestException, ExpectedResponseException {
 		if (apiRequest.getMethod() == HttpMethod.POST)
 			return getTradingResponseForPut(apiRequest, descr, clazz);
@@ -752,7 +751,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		}
 	}
 	
-	private <T> T getTradingResponseForPut(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException, ExpectedResponseException {
+	private <T> T getTradingResponseForPut(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException, ExpectedResponseException {
 		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
 		logger.info("Requesting {} from POST {}", descr, apiRequest);
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), apiRequest.getRequestPath(), apiRequest.getBodyAsString());
@@ -760,15 +759,15 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return processResponse(apiRequest.getUrl(), entity, apiRequest, descr, clazz);
 	}
 	
-	private <T> T getTradingResponseForMethod(ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ExpectedResponseException {
-		ApiRequest securityEnrichedUrl = new ApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), apiRequest.getMethod());
+	private <T> T getTradingResponseForMethod(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ExpectedResponseException {
+		ExchangeApiRequest securityEnrichedUrl = new ExchangeApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), apiRequest.getMethod());
 		logger.info("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), securityEnrichedUrl.getRequestPath(), null);
 		HttpEntity<?> entity = new HttpEntity<>(headers);
 		return processResponse(securityEnrichedUrl.getUrl(), entity, apiRequest, descr, clazz);
 	}
 	
-	private <T> T processResponse(String url, HttpEntity<?> entity, ApiRequest apiRequest, String descr, Class<? extends T> clazz) throws ExpectedResponseException {
+	private <T> T processResponse(String url, HttpEntity<?> entity, ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws ExpectedResponseException {
 		try {
 			ResponseEntity<? extends T> response = null;
 			if (HttpMethod.POST == apiRequest.getMethod())

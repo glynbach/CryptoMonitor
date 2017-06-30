@@ -10,15 +10,15 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-import com.kieral.cryptomon.model.general.ApiRequest;
-import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorChecker;
-import com.kieral.cryptomon.model.general.ApiRequest.BodyType;
-import com.kieral.cryptomon.model.general.ApiRequest.ResponseErrorAction;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest;
 import com.kieral.cryptomon.service.exchange.ServiceExchangeProperties;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.BodyType;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.ResponseErrorAction;
+import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.ResponseErrorChecker;
 
 @Component
 @PropertySource(value = { "classpath:application.yaml" })
@@ -76,8 +76,8 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	}
 
 	@Override
-	public ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
-		return new ApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol), HttpMethod.GET);
+	public ExchangeApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol) {
+		return new ExchangeApiRequest(snapshotApi, String.format(SNAPSHOT_QUERY, currencyPairSymbol), HttpMethod.GET);
 	}
 
 	@Override
@@ -86,12 +86,12 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	}
 
 	@Override
-	public ApiRequest getAccountsQuery() {
-		return new ApiRequest(tradingApi, ACCOUNTS_QUERY, HttpMethod.GET);
+	public ExchangeApiRequest getAccountsQuery() {
+		return new ExchangeApiRequest(tradingApi, ACCOUNTS_QUERY, HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
+	public ExchangeApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount) {
 		if (side == null)
 			throw new IllegalArgumentException("side can not be null");
 		if (currencyPair == null || currencyPair.getTopic() == null)
@@ -101,7 +101,7 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 		// Gdax amounts are in base currency
 		if (amount == null || amount.getBaseAmount() == null || amount.getBaseAmount().compareTo(BigDecimal.ZERO) <= 0)
 			throw new IllegalArgumentException("invalid amount " + amount);
-		ApiRequest apiRequest = new ApiRequest(tradingApi, PLACE_ORDER_QUERY, HttpMethod.POST, BodyType.JSON, generalErrorStatus);
+		ExchangeApiRequest apiRequest = new ExchangeApiRequest(tradingApi, PLACE_ORDER_QUERY, HttpMethod.POST, BodyType.JSON, generalErrorStatus);
 		apiRequest.addPostParameter("side", side == Side.BID ? "buy" : "sell");
 		apiRequest.addPostParameter("product_id", currencyPair.getTopic());
 		apiRequest.addPostParameter("type", "limit");
@@ -112,31 +112,31 @@ public class GdaxServiceConfig extends ServiceExchangeProperties {
 	}
 
 	@Override
-	public ApiRequest getCancelOrderQuery(String orderId) {
+	public ExchangeApiRequest getCancelOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.DELETE, BodyType.JSON, notFoundStatus, alreadyDoneStatus);
+		return new ExchangeApiRequest(tradingApi, String.format(CANCEL_ORDER_QUERY, orderId), HttpMethod.DELETE, BodyType.JSON, notFoundStatus, alreadyDoneStatus);
 	}
 
 	@Override
-	public ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
+	public ExchangeApiRequest getOpenOrdersQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		return new ApiRequest(tradingApi, String.format(OPEN_ORDERS_QUERY, currencyPair.getTopic()), HttpMethod.GET);
+		return new ExchangeApiRequest(tradingApi, String.format(OPEN_ORDERS_QUERY, currencyPair.getTopic()), HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
+	public ExchangeApiRequest getOrderHistoryQuery(CurrencyPair currencyPair) {
 		if (currencyPair == null || currencyPair.getTopic() == null)
 			throw new IllegalArgumentException("currencyPair can not be null");
-		return new ApiRequest(tradingApi, String.format(ORDER_HISTORY_QUERY, currencyPair.getTopic()), HttpMethod.GET);
+		return new ExchangeApiRequest(tradingApi, String.format(ORDER_HISTORY_QUERY, currencyPair.getTopic()), HttpMethod.GET);
 	}
 
 	@Override
-	public ApiRequest getOrderQuery(String orderId) {
+	public ExchangeApiRequest getOrderQuery(String orderId) {
 		if (orderId == null)
 			throw new IllegalArgumentException("orderId can not be null");
-		return new ApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET, BodyType.JSON, notFoundStatus);
+		return new ExchangeApiRequest(tradingApi, String.format(ORDER_QUERY, orderId), HttpMethod.GET, BodyType.JSON, notFoundStatus);
 	}
 
 	@Override

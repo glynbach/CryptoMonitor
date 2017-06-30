@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
 
@@ -18,7 +19,7 @@ import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 
-public class ArbMonitorService {
+public class ArbMonitorService implements ArbService {
 
 	private final static ArbComparator COMPARATOR = new ArbComparator();
 
@@ -27,12 +28,13 @@ public class ArbMonitorService {
 	@Autowired
 	BalanceService balanceHandler;
 	@Autowired
-	ArbExaminer arbExaminer;
+	ArbInspector arbInspector;
 	@Autowired
 	ArbInstructionHandler arbInstructionHandler;
 	
 	private final ConcurrentMap<String, ConcurrentMap<String, OrderBook>> books = new ConcurrentHashMap<String, ConcurrentMap<String, OrderBook>>();
-	final ConcurrentMap<String, List<String>> comparedBooks = new ConcurrentHashMap<String, List<String>>();
+	private final ConcurrentMap<String, List<String>> comparedBooks = new ConcurrentHashMap<String, List<String>>();
+	private final AtomicBoolean suspended = new AtomicBoolean(false);
 	
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -47,7 +49,12 @@ public class ArbMonitorService {
 			});
 		});
 	}
-	
+
+	@Override
+	public OrderBook getOrderBook(String market, String currencyPairName) {
+		return books.containsKey(market) ? books.get(market).get(currencyPairName) : null;
+	}
+
 	private void processOrderBook(OrderBook orderBook) {
 		if (orderBook == null)
 			return;
@@ -68,37 +75,39 @@ public class ArbMonitorService {
 	}
 	
 	private void sweepBooks() {
-		final List<ArbInstruction> instructions = new ArrayList<ArbInstruction>();
-		if (books.size() > 1) {
-			books.keySet().forEach(market -> {
-				books.get(market).values().forEach(book -> {
-					books.keySet().forEach(otherMarket -> {
-						if (!otherMarket.equals(market)) {
-							books.get(otherMarket).values().forEach(otherBook -> {
-								if (otherBook.getCurrencyPair().getName().equals(book.getCurrencyPair().getName())) {
-									if (!checkAndSetComparedBooks(book, otherBook)) {
-										if (logger.isDebugEnabled())
-											logger.debug("examining {} versus {}", book, otherBook);
-										instructions.add(arbExaminer.examine(book, otherBook));
-									} 
-								}
-							});
-						}
+		if (!suspended.get()) {
+			final List<ArbInstruction> instructions = new ArrayList<ArbInstruction>();
+			if (books.size() > 1) {
+				books.keySet().forEach(market -> {
+					books.get(market).values().forEach(book -> {
+						books.keySet().forEach(otherMarket -> {
+							if (!otherMarket.equals(market)) {
+								books.get(otherMarket).values().forEach(otherBook -> {
+									if (otherBook.getCurrencyPair().getName().equals(book.getCurrencyPair().getName())) {
+										if (!checkAndSetComparedBooks(book, otherBook)) {
+											if (logger.isDebugEnabled())
+												logger.debug("examining {} versus {}", book, otherBook);
+											instructions.add(arbInspector.examine(book, otherBook));
+										} 
+									}
+								});
+							}
+						});
 					});
 				});
-			});
-		}
-		instructions.sort(COMPARATOR);
-		if (logger.isDebugEnabled())
-			logger.debug("results of sweep {}", instructions);
-		if (instructions.size() > 0 && instructions.get(0).getDecision() != ArbDecision.NOTHING_THERE) {
-			BigDecimal usdValue = instructions.get(0).getEstimatedValue().multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP);
-			logger.info("Best arb decision for ~ {} {} {}", usdValue, "USD", instructions.get(0));
-			// check affect of transfer fees
-			// check inflight statuses
-			// check market conditions
-			// TODO: handle sending multiple instructions
-			arbInstructionHandler.onArbInstruction(instructions.get(0));
+			}
+			instructions.sort(COMPARATOR);
+			if (logger.isDebugEnabled())
+				logger.debug("results of sweep {}", instructions);
+			if (instructions.size() > 0 && instructions.get(0).getDecision() != ArbDecision.NOTHING_THERE) {
+				BigDecimal usdValue = instructions.get(0).getEstimatedValue().multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP);
+				logger.info("Best arb decision for ~ {} {} {}", usdValue, "USD", instructions.get(0));
+				// check affect of transfer fees
+				// check inflight statuses
+				// check market conditions
+				// TODO: handle sending multiple instructions
+				arbInstructionHandler.onArbInstruction(instructions.get(0));
+			}
 		}
 	}
 	
@@ -132,6 +141,22 @@ public class ArbMonitorService {
 		if (orderBook == null)
 			throw new IllegalArgumentException("orderBook can not be null");
 		comparedBooks.remove(orderBook.getSnapshotSequence());
+	}
+
+	@Override
+	public ArbInstruction calculateArb(OrderBook longBook, OrderBook shortBook, BigDecimal longAmountRemaining,
+			BigDecimal shortAmountRemaining) {
+		return arbInspector.resolve(longBook, shortBook, longAmountRemaining, shortAmountRemaining);
+	}
+
+	@Override
+	public void suspend(boolean suspend) {
+		suspended.set(suspend);
+	}
+
+	@Override
+	public boolean isSuspended() {
+		return suspended.get();
 	}
 
 }

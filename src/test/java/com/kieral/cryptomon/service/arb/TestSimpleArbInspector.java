@@ -16,22 +16,22 @@ import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.test.utlil.TestUtils;
 
-public class TestBasicArbExaminer {
+public class TestSimpleArbInspector {
 
-	BasicArbExaminer arbExaminer;
+	SimpleArbInspector arbInspector;
 	OrderBookConfig orderBookConfig;
 	BalanceService balanceHandler;
 	OrderBookManager orderBookManager;
 	
 	@Before
 	public void setUp() {
-		arbExaminer = new BasicArbExaminer();
+		arbInspector = new SimpleArbInspector();
 		orderBookConfig = TestUtils.obConfig();
 		balanceHandler = new BalanceService();
 		orderBookManager = new OrderBookManager();
-		ReflectionTestUtils.setField(arbExaminer, "balanceHandler", balanceHandler);
-		ReflectionTestUtils.setField(arbExaminer, "orderBookManager", orderBookManager);
-		ReflectionTestUtils.setField(arbExaminer, "orderBookConfig", orderBookConfig);
+		ReflectionTestUtils.setField(arbInspector, "balanceHandler", balanceHandler);
+		ReflectionTestUtils.setField(arbInspector, "orderBookManager", orderBookManager);
+		ReflectionTestUtils.setField(arbInspector, "orderBookConfig", orderBookConfig);
 		ReflectionTestUtils.setField(orderBookManager, "orderBookConfig", orderBookConfig);
 		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(100), true);
 		balanceHandler.setConfirmedBalance("Test1", Currency.LTC, new BigDecimal(100), true);
@@ -46,7 +46,7 @@ public class TestBasicArbExaminer {
 	
 	@Test
 	public void testNothingThereNormalMarkets() {
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
@@ -56,87 +56,83 @@ public class TestBasicArbExaminer {
 
 	@Test
 	public void testSomethingThereCrossedMarkets() {
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01970200"}, new String[]{"10000"}, new String[]{"0.01980200"}, new String[]{"10000"}));
 		assertTrue(ArbInstruction.SOMETHING_THERE.contains(instruction.getDecision()));
 		assertNotNull(instruction.getLegs());
-		assertEquals(2, instruction.getLegs().size());
-		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
-		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("100", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
-		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
-		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("100", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
+		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
+		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
+		assertEquals("100", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
+		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
+		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
+		assertEquals("100", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
 		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.01007475")));
 	}
 
 	@Test
 	public void testSomethingThereCrossedMarketsUsesLowestAmount() {
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"50"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01970200"}, new String[]{"10000"}, new String[]{"0.01980200"}, new String[]{"10000"}));
 		assertTrue(ArbInstruction.SOMETHING_THERE.contains(instruction.getDecision()));
 		assertNotNull(instruction.getLegs());
-		assertEquals(2, instruction.getLegs().size());
-		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
-		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("50", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
-		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
-		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("50", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
+		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
+		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
+		assertEquals("50", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
+		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
+		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
+		assertEquals("50", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
 		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00503737")));
 	}
 
 	@Test
 	public void testSomethingThereCrossedMarketsUsesLowestSellBalance() {
 		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(20), true);
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01970200"}, new String[]{"10000"}, new String[]{"0.01980200"}, new String[]{"10000"}));
 		assertTrue(ArbInstruction.SOMETHING_THERE.contains(instruction.getDecision()));
 		assertNotNull(instruction.getLegs());
-		assertEquals(2, instruction.getLegs().size());
-		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
-		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("20", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
-		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
-		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("20", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
+		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
+		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
+		assertEquals("20", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
+		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
+		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
+		assertEquals("20", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
 		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00201495")));
 	}
 
 	@Test
 	public void testSomethingThereCrossedMarketsUsesLowestBuyBalance() {
 		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(1), true);
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01970200"}, new String[]{"10000"}, new String[]{"0.01980200"}, new String[]{"10000"}));
 		assertTrue(ArbInstruction.SOMETHING_THERE.contains(instruction.getDecision()));
 		assertNotNull(instruction.getLegs());
-		assertEquals(2, instruction.getLegs().size());
-		assertEquals("Test1", instruction.getLegs().get(0).getMarket());
-		assertEquals("0.01960100", instruction.getLegs().get(0).getPrice().toPlainString());
-		assertEquals("51.01780521", instruction.getLegs().get(0).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.BID, instruction.getLegs().get(0).getSide());
-		assertEquals("Test2", instruction.getLegs().get(1).getMarket());
-		assertEquals("0.01970200", instruction.getLegs().get(1).getPrice().toPlainString());
-		assertEquals("51.01780521", instruction.getLegs().get(1).getAmount().getBaseAmount().toPlainString());
-		assertEquals(Side.ASK, instruction.getLegs().get(1).getSide());
+		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
+		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
+		assertEquals("51.01780521", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
+		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
+		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
+		assertEquals("51.01780521", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
 		assertEquals("Unexpected estimation " + instruction.getEstimatedValue(), 0
 				, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00513992")));
 	}
@@ -144,7 +140,7 @@ public class TestBasicArbExaminer {
 	@Test
 	public void testNothingThereCrossedMarketsNoBalanceSellSide() {
 		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(0), true);
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
@@ -155,7 +151,7 @@ public class TestBasicArbExaminer {
 	@Test
 	public void testNothingThereCrossedMarketsNoBalanceBuySide() {
 		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(0), true);
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
@@ -166,7 +162,7 @@ public class TestBasicArbExaminer {
 	@Test
 	public void testNothingThereCrossedMarketsInsignificantBalanceSellSide() {
 		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(0.001), true);
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 
@@ -177,7 +173,7 @@ public class TestBasicArbExaminer {
 	@Test
 	public void testNothingThereCrossedMarketsInsignificantBalanceBuySide() {
 		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(0.0001), true);
-		ArbInstruction instruction = arbExaminer.examine(
+		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
 				TestUtils.ob("Test2", cp(Currency.LTC, Currency.BTC), 

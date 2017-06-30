@@ -146,16 +146,21 @@ public class TestUtils {
 	}
 
 	public static void assertEquals(String expected, BigDecimal value) {
+		if (expected == null && value == null)
+			return;
+		if (!isNumber(expected)) 
+			Assert.fail("Expected " + expected + " but got " + value);
+	}
+	
+	public static void assertEquals(BigDecimal expected, BigDecimal value) {
 		if (expected == null) {
 			if (value != null)
 				Assert.fail("Expecred null but got " + value);
-		} else if (!isNumber(expected)) {
-			Assert.fail("Expected " + expected + " but got " + value);
 		} else {
 			if (value == null)
 				Assert.fail("Expecred " + expected + " but got null");
 			else {
-				if (new BigDecimal(expected).compareTo(value) != 0)
+				if (expected.compareTo(value) != 0)
 					Assert.fail("Expected " + expected + " but got " + value);
 			}
 		}

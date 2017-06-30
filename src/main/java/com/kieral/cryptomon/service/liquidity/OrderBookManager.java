@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.LiquidityEntry;
 import com.kieral.cryptomon.model.general.Side;
@@ -165,37 +166,49 @@ public class OrderBookManager {
 		}
 		return orderBook;
 	}
-	
+
 	public LiquidityEntry getBestBidAsk(OrderBook orderBook) {
+		return getBestBidAsk(orderBook, null);
+	}
+
+	public LiquidityEntry getBestBidAsk(OrderBook orderBook, BigDecimal desiredAmount) {
 		if (orderBook == null)
 			return null;
-		BigDecimal bidAmount = BigDecimal.ZERO;
-		BigDecimal bidPrice = null;
-		for (OrderBookEntry entry : orderBook.getBids()) {
-			bidAmount = bidAmount.add(entry.getAmount());
-			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
-				bidPrice = entry.getPrice();
-				break;
-			}
-		}
+		List<OrderBookEntry> bidEntries = getDepthNeeded(Side.BID, orderBook.getMarket(), 
+				orderBook.getCurrencyPair().getBaseCurrency(), orderBook.getBids(), desiredAmount);
+		BigDecimal bidAmount = bidEntries == null ? BigDecimal.ZERO :
+			bidEntries.stream().map(OrderBookEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+		BigDecimal bidPrice = bidEntries == null ? null : bidEntries.get(bidEntries.size() - 1).getPrice();
 		if (logger.isDebugEnabled() && bidPrice == null)
 			logger.debug("No best bid price from orderbook {} " + orderBook);
-		BigDecimal askAmount = BigDecimal.ZERO;
-		BigDecimal askPrice = null;
-		// TODO: write some tests around cumulating significant amounts and the best bid / ask returned 
-		for (OrderBookEntry entry : orderBook.getAsks()) {
-			askAmount = askAmount.add(entry.getAmount());
-			if (orderBookConfig.isSignificant(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency(), entry.getAmount())) {
-				askPrice = entry.getPrice();
-				break;
-			}
-		}
+		List<OrderBookEntry> askEntries = getDepthNeeded(Side.ASK, orderBook.getMarket(), 
+				orderBook.getCurrencyPair().getBaseCurrency(), orderBook.getAsks(), desiredAmount);
+		BigDecimal askAmount = askEntries == null ? BigDecimal.ZERO :
+			askEntries.stream().map(OrderBookEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+		BigDecimal askPrice = askEntries == null ? null : askEntries.get(askEntries.size() - 1).getPrice();
 		if (logger.isDebugEnabled() && askPrice == null)
 			logger.debug("No best ask price from orderbook {} " + orderBook);
 		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(new TradeAmount(bidAmount, askPrice, orderBook.getCurrencyPair().getPriceScale())
 				, new TradeAmount(askAmount, bidPrice, orderBook.getCurrencyPair().getPriceScale())));
 	}
 
+	private List<OrderBookEntry> getDepthNeeded(Side side, String market, Currency baseCurrency, List<OrderBookEntry> entries, BigDecimal desiredAmount) {
+		List<OrderBookEntry> rtn = new ArrayList<OrderBookEntry>();
+		BigDecimal cumulativeAmount = BigDecimal.ZERO;
+		for (OrderBookEntry entry : entries) {
+			rtn.add(entry);
+			cumulativeAmount = cumulativeAmount.add(entry.getAmount());
+			if (desiredAmount == null) {
+				if (orderBookConfig.isSignificant(market, baseCurrency, entry.getAmount())) {
+					return rtn;
+				}
+			} else if (desiredAmount.compareTo(cumulativeAmount) < 0) {
+				return rtn;
+			}
+		}
+		return null;
+	}
+	
 	private static final class PriceComparer implements Comparator<OrderBookEntry> {
 
 		private final Side side;

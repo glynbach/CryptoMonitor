@@ -10,7 +10,6 @@ import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
-import com.kieral.cryptomon.model.general.ApiRequest;
 
 public abstract class ServiceExchangeProperties {
 
@@ -214,14 +213,14 @@ public abstract class ServiceExchangeProperties {
 		return false;
 	}
 
-	public abstract ApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol);
+	public abstract ExchangeApiRequest getOrderBookSnapshotQuery(String currencyPairSymbol);
 	public abstract TradingFeeType getTradingFeeType();
-	public abstract ApiRequest getAccountsQuery();
-	public abstract ApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount);
-	public abstract ApiRequest getCancelOrderQuery(String orderId);
-	public abstract ApiRequest getOpenOrdersQuery(CurrencyPair currencyPair);
-	public abstract ApiRequest getOrderHistoryQuery(CurrencyPair currencyPair);
-	public abstract ApiRequest getOrderQuery(String orderId);
+	public abstract ExchangeApiRequest getAccountsQuery();
+	public abstract ExchangeApiRequest getPlaceOrderQuery(Side side, CurrencyPair currencyPair, BigDecimal price, TradeAmount amount);
+	public abstract ExchangeApiRequest getCancelOrderQuery(String orderId);
+	public abstract ExchangeApiRequest getOpenOrdersQuery(CurrencyPair currencyPair);
+	public abstract ExchangeApiRequest getOrderHistoryQuery(CurrencyPair currencyPair);
+	public abstract ExchangeApiRequest getOrderQuery(String orderId);
 	public abstract boolean isHasGranularTrades();
 	
 	@Override

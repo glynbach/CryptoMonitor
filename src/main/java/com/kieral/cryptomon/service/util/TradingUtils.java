@@ -3,7 +3,7 @@ package com.kieral.cryptomon.service.util;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.kieral.cryptomon.model.trading.AmountHolder;
+import com.kieral.cryptomon.model.trading.AmountValue;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.rest.OrderResponse.RequestNature;
@@ -47,13 +47,13 @@ public class TradingUtils {
 		}
 	}
 	
-	public static BigDecimal getFilledAmount(List<? extends AmountHolder> amountHolders) {
-		if (amountHolders == null || amountHolders.size() == 0)
+	public static BigDecimal getFilledAmount(List<? extends AmountValue> amountValues) {
+		if (amountValues == null || amountValues.size() == 0)
 			return BigDecimal.ZERO;
 		BigDecimal filledAmount = BigDecimal.ZERO;
-		for (AmountHolder amountHolder : amountHolders) {
-			if (amountHolder.getAmount() != null) {
-				filledAmount = filledAmount.add(amountHolder.getAmount());
+		for (AmountValue amountValue : amountValues) {
+			if (amountValue.getAmount() != null) {
+				filledAmount = filledAmount.add(amountValue.getAmount());
 			}
 		}
 		return filledAmount;

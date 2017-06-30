@@ -1,0 +1,19 @@
+orderbook: 
+  default-significant-amount: 0.005
+  currencies:
+    - currency: "BTC"
+      significant-amount: 0.005
+    - currency: "LTC"
+      significant-amount: 0.5
+    - currency: "ETH"
+      significant-amount: 0.5
+  markets:
+    - market: "bittrex"
+      default-significant-amount: 0.005
+      currencies:
+        - currency: "BTC"
+          significant-amount: 0.01
+        - currency: "LTC"
+          significant-amount: 0.5
+        - currency: "ETH"
+          significant-amount: 0.5

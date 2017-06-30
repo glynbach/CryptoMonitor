@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 
 public class CommonUtils {
 
-	public static final BigDecimal ONE_HUNDRED = new BigDecimal("100.0000");
+	public static final BigDecimal ONE_HUNDRED = new BigDecimal("100.00000000");
 	public static final DateTimeFormatter SECONDS_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm:ss");
 	public static final DateTimeFormatter MILLIS_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm:ss.SSS");
 	
@@ -49,7 +49,11 @@ public class CommonUtils {
 			return false;
 		}
 	}
-	
+
+	public static boolean isZero(BigDecimal value) {
+		return BigDecimal.ZERO.compareTo(value) == 0;
+	}
+
 	public static boolean isAtLeast(BigDecimal value, BigDecimal minimum) {
 		if (minimum == null)
 			return true;

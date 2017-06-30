@@ -1,5 +1,8 @@
 package com.kieral.cryptomon.model.sided;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.kieral.cryptomon.model.general.Side;
 
 public abstract class SidedValue<T> {
@@ -24,6 +27,11 @@ public abstract class SidedValue<T> {
 		if (side == null)
 			throw new IllegalArgumentException("side can not be null");
 		return side == Side.BID ? getBidValue() : getAskValue();
+	}
+	
+	public List<T> values() {
+		List<T> rtn = new ArrayList<T>();
+		return rtn;
 	}
 	
 }

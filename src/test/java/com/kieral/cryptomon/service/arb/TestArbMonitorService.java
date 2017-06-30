@@ -38,7 +38,7 @@ public class TestArbMonitorService {
 	
 	ExchangeManagerService exchangeManager;
 	BalanceService balanceHandler;
-	ArbExaminer arbExaminer;
+	ArbInspector arbInspector;
 	ArbInstructionHandler instructionHandler;
 	
 	OrderBookListener obListener1;
@@ -56,32 +56,32 @@ public class TestArbMonitorService {
 		obListener1.onOrderBookUpdate(TestUtils.ob("Test1", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		assertEquals(0, arbInstructions.size());
-		Mockito.verify(arbExaminer, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 	}
 
 	@Test
 	public void testCanCompareThreeOrderBooks() {
 		obListener1.onOrderBookUpdate(TestUtils.ob("Test1", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
-		Mockito.verify(arbExaminer, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		obListener3.onOrderBookUpdate(TestUtils.ob("Test3", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		assertEquals(0, arbInstructions.size());
 		// 2 more
-		Mockito.verify(arbExaminer, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 	}
 
 	@Test
 	public void testAgainOnOrderBookUpdate() {
 		obListener1.onOrderBookUpdate(TestUtils.ob("Test1", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
-		Mockito.verify(arbExaminer, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		obListener3.onOrderBookUpdate(TestUtils.ob("Test3", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		assertEquals(0, arbInstructions.size());
 		// 2 more
-		Mockito.verify(arbExaminer, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		obListener3.onOrderBookUpdate(TestUtils.ob("Test3", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
 		// 2 more
-		Mockito.verify(arbExaminer, Mockito.times(5)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(5)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 	}
 
 	@Test
@@ -89,7 +89,7 @@ public class TestArbMonitorService {
 		obListener1.onOrderBookUpdate(TestUtils.ob("Test1", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO),
 				new String[]{LOW_MAGIC_NUMBER.toPlainString()}, new String[]{"0.1"}));
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
-		Mockito.verify(arbExaminer, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		assertEquals(1, arbInstructions.size());
 		assertEquals(ArbDecision.LOW, arbInstructions.get(0).getDecision());
 	}
@@ -99,12 +99,12 @@ public class TestArbMonitorService {
 		obListener1.onOrderBookUpdate(TestUtils.ob("Test1", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO),
 				new String[]{LOW_MAGIC_NUMBER.toPlainString()}, new String[]{"0.1"}));
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
-		Mockito.verify(arbExaminer, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		assertEquals(1, arbInstructions.size());
 		assertEquals(ArbDecision.LOW, arbInstructions.get(0).getDecision());
 		obListener3.onOrderBookUpdate(TestUtils.ob("Test3", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO),
 				new String[]{HIGH_MAGIC_NUMBER.toPlainString()}, new String[]{"0.1"}));
-		Mockito.verify(arbExaminer, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		assertEquals(2, arbInstructions.size());
 		assertEquals(ArbDecision.HIGH, arbInstructions.get(1).getDecision());
 	}
@@ -114,17 +114,17 @@ public class TestArbMonitorService {
 		obListener1.onOrderBookUpdate(TestUtils.ob("Test1", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO),
 				new String[]{LOW_MAGIC_NUMBER.toPlainString()}, new String[]{"0.1"}));
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO)));
-		Mockito.verify(arbExaminer, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(1)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		assertEquals(1, arbInstructions.size());
 		assertEquals(ArbDecision.LOW, arbInstructions.get(0).getDecision());
 		obListener3.onOrderBookUpdate(TestUtils.ob("Test3", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO),
 				new String[]{HIGH_MAGIC_NUMBER.toPlainString()}, new String[]{"0.1"}));
-		Mockito.verify(arbExaminer, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(3)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		assertEquals(2, arbInstructions.size());
 		assertEquals(ArbDecision.HIGH, arbInstructions.get(1).getDecision());
 		obListener2.onOrderBookUpdate(TestUtils.ob("Test2", TestUtils.cp(Currency.LTC, Currency.BTC, BigDecimal.ZERO),
 				new String[]{CANCEL_MAGIC_NUMBER.toPlainString()}, new String[]{"0.1"}));
-		Mockito.verify(arbExaminer, Mockito.times(5)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+		Mockito.verify(arbInspector, Mockito.times(5)).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		assertEquals(3, arbInstructions.size());
 		assertEquals(ArbDecision.CANCEL, arbInstructions.get(2).getDecision());
 	}
@@ -174,7 +174,7 @@ public class TestArbMonitorService {
 				statusListener3 = (ConnectionStatusListener)invocation.getArgument(0);
 				return null;
 			}}).when(exchange3).registerStatusListener(Mockito.any(ConnectionStatusListener.class));
-		arbExaminer = Mockito.mock(ArbExaminer.class);
+		arbInspector = Mockito.mock(ArbInspector.class);
 		Mockito.doAnswer(new Answer<ArbInstruction>() {
 			@Override
 			public ArbInstruction answer(InvocationOnMock invocation) throws Throwable {
@@ -202,7 +202,7 @@ public class TestArbMonitorService {
 					}
 				}
 				return ArbInstructionFactory.createNoArbInstruction("");
-			}}).when(arbExaminer).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
+			}}).when(arbInspector).examine(Mockito.any(OrderBook.class), Mockito.any(OrderBook.class));
 		arbInstructions = new ArrayList<ArbInstruction>();
 		instructionHandler = Mockito.mock(ArbInstructionHandler.class);
 		Mockito.doAnswer(new Answer<Void>() {
@@ -214,7 +214,7 @@ public class TestArbMonitorService {
 		arbMonitorService = new ArbMonitorService();
 		ReflectionTestUtils.setField(arbMonitorService, "exchangeManager", exchangeManager);
 		ReflectionTestUtils.setField(arbMonitorService, "balanceHandler", balanceHandler);
-		ReflectionTestUtils.setField(arbMonitorService, "arbExaminer", arbExaminer);
+		ReflectionTestUtils.setField(arbMonitorService, "arbInspector", arbInspector);
 		ReflectionTestUtils.setField(arbMonitorService, "arbInstructionHandler", instructionHandler);
 		arbMonitorService.init();
 	}
