@@ -55,7 +55,7 @@ public class OrderServiceTests {
 	
 	@Test
 	public void placeOrderPropagatesOpenStatus() throws InterruptedException {
-		os.setDesiredOrderStatuses(OrderStatus.OPEN);
+		os.setDesiredActionOrderStatuses(OrderStatus.OPEN);
 		os.setDefaultDesiredOrderId("AAA");
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.BIT));
 		Order order = os.pollOrderUpdate(1000);

@@ -59,10 +59,14 @@ public class TradingUtils {
 		return filledAmount;
 	}
 
-	public static BigDecimal getFilledAmount(Order order) {
-		if (order == null)
+	public static BigDecimal getFilledAmount(Order... orders) {
+		if (orders == null)
 			return BigDecimal.ZERO;
-		return getFilledAmount(order.getTrades());
+		BigDecimal filledAmount = BigDecimal.ZERO;
+		for (Order order : orders) {
+			filledAmount = filledAmount.add(getFilledAmount(order.getTrades()));
+		}
+		return filledAmount;
 	}
 
 }

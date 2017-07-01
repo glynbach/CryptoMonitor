@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +44,13 @@ public class OrderBookManager {
 	
 	@Autowired
 	OrderBookConfig orderBookConfig;
+	@Autowired
+	OrderBookSanityChecker orderBookSanityChecker;
+	
+	@PostConstruct
+	public void init() {
+		logger.info("OrderbookManager using config {} and sanity checker {}", orderBookConfig, orderBookSanityChecker);
+	}
 
 	public OrderBook getOrderBook(OrderBookResponse orderBookResponse, String market, 
 			CurrencyPair currencyPair, int maxLevel) {
@@ -162,9 +171,26 @@ public class OrderBookManager {
 			if (sequenceNumber == AUTO_INCREMENT_SEQUENCE)
 				sequenceNumber = orderBook.getSnapshotSequence() + 1;
 			orderBook.setSnapshotSequence(sequenceNumber);
+			if (valid && orderBookSanityChecker != null)
+				valid = orderBookSanityChecker.isValid(orderBook);
 			orderBook.setValid(valid);
 		}
 		return orderBook;
+	}
+
+	public boolean isValidPrice(Side side, CurrencyPair pair, BigDecimal price) {
+		if (orderBookSanityChecker != null) {
+			return orderBookSanityChecker.isValid(side, pair, price);
+		} else {
+			logger.warn("Cannot sanity check price as orderBookSanityChecker is null");
+			return true;
+		}
+	}
+
+	public LiquidityEntry getBestBidAsk(String market, CurrencyPair currencyPair, BigDecimal amount) {
+		if (market == null || currencyPair == null)
+			return null;
+		return getBestBidAsk(orderBooks.get(new OrderBookKey(market, currencyPair.getName())), amount);
 	}
 
 	public LiquidityEntry getBestBidAsk(OrderBook orderBook) {
@@ -278,6 +304,5 @@ public class OrderBookManager {
 			return "OrderBookKey [market=" + market + ", currencyPair=" + currencyPair + "]";
 		}
 	}
-
 
 }

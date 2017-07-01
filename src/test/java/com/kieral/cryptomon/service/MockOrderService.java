@@ -47,13 +47,14 @@ public class MockOrderService implements OrderService {
 	final Map<String, String> clientOrderIdToMarketMap = new HashMap<String, String>();
 	final Map<String, String> desiredOrderIds = new HashMap<String, String>();
 	final Map<String, OrderStatus> desiredOrderStatuses = new HashMap<String, OrderStatus>();
+	final Map<String, BigDecimal> desiredOrderFills = new HashMap<String, BigDecimal>();
 	final List<Order> desiredExchangeOpenOrders = new ArrayList<Order>();
 	
 	final Map<String, TradingStatusListener> tradingStatusListeners = new HashMap<String, TradingStatusListener>();
 	final Map<String, ConnectionStatus> desiredExchangeStatus = new HashMap<String, ConnectionStatus>();
 	final Map<String, Boolean> desiredExchangeTradingEnabled = new HashMap<String, Boolean>();
 
-	final BlockingQueue<OrderStatus> openingOrderStatuses = new ArrayBlockingQueue<OrderStatus>(512);
+	final BlockingQueue<OrderStatus> actionOrderStatuses = new ArrayBlockingQueue<OrderStatus>(512);
 	final BlockingQueue<Order> orderUpdates = new ArrayBlockingQueue<Order>(512);
 
 	public void setDesiredOrderId(String clientOrderId, String orderId) {
@@ -64,14 +65,27 @@ public class MockOrderService implements OrderService {
 		desiredOrderIds.put("DEFAULT", orderId);
 	}
 
-	public void setDesiredOrderStatuses(OrderStatus... orderStatus) {
+	public void setDesiredActionOrderStatuses(OrderStatus... orderStatus) {
 		for (OrderStatus status : orderStatus) {
-			openingOrderStatuses.add(status);
+			actionOrderStatuses.add(status);
 		}
 	}
-	
+
 	public void setDesiredOrderStatus(String clientOrderId, OrderStatus orderStatus) {
+		setDesiredOrderStatus(clientOrderId, orderStatus, null);
+	}
+
+	public void setDesiredOrderStatus(String clientOrderId, OrderStatus orderStatus, BigDecimal fillAmount) {
 		desiredOrderStatuses.put(clientOrderId, orderStatus);
+		if (fillAmount != null && fillAmount.compareTo(BigDecimal.ZERO) > 0)
+			desiredOrderFills.put(clientOrderId, fillAmount);
+	}
+
+	public void clearDesiredOrderStatus() {
+		desiredOrderStatuses.clear();
+	}
+	public void removeDesiredOrderStatus(String clientOrderId) {
+		desiredOrderStatuses.remove(clientOrderId);
 	}
 
 	public void setDefaultDesiredOrderStatus(OrderStatus orderStatus) {
@@ -173,26 +187,44 @@ public class MockOrderService implements OrderService {
 			@Override
 			public OrderStatus answer(InvocationOnMock invocation) throws Throwable {
 				Order order = (Order)invocation.getArgument(0);
-				OrderStatus orderStatus = getOrderStatus(order.getClientOrderId());
+				OrderStatus orderStatus = getActionOrderStatus(order.getClientOrderId());
 				if (OrderStatus.CANCELLED != orderStatus) {
-					order.setOrderId(getOrderId(order.getClientOrderId()));
+					order.setOrderId(getActionOrderId(order.getClientOrderId()));
 				} 
 				return orderStatus;
 			}}).when(exchangeManagerService).placeOrder(Mockito.any(Order.class));
+		Mockito.doAnswer(new Answer<OrderStatus>() {
+			@Override
+			public OrderStatus answer(InvocationOnMock invocation) throws Throwable {
+				Order order = (Order)invocation.getArgument(0);
+				OrderStatus orderStatus = getActionOrderStatus(order.getClientOrderId());
+				if (OrderStatus.CANCELLED != orderStatus) {
+					order.setOrderId(getActionOrderId(order.getClientOrderId()));
+				} 
+				return orderStatus;
+			}}).when(exchangeManagerService).placeMarketOrder(Mockito.any(Order.class));
 		Mockito.doAnswer(new Answer<Map<String, OrderStatus>>(){
 			@Override
 			public Map<String, OrderStatus> answer(InvocationOnMock invocation) throws Throwable {
-				desiredOrderStatuses.keySet().forEach(clientOrderId -> {
-					if (desiredOrderStatuses.get(clientOrderId) == OrderStatus.FILLED) {
-						fillOrder(true, orderService.getOrder(clientOrderIdToMarketMap.get(clientOrderId), clientOrderId));
-					}
-					if (desiredOrderStatuses.get(clientOrderId) == OrderStatus.PARTIALLY_FILLED) {
-						fillOrder(false, orderService.getOrder(clientOrderIdToMarketMap.get(clientOrderId), clientOrderId));
-					}
-				});;
-				return desiredOrderStatuses;
-			}}).when(exchangeManagerService)
-			.getOpenOrderStatuses(Mockito.anyString(), Mockito.any(List.class));
+				List<Order> orders = invocation.getArgument(1);
+				Map<String, OrderStatus> rtn = new HashMap<String, OrderStatus>();
+				if (orders != null) {
+					orders.forEach(order -> {
+						String clientOrderId = order.getClientOrderId();
+						OrderStatus orderStatus = getOpenOrderStatus(clientOrderId);
+						if (OrderStatus.FILLED == orderStatus) {
+							fillOrder(true, orderService.getOrder(clientOrderIdToMarketMap.get(clientOrderId), clientOrderId));
+						}
+						if (OrderStatus.PARTIALLY_FILLED == orderStatus) {
+							fillOrder(false, orderService.getOrder(clientOrderIdToMarketMap.get(clientOrderId), clientOrderId), desiredOrderFills.get(clientOrderId));
+							if (desiredOrderFills.containsKey(clientOrderId))
+								desiredOrderFills.put(clientOrderId, BigDecimal.ZERO);
+						}
+						rtn.put(clientOrderId, orderStatus);
+					});
+				}
+				return rtn;
+			}}).when(exchangeManagerService).getOpenOrderStatuses(Mockito.anyString(), Mockito.any(List.class));
 		Mockito.doAnswer(new Answer<List<Order>>(){
 			@Override
 			public List<Order> answer(InvocationOnMock invocation) throws Throwable {
@@ -202,7 +234,7 @@ public class MockOrderService implements OrderService {
 			@Override
 			public OrderStatus answer(InvocationOnMock invocation) throws Throwable {
 				Order order = (Order)invocation.getArgument(0);
-				return getOrderStatus(order.getClientOrderId());
+				return getActionOrderStatus(order.getClientOrderId());
 			}}).when(exchangeManagerService).cancelOrder(Mockito.any(Order.class));
 		Mockito.doAnswer(new Answer<ConnectionStatus>() {
 			@Override
@@ -233,9 +265,17 @@ public class MockOrderService implements OrderService {
 		orderService.init();
 	}
 
-	private OrderStatus getOrderStatus(String clientOrderId) {
-		if (!openingOrderStatuses.isEmpty())
-			return openingOrderStatuses.poll();
+	private OrderStatus getOpenOrderStatus(String clientOrderId) {
+		if (desiredOrderStatuses.containsKey(clientOrderId))
+			return desiredOrderStatuses.get(clientOrderId);
+		if (desiredOrderStatuses.containsKey("DEFAULT"))
+			return desiredOrderStatuses.get("DEFAULT");
+		return OrderStatus.ERROR;
+	}
+	
+	private OrderStatus getActionOrderStatus(String clientOrderId) {
+		if (!actionOrderStatuses.isEmpty())
+			return actionOrderStatuses.poll();
 		if (desiredOrderStatuses.containsKey(clientOrderId))
 			return desiredOrderStatuses.get(clientOrderId);
 		if (desiredOrderStatuses.containsKey("DEFAULT"))
@@ -243,7 +283,7 @@ public class MockOrderService implements OrderService {
 		return OrderStatus.ERROR;
 	}
 
-	private String getOrderId(String clientOrderId) {
+	private String getActionOrderId(String clientOrderId) {
 		if (desiredOrderIds.containsKey(clientOrderId))
 			return desiredOrderIds.get(clientOrderId);
 		if (desiredOrderIds.containsKey("DEFAULT"))
@@ -252,8 +292,12 @@ public class MockOrderService implements OrderService {
 	}
 
 	private void fillOrder(boolean fullyFill, Order order) {
+		fillOrder(fullyFill, order, null);
+	}
+		
+	private void fillOrder(boolean fullyFill, Order order, BigDecimal amount) {
 		BigDecimal filledAmount = TradingUtils.getFilledAmount(order);
-		BigDecimal remainingAmount = order.getAmount().subtract(filledAmount)
+		BigDecimal remainingAmount = amount != null ? amount : order.getAmount().subtract(filledAmount)
 				.divide(fullyFill ? BigDecimal.ONE : new BigDecimal("2"), 8, RoundingMode.HALF_DOWN);
 		if (remainingAmount.compareTo(BigDecimal.ZERO) > 0)
 			order.mergeTrades(Arrays.asList(new Trade[]{new Trade(UUID.randomUUID().toString(), order.getPrice(), 
@@ -288,6 +332,11 @@ public class MockOrderService implements OrderService {
 	@Override
 	public void placeOrder(Order order) {
 		orderService.placeOrder(order);
+	}
+
+	@Override
+	public void placeMarketOrder(Order order) {
+		orderService.placeMarketOrder(order);
 	}
 
 	@Override

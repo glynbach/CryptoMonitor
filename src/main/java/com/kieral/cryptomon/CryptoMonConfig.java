@@ -44,6 +44,8 @@ import com.kieral.cryptomon.service.exchange.poloniex.PoloniexService;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexServiceConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
+import com.kieral.cryptomon.service.liquidity.OrderBookSanityChecker;
+import com.kieral.cryptomon.service.liquidity.OrderBookSanityCheckerImpl;
 import com.kieral.cryptomon.service.rest.LoggingRequestInterceptor;
 import com.kieral.cryptomon.service.tickstore.TickstoreService;
 import com.kieral.cryptomon.service.util.LoggingUtils;
@@ -165,6 +167,11 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 		return new OrderBookManager();
 	}
 
+	@Bean
+	OrderBookSanityChecker orderBookSanityChecker() {
+		return new OrderBookSanityCheckerImpl();
+	}
+	
 	@Bean
 	ArbInspector arbInspector() {
 		return new SimpleArbInspector();

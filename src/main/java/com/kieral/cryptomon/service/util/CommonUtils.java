@@ -70,4 +70,10 @@ public class CommonUtils {
 		return isAtLeast(new BigDecimal(value), new BigDecimal(minimum));
 	}
 
+	public static BigDecimal percentageChange(BigDecimal from, BigDecimal to) {
+		if (from == null || to == null)
+			return ONE_HUNDRED;
+		return to.subtract(from).abs().divide(from, 8, RoundingMode.HALF_UP).multiply(ONE_HUNDRED);
+	}
+
 }

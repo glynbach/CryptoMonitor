@@ -1,6 +1,8 @@
 package com.kieral.cryptomon.service.exchange;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -31,6 +33,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.LiquidityEntry;
+import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.orderbook.OrderBookUpdate;
 import com.kieral.cryptomon.model.trading.Order;
@@ -212,26 +216,30 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			marketDataPoller = scheduler.scheduleWithFixedDelay(new Runnable(){
 				@Override
 				public void run() {
-					List<OrderBookResponse> orderBookResponses = null;
-					try {
-						orderBookResponses = getOrderBookResponses(serviceProperties.getPairs());
-					} catch (Exception e) {
-						logger.error("Error requesting order book snapshots", e);
-					}
-					if (orderBookResponses != null) {
-						orderBookResponses.forEach(orderBookResponse -> {
-							try {
-								OrderBook orderBook = orderBookManager.getOrderBook(orderBookResponse, 
-										getName(), orderBookResponse.getCurrencyPair(), serviceProperties.getMaxLevels());
-								orderBookListeners.forEach(listener -> {
-									listener.onOrderBookUpdate(orderBook);
-								});
-							} catch (Exception e) {
-								logger.error("Error processing order book response {}", orderBookResponse, e);
-							}
-						});
-					}
+					requestOrderBookSnapshots(serviceProperties.getPairs());
 				}}, delay, delay, TimeUnit.MILLISECONDS);
+		}
+	}
+	
+	private void requestOrderBookSnapshots(List<CurrencyPair> pairs) {
+		List<OrderBookResponse> orderBookResponses = null;
+		try {
+			orderBookResponses = getOrderBookResponses(pairs);
+		} catch (Exception e) {
+			logger.error("Error requesting order book snapshots", e);
+		}
+		if (orderBookResponses != null) {
+			orderBookResponses.forEach(orderBookResponse -> {
+				try {
+					OrderBook orderBook = orderBookManager.getOrderBook(orderBookResponse, 
+							getName(), orderBookResponse.getCurrencyPair(), serviceProperties.getMaxLevels());
+					orderBookListeners.forEach(listener -> {
+						listener.onOrderBookUpdate(orderBook);
+					});
+				} catch (Exception e) {
+					logger.error("Error processing order book response {}", orderBookResponse, e);
+				}
+			});
 		}
 	}
 	
@@ -375,9 +383,31 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 
 	
 	@Override
+	public boolean passesLastlookPriceCheck(Side side, CurrencyPair pair, BigDecimal price) {
+		return orderBookManager.isValidPrice(side, pair, price);
+	}
+
+
+	@Override
+	public OrderStatus placeMarketOrder(Order order) {
+		requestOrderBookSnapshots(Arrays.asList(new CurrencyPair[]{order.getCurrencyPair()}));
+		LiquidityEntry entry = orderBookManager.getBestBidAsk(order.getMarket(), order.getCurrencyPair(), order.getAmount());
+		if (entry == null || entry.getBidAskPrice() == null) {
+			order.setMessage("No price avaialable for market order");
+			return OrderStatus.ERROR;
+		}
+		order.setPrice(order.getSide() == Side.BID ? entry.getBidAskPrice().get(Side.ASK) : entry.getBidAskPrice().get(Side.BID));
+		return placeOrder(order);
+	}
+
+	@Override
 	public OrderStatus placeOrder(Order order) {
 		if (order == null)
 			throw new IllegalArgumentException("order can not be null");
+		if (!passesLastlookPriceCheck(order.getSide(), order.getCurrencyPair(), order.getPrice())) {
+			order.setMessage(String.format("Suspect price %s for %s", order.getPrice(), order.getSide()));
+			return OrderStatus.CANCELLED;
+		}
 		ExchangeApiRequest apiRequest = null;
 		try {
 			apiRequest = serviceProperties.getPlaceOrderQuery(order.getSide(), order.getCurrencyPair(), 

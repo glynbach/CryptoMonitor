@@ -88,9 +88,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void testPlacesOrders() throws InterruptedException {
 		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		TestUtils.assertEquals("0.13400", longOrder.getPrice());
 		TestUtils.assertEquals("0.5", longOrder.getAmount());
@@ -105,9 +103,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void detectsDoneOrders() throws InterruptedException {
 		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.FILLED);
 		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.FILLED);
@@ -125,9 +121,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void ResolvesNoFillsOrdersNoChange() throws InterruptedException {
 		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
@@ -135,6 +129,7 @@ public class TestExecutionMonitor {
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13500"}, new String[]{"1"}, new String[]{"0.13600"}, new String[]{"2"}));
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
 		canProceed.set(true);
 		proceedLatch.countDown();
 		longOrder = orderService.pollOrderUpdate(100);
@@ -146,9 +141,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void ResolvesNoFillsOrdersPriceChange() throws InterruptedException {
 		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
@@ -156,8 +149,9 @@ public class TestExecutionMonitor {
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
 		canProceed.set(true);
 		proceedLatch.countDown();
 		longOrder = orderService.pollOrderUpdate(100);
@@ -166,9 +160,7 @@ public class TestExecutionMonitor {
 		assertNotNull(shortOrder);
 		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
 		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newLongOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newShortOrder = orderService.pollOrderUpdate(100);
 		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
 		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
@@ -185,9 +177,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void ResolvesNoFillsOrdersPriceChangeUsesLowerBookLevel() throws InterruptedException {
 		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
@@ -197,8 +187,9 @@ public class TestExecutionMonitor {
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13491", "0.13490"}, new String[]{"0.1", "1"}, 
 						new String[]{"0.13589", "0.13590"}, new String[]{"0.1", "2"}));
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
 		canProceed.set(true);
 		proceedLatch.countDown();
 		longOrder = orderService.pollOrderUpdate(100);
@@ -207,9 +198,7 @@ public class TestExecutionMonitor {
 		assertNotNull(shortOrder);
 		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
 		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newLongOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newShortOrder = orderService.pollOrderUpdate(100);
 		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
 		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
@@ -226,9 +215,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void ResolvesNothingThereCancelsOut() throws InterruptedException {
 		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
@@ -236,7 +223,8 @@ public class TestExecutionMonitor {
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13450"}, new String[]{"1"}, new String[]{"0.13550"}, new String[]{"2"}));
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
 		canProceed.set(true);
 		proceedLatch.countDown();
 		longOrder = orderService.pollOrderUpdate(100);
@@ -259,9 +247,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void ResolvesPartialFillsOrdersPriceChange() throws InterruptedException {
 		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
@@ -269,7 +255,7 @@ public class TestExecutionMonitor {
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
 		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
 		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
@@ -287,9 +273,7 @@ public class TestExecutionMonitor {
 		assertNotNull(shortOrder);
 		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
 		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newLongOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newShortOrder = orderService.pollOrderUpdate(100);
 		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
 		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
@@ -306,9 +290,7 @@ public class TestExecutionMonitor {
 	@Test
 	public void ResolvesPartialFillsCancelsNothingThere() throws InterruptedException {
 		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5");
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order longOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order shortOrder = orderService.pollOrderUpdate(100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
@@ -316,7 +298,7 @@ public class TestExecutionMonitor {
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
 		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
 		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
@@ -334,9 +316,7 @@ public class TestExecutionMonitor {
 		assertNotNull(shortOrder);
 		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
 		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newLongOrder = orderService.pollOrderUpdate(100);
-		pollForStatuses(new OrderStatus[]{OrderStatus.PENDING});
 		Order newShortOrder = orderService.pollOrderUpdate(100);
 		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
 		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
@@ -354,7 +334,8 @@ public class TestExecutionMonitor {
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13450"}, new String[]{"1"}, new String[]{"0.13550"}, new String[]{"2"}));
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
 		canProceed.set(true);
 		proceedLatch.countDown();
 		longOrder = orderService.pollOrderUpdate(100);
@@ -374,9 +355,178 @@ public class TestExecutionMonitor {
 		assertTrue(executionMonitor.isClosed());
 	}
 
+	@Test
+	public void ResolvesInbalancedPartialFillsCreatesBalanceTrade() throws InterruptedException {
+		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "2.5", "2.5");
+		Order longOrder = orderService.pollOrderUpdate(100);
+		Order shortOrder = orderService.pollOrderUpdate(100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13310"}, new String[]{"13"}, new String[]{"0.13410"}, new String[]{"15"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"11"}, new String[]{"0.13590"}, new String[]{"12"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+				OrderStatus.OPEN, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.4"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("1.1"));
+		canProceed.set(true);
+		proceedLatch.countDown();
+		longOrder = orderService.pollOrderUpdate(100);
+		shortOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(100);
+		shortOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		Order newLongOrder = orderService.pollOrderUpdate(100);
+		Order newShortOrder = orderService.pollOrderUpdate(100);
+		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
+		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
+		TestUtils.assertEquals("0.13410", newLongOrder.getPrice());
+		assertTrue(longOrder.getAmount().compareTo(newLongOrder.getAmount()) > 0);
+		assertEquals(MockOrderService.BIT, newLongOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newLongOrder.getOrderStatus());
+		TestUtils.assertEquals("0.13490", newShortOrder.getPrice());
+		assertTrue(shortOrder.getAmount().compareTo(newShortOrder.getAmount()) > 0);
+		assertEquals(MockOrderService.POL, newShortOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13350"}, new String[]{"13"}, new String[]{"0.13450"}, new String[]{"15"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13450"}, new String[]{"11"}, new String[]{"0.13550"}, new String[]{"12"}));
+		orderService.clearDesiredOrderStatus();
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
+		canProceed.set(true);
+		proceedLatch.countDown();
+		longOrder = orderService.pollOrderUpdate(100);
+		shortOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		Order balancingOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(balancingOrder);
+		TestUtils.assertEquals("0.7", balancingOrder.getAmount());
+		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		newLongOrder = orderService.pollOrderUpdate(100);
+		newShortOrder = orderService.pollOrderUpdate(100);
+		assertNull(newLongOrder);
+		assertNull(newShortOrder);
+		// let the balancing order be filled
+		orderService.clearDesiredOrderStatus();
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.FILLED);
+		canProceed.set(true);
+		proceedLatch.countDown();
+		testLatch.await(1000, TimeUnit.MILLISECONDS);
+		if (testLatch.getCount() > 0)
+			fail("Expected execution monitor to be complete");
+		assertFalse(executionMonitor.isDone());
+		assertTrue(executionMonitor.isClosed());
+	}
+
+	@Test
+	public void ResolvesInbalancedPartialFillsCreatesMultipleBalanceTrades() throws InterruptedException {
+		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "2.5", "2.5");
+		Order longOrder = orderService.pollOrderUpdate(100);
+		Order shortOrder = orderService.pollOrderUpdate(100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13310"}, new String[]{"13"}, new String[]{"0.13410"}, new String[]{"15"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"11"}, new String[]{"0.13590"}, new String[]{"12"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+				OrderStatus.OPEN, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.4"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("1.1"));
+		canProceed.set(true);
+		proceedLatch.countDown();
+		longOrder = orderService.pollOrderUpdate(100);
+		shortOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(100);
+		shortOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		Order newLongOrder = orderService.pollOrderUpdate(100);
+		Order newShortOrder = orderService.pollOrderUpdate(100);
+		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
+		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
+		TestUtils.assertEquals("0.13410", newLongOrder.getPrice());
+		assertTrue(longOrder.getAmount().compareTo(newLongOrder.getAmount()) > 0);
+		assertEquals(MockOrderService.BIT, newLongOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newLongOrder.getOrderStatus());
+		TestUtils.assertEquals("0.13490", newShortOrder.getPrice());
+		assertTrue(shortOrder.getAmount().compareTo(newShortOrder.getAmount()) > 0);
+		assertEquals(MockOrderService.POL, newShortOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13350"}, new String[]{"13"}, new String[]{"0.13450"}, new String[]{"15"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13450"}, new String[]{"11"}, new String[]{"0.13550"}, new String[]{"12"}));
+		orderService.clearDesiredOrderStatus();
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
+		canProceed.set(true);
+		proceedLatch.countDown();
+		longOrder = orderService.pollOrderUpdate(100);
+		shortOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		Order balancingOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(balancingOrder);
+		TestUtils.assertEquals("0.7", balancingOrder.getAmount());
+		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		newLongOrder = orderService.pollOrderUpdate(100);
+		newShortOrder = orderService.pollOrderUpdate(100);
+		assertNull(newLongOrder);
+		assertNull(newShortOrder);
+		// let the balancing order be partially filled
+		orderService.clearDesiredOrderStatus();
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, 
+				OrderStatus.OPEN, OrderStatus.CANCELLED});
+		orderService.setDefaultDesiredOrderStatus(OrderStatus.PARTIALLY_FILLED);
+		canProceed.set(true);
+		proceedLatch.countDown();
+		balancingOrder = orderService.pollOrderUpdate(100);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, balancingOrder.getOrderStatus());
+		balancingOrder = orderService.pollOrderUpdate(100);
+		assertEquals(OrderStatus.CANCELLED, balancingOrder.getOrderStatus());
+		Order newBalancingOrder = orderService.pollOrderUpdate(100);
+		assertNotNull(newBalancingOrder);
+		assertTrue(new BigDecimal("0.7").compareTo(newBalancingOrder.getAmount()) > 0);
+		assertEquals(OrderStatus.OPEN, newBalancingOrder.getOrderStatus());
+		// The ExecutionMonitor only waits 5 seconds until giving up
+		testLatch.await(6000, TimeUnit.MILLISECONDS);
+		if (testLatch.getCount() > 0)
+			fail("Expected execution monitor to be complete");
+		assertFalse(executionMonitor.isDone());
+		assertTrue(executionMonitor.isClosed());
+	}
+
+	@SuppressWarnings("unused")
 	private void pollForStatuses(OrderStatus... statuses) throws InterruptedException {
 		for (OrderStatus status : statuses) {
 			Order order = orderService.pollOrderUpdate(100);
+			assertNotNull("Was execting an order with status " + status, order);
 			assertEquals(status, order.getOrderStatus());
 		}
 	}
@@ -391,7 +541,7 @@ public class TestExecutionMonitor {
 			String longAmount, String shortAmount, String longMarket, String shortMarket, 
 			OrderStatus longOpenStatus, OrderStatus shortOpenStatus) {
 		CurrencyPair pair = TestUtils.cpFor(currencyPair);
-		orderService.setDesiredOrderStatuses(new OrderStatus[]{longOpenStatus, shortOpenStatus});
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{longOpenStatus, shortOpenStatus});
 		ArbInstruction arbInstruction = ArbInstructionFactory.createArbInstruction(ArbDecision.HIGH, new BigDecimal("0.1"), 
 				pair.getQuotedCurrency(), pair, new BidAskPrice(new BigDecimal(longPrice), new BigDecimal(shortPrice)), 
 				new BidAskAmount(new TradeAmount(new BigDecimal(longAmount), BigDecimal.ZERO), new TradeAmount(new BigDecimal(shortAmount), BigDecimal.ZERO)), 
