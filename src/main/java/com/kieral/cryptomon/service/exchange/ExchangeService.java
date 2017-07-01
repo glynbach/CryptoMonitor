@@ -1,9 +1,11 @@
 package com.kieral.cryptomon.service.exchange;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
@@ -74,6 +76,11 @@ public interface ExchangeService {
 	OrderStatus placeOrder(Order order);
 
 	/**
+	 * Determines a top of book price and places a limit order on the exchange returning the resulting status (CANCELLED if failed to place the order)
+	 */
+	OrderStatus placeMarketOrder(Order order);
+
+	/**
 	 * Cancels a known limit order on the exchange returning the resulting status or existing status if failed to cancel
 	 */
 	OrderStatus cancelOrder(Order order);
@@ -97,5 +104,10 @@ public interface ExchangeService {
 	 * Returns the ServiceExchangeProperties
 	 */
 	ServiceExchangeProperties getProperties();
+	
+	/**
+	 * A fat finger price check before placing orders
+	 */
+	boolean passesLastlookPriceCheck(Side side, CurrencyPair pair, BigDecimal price);
 
 }

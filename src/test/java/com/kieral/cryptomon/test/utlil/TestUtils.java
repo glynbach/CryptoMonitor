@@ -1,6 +1,8 @@
 package com.kieral.cryptomon.test.utlil;
 
 import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -16,6 +18,9 @@ import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBookEntry;
 import com.kieral.cryptomon.model.trading.TradingFeeType;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
+import com.kieral.cryptomon.service.exchange.bittrex.payload.BittrexOrderBookResponse;
+import com.kieral.cryptomon.service.exchange.gdax.payload.GdaxOrderBookResponse;
+import com.kieral.cryptomon.service.exchange.poloniex.payload.PoloniexOrderBookResponse;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 
 public class TestUtils {
@@ -89,6 +94,7 @@ public class TestUtils {
 			}
 			ob.setAsks(askEntries);
 		}
+		ob.setValid(true);
 		return ob;
 	}
 
@@ -175,6 +181,159 @@ public class TestUtils {
 		}
 	}
 	
+	public static String getLogValue(String label, String seperator, String line) {
+		if (line == null || label == null)
+			return null;
+		if (!label.endsWith("="))
+			label = label.trim() + "=";
+		int pos = line.indexOf(label);
+		if (pos == -1)
+			return null;
+		int endPos = line.indexOf(seperator, pos);
+		if (endPos == -1)
+			endPos = line.length();
+		return line.substring(pos + label.length(), endPos).trim();
+	}
+
+	public static List<List<String>> tokeniseLogArrayEntry(String logArrayEntry) {
+		List<List<String>> rtn = new ArrayList<List<String>>();
+		if (logArrayEntry == null || logArrayEntry.length() == 0)
+			return rtn;
+		String[] elements = logArrayEntry.replaceAll("\\[\\[", "[").replaceAll("\\]", "").split("\\[");
+		for (String element : elements) {
+			if (element.trim().length() > 0) {
+				List<String> entries = new ArrayList<String>();
+				for (String elementEntry : element.trim().split(","))
+					entries.add(elementEntry.trim());
+				rtn.add(entries);
+			}
+		}
+		return rtn;
+	}
+	
+	public static List<GdaxOrderBookResponse> convertGdaxLogs(CurrencyPair currencyPair, InputStream resourceStream) throws IOException {
+		List<GdaxOrderBookResponse> rtn = new ArrayList<GdaxOrderBookResponse>();
+		if (resourceStream != null) {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(resourceStream));
+			try {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					if (line.contains("sequence")) {
+						long sequence = Long.valueOf(getLogValue("sequence", ",", line));
+						String bids = getLogValue("bids", "]]", line) + "]]";
+						List<List<String>> bidEntries = tokeniseLogArrayEntry(bids);
+						String asks = getLogValue("asks", "]]", line) + "]]";
+						List<List<String>> askEntries = tokeniseLogArrayEntry(asks);
+						GdaxOrderBookResponse response = new GdaxOrderBookResponse();
+						response.setSequence(sequence);
+						response.setCurrencyPair(currencyPair);
+						response.setBids(bidEntries);
+						response.setAsks(askEntries);
+						rtn.add(response);
+					}
+				}
+			} finally {
+				try {
+					reader.close();
+				} catch (Exception e) {}
+			}
+		}
+		return rtn;
+	}
+
+	public static List<PoloniexOrderBookResponse> convertPoloniexLogs(CurrencyPair currencyPair, InputStream resourceStream) throws IOException {
+		List<PoloniexOrderBookResponse> rtn = new ArrayList<PoloniexOrderBookResponse>();
+		if (resourceStream != null) {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(resourceStream));
+			try {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					if (line.contains("createdTime")) {
+						long seq = Long.valueOf(getLogValue("seq", ",", line));
+						String isFrozen = getLogValue("isFrozen", ",", line);
+						String bids = getLogValue("bids", "]]", line) + "]]";
+						List<List<String>> bidEntries = tokeniseLogArrayEntry(bids);
+						String asks = getLogValue("asks", "]]", line) + "]]";
+						List<List<String>> askEntries = tokeniseLogArrayEntry(asks);
+						PoloniexOrderBookResponse response = new PoloniexOrderBookResponse();
+						response.setSeq(seq);
+						response.setIsFrozen(isFrozen);
+						response.setCurrencyPair(currencyPair);
+						response.setBids(bidEntries);
+						response.setAsks(askEntries);
+						rtn.add(response);
+					}
+				}
+			} finally {
+				try {
+					reader.close();
+				} catch (Exception e) {}
+			}
+		}
+		return rtn;
+	}
+
+	public static List<BittrexOrderBookResponse> convertBittrexLogs(CurrencyPair currencyPair, InputStream resourceStream) throws IOException {
+		List<BittrexOrderBookResponse> rtn = new ArrayList<BittrexOrderBookResponse>();
+		if (resourceStream != null) {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(resourceStream));
+			try {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					if (line.contains("createdTime")) {
+						boolean success  = Boolean.valueOf(getLogValue("success", ",", line));
+						String message = getLogValue("message", ",", line);
+						// parse result
+						List<BittrexOrderBookResponse.Entry> buys = new ArrayList<BittrexOrderBookResponse.Entry>(); 
+						List<BittrexOrderBookResponse.Entry> sells = new ArrayList<BittrexOrderBookResponse.Entry>(); 
+						String buysFragment = line.substring(line.indexOf("buy="), line.indexOf("sell="));
+						String sellsFragment = line.substring(line.indexOf("sell="));
+						int pos = 0;
+						while (pos >= 0) {
+							BittrexOrderBookResponse.Entry entry = new BittrexOrderBookResponse.Entry();
+							entry.setQuantity(new BigDecimal(getLogValue("quantity", ",", buysFragment)));
+							String rate = getLogValue("rate", "],", buysFragment);
+							// last rate in array will have ]]
+							rate = rate.replaceAll("\\]", "");
+							entry.setRate(new BigDecimal(rate));
+							buys.add(entry);
+							pos = buysFragment.indexOf("Entry", buysFragment.indexOf("Entry") + "Entry".length());
+							if (pos >= 0)
+								buysFragment = buysFragment.substring(pos);
+						}
+						pos = 0;
+						while (pos >= 0) {
+							BittrexOrderBookResponse.Entry entry = new BittrexOrderBookResponse.Entry();
+							entry.setQuantity(new BigDecimal(getLogValue("quantity", ",", sellsFragment)));
+							String rate = getLogValue("rate", "],", sellsFragment);
+							// last rate in array will have ]]
+							rate = rate.replaceAll("\\]", "");
+							entry.setRate(new BigDecimal(rate));
+							sells.add(entry);
+							pos = sellsFragment.indexOf("Entry", sellsFragment.indexOf("Entry") + "Entry".length());
+							if (pos >= 0)
+								sellsFragment = sellsFragment.substring(pos);
+						}
+						BittrexOrderBookResponse.Result result = new BittrexOrderBookResponse.Result();
+						result.setBuy(buys);
+						result.setSell(sells);
+						BittrexOrderBookResponse response = new BittrexOrderBookResponse();
+						response.setSuccess(success);
+						response.setMessage(message);
+						response.setCurrencyPair(currencyPair);
+						response.setResult(result);
+						rtn.add(response);
+					}
+				}
+			} finally {
+				try {
+					reader.close();
+				} catch (Exception e) {}
+			}
+		}
+		return rtn;
+	}
+
 	private static class ObEntry implements OrderBookEntry {
 
 		private final Side side;

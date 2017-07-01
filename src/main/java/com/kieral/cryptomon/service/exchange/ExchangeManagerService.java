@@ -136,6 +136,14 @@ public class ExchangeManagerService {
 		}
 	}
 
+	public OrderStatus placeMarketOrder(Order order) {
+		if (checkWithMessageUpdateMarketStatus(order)) {
+			return enabledExchangeMap.get(order.getMarket()).placeMarketOrder(order);
+		} else {
+			return OrderStatus.CANCELLED;
+		}
+	}
+
 	public OrderStatus cancelOrder(Order order) {
 		if (checkWithMessageUpdateMarketStatus(order)) {
 			return enabledExchangeMap.get(order.getMarket()).cancelOrder(order);

@@ -1,5 +1,6 @@
 package com.kieral.cryptomon.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +40,7 @@ public class OrderServiceImpl implements OrderService {
 
 	private static final AtomicLong orderIdCounter = new AtomicLong(Instant.now().getEpochSecond());
 	private static final AtomicInteger counter = new AtomicInteger(0);
+	private static final BigDecimal MARKET_ORDER_PRICE = new BigDecimal("-1");
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
@@ -120,7 +122,13 @@ public class OrderServiceImpl implements OrderService {
 		rtn.addAll(getClosedOrders(market));
 		return rtn;
 	}
-	
+
+	@Override
+	public void placeMarketOrder(Order order) {
+		order.setPrice(MARKET_ORDER_PRICE);
+		placeOrder(order);
+	}
+
 	@Override
 	public void placeOrder(Order order) {
 		if (order.getMarket() == null)
@@ -149,7 +157,11 @@ public class OrderServiceImpl implements OrderService {
 			order.setCreatedTime(System.currentTimeMillis());
 		updateStatus(order, order.getOrderStatus());
 		try {
-			OrderStatus status = exchangeManagerService.placeOrder(order);
+			OrderStatus status;
+			if (order.getPrice() == MARKET_ORDER_PRICE)
+				status = exchangeManagerService.placeMarketOrder(order);
+			else
+				status = exchangeManagerService.placeOrder(order);
 			if (order.getOrderId() == null)
 				throw new IllegalStateException("No orderId returned from placing order");
 			updateStatus(order, status);
@@ -213,6 +225,8 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	private void updateStatus(Order order, OrderStatus orderStatus) {
+		if (order == null || order.getOrderStatus() == orderStatus)
+			return;
 		logger.info("Updating order status to {} for order {}", orderStatus, order);
 		if (OrderStatus.OPEN_ORDER.contains(orderStatus)) {
 			if (OrderStatus.CLOSED_ORDER.contains(order.getOrderStatus())) {

@@ -11,7 +11,7 @@ public enum OrderStatus {
 	CANCELLED,
 	ERROR;
 	
-	public final static EnumSet<OrderStatus> OPEN_ORDER = EnumSet.of(OrderStatus.PENDING, OrderStatus.OPEN, OrderStatus.ERROR);
+	public final static EnumSet<OrderStatus> OPEN_ORDER = EnumSet.of(OrderStatus.PENDING, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED, OrderStatus.ERROR);
 	public final static EnumSet<OrderStatus> CLOSED_ORDER = EnumSet.of(OrderStatus.FILLED, OrderStatus.CANCELLED);
 	
 }
