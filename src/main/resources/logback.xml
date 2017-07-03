@@ -53,6 +53,7 @@
 		<appender-ref ref="DATA_FILE"/>
 	</logger>
 
+	<logger name="com.kieral.cryptomon.service.arb.execution" level="DEBUG" />
 	<!--
 	<logger name="org.apache.http.wire" level="DEBUG" />
 	<logger name="org.apache.http.headers" level="DEBUG" />

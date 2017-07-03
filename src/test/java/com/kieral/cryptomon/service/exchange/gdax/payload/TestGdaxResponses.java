@@ -60,7 +60,7 @@ public class TestGdaxResponses {
 	public void testPlaceOrderSuccess() throws JsonParseException, JsonMappingException, IOException {
 		GdaxPlaceOrderResponse response = objectMapper.readValue(this.getClass().getResourceAsStream("/gdax/placeOrderSuccess.json"), GdaxPlaceOrderResponse.class);
 		System.out.println(response);
-		assertEquals(OrderStatus.OPEN, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.PENDING));
+		assertEquals(OrderStatus.OPEN, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.SENDING));
 		assertEquals("3d0fb74e-e4b5-43b5-98cd-a79cdfb13810", response.getOrderId());
 	}
 

@@ -218,7 +218,7 @@ public class BalanceService {
 	
 	@Override
 	public String toString() {
-		return "BalanceHandler [balances=" + balances + "]";
+		return "BalanceService [balances=" + balances + "]";
 	}
 	
 }

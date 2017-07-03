@@ -46,7 +46,6 @@ public class PoloniexAccountsResponse implements AccountsResponse {
 	@Override
 	public List<AccountResponse> getAccountResponses() {
 		List<AccountResponse> accountResponses = new ArrayList<AccountResponse>();
-		// TODO: get wallet addresses and set them here too
 		if (btc != null) {
 			btc.setCurrency(Currency.BTC);
 			accountResponses.add(btc);

@@ -58,7 +58,7 @@ public class TestBittrexResponses {
 	public void testPlaceOrderFailure() throws JsonParseException, JsonMappingException, IOException {
 		BittrexActionResponseContainer response = objectMapper.readValue(this.getClass().getResourceAsStream("/bittrex/placeOrderFailure.json"), BittrexActionResponseContainer.class);
 		System.out.println(response);
-		assertEquals(OrderStatus.CANCELLED, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.PENDING));
+		assertEquals(OrderStatus.CANCELLED, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.SENDING));
 		assertEquals("DUST_TRADE_DISALLOWED_MIN_VALUE_50K_SAT", response.getMessage());
 	}
 
@@ -66,7 +66,7 @@ public class TestBittrexResponses {
 	public void testPlaceOrderSuccess() throws JsonParseException, JsonMappingException, IOException {
 		BittrexActionResponseContainer response = objectMapper.readValue(this.getClass().getResourceAsStream("/bittrex/placeOrderSuccess.json"), BittrexActionResponseContainer.class);
 		System.out.println(response);
-		assertEquals(OrderStatus.OPEN, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.PENDING));
+		assertEquals(OrderStatus.OPEN, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.SENDING));
 		assertEquals("96eb6d8e-bc4a-4bd5-a59d-d05c603ad655", response.getOrderId());
 	}
 

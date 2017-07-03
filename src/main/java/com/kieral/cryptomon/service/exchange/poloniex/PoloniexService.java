@@ -149,7 +149,6 @@ public class PoloniexService extends BaseExchangeService {
 	
 	@Override
 	protected void unsubscribeMarketDataTopics() {
-		// TODO Auto-generated method stub
 	}
 
 	@Override

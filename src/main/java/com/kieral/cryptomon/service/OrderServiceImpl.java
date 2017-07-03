@@ -24,8 +24,6 @@ import javax.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
@@ -33,9 +31,9 @@ import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.exception.OrderNotExistsException;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
+import com.kieral.cryptomon.service.exchange.ExchangeService;
 
 @Component
-@EnableScheduling
 public class OrderServiceImpl implements OrderService {
 
 	private static final AtomicLong orderIdCounter = new AtomicLong(Instant.now().getEpochSecond());
@@ -68,11 +66,7 @@ public class OrderServiceImpl implements OrderService {
 				if (enabled) {
 					logger.info("Exchange {} enabled for trading", exchange.getName());
 					asyncProcessor.submit(() -> {
-						try {
-							exchange.updateBalances(true);
-						} catch (Exception e) {
-							logger.error("Error updating balances for " + exchange.getName());
-						}
+						requestBalances(exchange, 0);
 						List<Order> openOrders = exchange.getOpenOrders();
 						if (openOrders != null) {
 							openOrders.forEach(order -> {
@@ -83,6 +77,21 @@ public class OrderServiceImpl implements OrderService {
 				}
 			});
 		});
+	}
+	
+	private void requestBalances(ExchangeService exchange, long delay) {
+		if (delay > 0) {
+			try {
+				Thread.sleep(delay);
+			} catch (InterruptedException e) {}
+		}
+		try {
+			exchange.updateBalances(true);
+		} catch (Exception e) {
+			logger.error("Error updating balances for " + exchange.getName(), e);
+			// resubmit with delay
+			requestBalances(exchange, 1000);
+		}
 	}
 
 	@Override
@@ -124,13 +133,13 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	@Override
-	public void placeMarketOrder(Order order) {
+	public boolean placeMarketOrder(Order order) {
 		order.setPrice(MARKET_ORDER_PRICE);
-		placeOrder(order);
+		return placeOrder(order);
 	}
 
 	@Override
-	public void placeOrder(Order order) {
+	public boolean placeOrder(Order order) {
 		if (order.getMarket() == null)
 			throw new IllegalArgumentException("market can not be null");
 		if (order.getAmount() == null)
@@ -142,8 +151,8 @@ public class OrderServiceImpl implements OrderService {
 		if (order.getSide() == null)
 			throw new IllegalArgumentException("side can not be null");
 		if (order.getOrderStatus() == null)
-			order.setOrderStatus(OrderStatus.PENDING);
-		if (order.getOrderStatus() != OrderStatus.PENDING)
+			order.setOrderStatus(OrderStatus.INITIALISED);
+		if (order.getOrderStatus() != OrderStatus.INITIALISED)
 			throw new IllegalStateException(String.format("Cannot place an order with status %s", order.getOrderStatus()));
 		if (order.getCurrencyPair() == null) {
 			CurrencyPair currencyPair = exchangeManagerService.getCurrencyPair(order.getMarket(), order.getCurrencyPairStr());
@@ -155,7 +164,7 @@ public class OrderServiceImpl implements OrderService {
 			order.setClientOrderId(generateClientOrderId());
 		if (order.getCreatedTime() == 0)
 			order.setCreatedTime(System.currentTimeMillis());
-		updateStatus(order, order.getOrderStatus());
+		updateStatus(order, OrderStatus.SENDING);
 		try {
 			OrderStatus status;
 			if (order.getPrice() == MARKET_ORDER_PRICE)
@@ -165,6 +174,7 @@ public class OrderServiceImpl implements OrderService {
 			if (order.getOrderId() == null)
 				throw new IllegalStateException("No orderId returned from placing order");
 			updateStatus(order, status);
+			return status == OrderStatus.OPEN;
 		} catch (Exception e) {
 			logger.error("Uncaught error attempting to place order {} - checking open orders to see if it has been placed", order, e);
 			// if the service could not handle the exception then we don't know the outcome of the order; check all known open orders
@@ -183,7 +193,7 @@ public class OrderServiceImpl implements OrderService {
 									logger.info("open order {} is a match to {}", openOrder, order);
 									order.setOrderId(openOrder.getOrderId());
 									updateStatus(order, openOrder.getOrderStatus());
-									return;
+									return true;
 								}
 							} 
 						}
@@ -192,6 +202,7 @@ public class OrderServiceImpl implements OrderService {
 					logger.info("No open orders found we don't know about - marking {} as cancelled", order);
 					updateStatus(order, OrderStatus.CANCELLED);
 				}
+				return false;
 			} catch (Exception ex) {
 				// TODO: we need to send an SMS alert or attempt a full recovery
 				logger.error("Unable to check open orders - we now have an order {} with an unknown state", order);
@@ -203,18 +214,22 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	@Override
-	public void cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
+	public boolean cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
 		Order order = get(openOrders, market, clientOrderId);
 		if (order == null) {
 			order = get(closedOrders, market, clientOrderId);
 			if (order != null) {
 				logger.warn("Received cancel for already cancelled order {} - sending cancel anyway", order);
-				updateStatus(order, exchangeManagerService.cancelOrder(order));
+				OrderStatus status = exchangeManagerService.cancelOrder(order);
+				updateStatus(order, status);
+				return status != OrderStatus.ERROR;
 			} else {
 				throw new OrderNotExistsException(String.format("No order exists to cancel for clientOrderId {}", clientOrderId));
 			}
 		} else {
-			updateStatus(order, exchangeManagerService.cancelOrder(order));
+			OrderStatus status = exchangeManagerService.cancelOrder(order);
+			updateStatus(order, status);
+			return status != OrderStatus.ERROR;
 		}
 	}
 
@@ -252,23 +267,6 @@ public class OrderServiceImpl implements OrderService {
 		});
 	}
 	
-    @Scheduled(fixedRate = 1000)
-    public void checkOpenOrders() {
-    	// TODO: this might be a bit spammy - it might be better to request updates from arb manager
-//    	openOrders.keySet().forEach(market -> {
-//    		List<Order> openOrders = getOpenOrders(market);
-//    		if (openOrders.size() > 0) {
-//    			logger.info("Checking status of open orders on {}", market);
-//    			Map<String, OpenOrderStatus> statuses = exchangeManagerService.getOpenOrderStatuses(market, openOrders);
-//    			if (statuses != null) {
-//    				statuses.values().forEach(status -> {
-//    					updateStatus(status.getOrder(), status.getNewStatus(), status.getAmountRemaining());
-//    				});
-//    			}
-//    		}
-//    	});
-    }
-    
 	@Override
 	public void checkStatus(String market, String clientOrderId) throws OrderNotExistsException {
 		Order order = get(openOrders, market, clientOrderId);

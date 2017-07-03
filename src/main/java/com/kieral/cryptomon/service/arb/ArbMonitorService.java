@@ -1,7 +1,6 @@
 package com.kieral.cryptomon.service.arb;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.kieral.cryptomon.model.orderbook.OrderBook;
-import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 
@@ -25,8 +23,6 @@ public class ArbMonitorService implements ArbService {
 
 	@Autowired
 	ExchangeManagerService exchangeManager;
-	@Autowired
-	BalanceService balanceHandler;
 	@Autowired
 	ArbInspector arbInspector;
 	@Autowired
@@ -100,13 +96,12 @@ public class ArbMonitorService implements ArbService {
 			if (logger.isDebugEnabled())
 				logger.debug("results of sweep {}", instructions);
 			if (instructions.size() > 0 && instructions.get(0).getDecision() != ArbDecision.NOTHING_THERE) {
-				BigDecimal usdValue = instructions.get(0).getEstimatedValue().multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP);
-				logger.info("Best arb decision for ~ {} {} {}", usdValue, "USD", instructions.get(0));
-				// check affect of transfer fees
-				// check inflight statuses
-				// check market conditions
-				// TODO: handle sending multiple instructions
-				arbInstructionHandler.onArbInstruction(instructions.get(0));
+				try {
+					arbInstructionHandler.onArbInstruction(instructions.get(0));
+				} catch (Exception e) {
+					logger.error("Uncaught exception processing arb instruction {} - suspending service", instructions.get(0), e);
+					suspend(true);
+				}
 			}
 		}
 	}

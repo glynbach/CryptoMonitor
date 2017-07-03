@@ -5,8 +5,10 @@ import java.util.EnumSet;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.Side;
+import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.sided.SidedValue;
 import com.kieral.cryptomon.model.trading.TradeAmount;
+import com.kieral.cryptomon.service.util.Tuple2;
 
 public class ArbInstruction {
 
@@ -16,12 +18,15 @@ public class ArbInstruction {
 	private final BigDecimal estimatedValue;
 	private final SidedArbInstructionLeg legs;
 	private final String message;
+	private final Tuple2<OrderBook, OrderBook> orderBooks;
 
-	public ArbInstruction(ArbDecision decision, BigDecimal estimatedValue, SidedArbInstructionLeg legs, String message) {
+	public ArbInstruction(ArbDecision decision, BigDecimal estimatedValue, SidedArbInstructionLeg legs, String message,
+			Tuple2<OrderBook, OrderBook> orderBooks) {
 		this.decision = decision;
 		this.estimatedValue = estimatedValue;
 		this.legs = legs;
 		this.message = message;
+		this.orderBooks = orderBooks;
 	}
 
 	public ArbDecision getDecision() {
@@ -42,6 +47,10 @@ public class ArbInstruction {
 
 	public String getMessage() {
 		return message;
+	}
+
+	public Tuple2<OrderBook, OrderBook> getOrderBooks() {
+		return orderBooks;
 	}
 
 	public static class SidedArbInstructionLeg extends SidedValue<ArbInstructionLeg> {
@@ -104,7 +113,7 @@ public class ArbInstruction {
 	@Override
 	public String toString() {
 		return "ArbInstruction [decision=" + decision + ", estimatedValue=" + estimatedValue + ", legs=" + legs
-				+ ", message=" + message + "]";
+				+ ", message=" + message + ", orderBooks=" + orderBooks + "]";
 	}
 	
 }

@@ -330,18 +330,18 @@ public class MockOrderService implements OrderService {
 	}
 
 	@Override
-	public void placeOrder(Order order) {
-		orderService.placeOrder(order);
+	public boolean placeOrder(Order order) {
+		return orderService.placeOrder(order);
 	}
 
 	@Override
-	public void placeMarketOrder(Order order) {
-		orderService.placeMarketOrder(order);
+	public boolean placeMarketOrder(Order order) {
+		return orderService.placeMarketOrder(order);
 	}
 
 	@Override
-	public void cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
-		orderService.cancelOrder(market, clientOrderId);
+	public boolean cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
+		return orderService.cancelOrder(market, clientOrderId);
 	}
 
 	@Override

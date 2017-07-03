@@ -23,12 +23,16 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
+import com.kieral.cryptomon.service.BackOfficeService;
+import com.kieral.cryptomon.service.BackOfficeServiceImpl;
 import com.kieral.cryptomon.service.BalanceService;
+import com.kieral.cryptomon.service.CommonPollingService;
 import com.kieral.cryptomon.service.OrderService;
 import com.kieral.cryptomon.service.OrderServiceImpl;
-import com.kieral.cryptomon.service.arb.ArbInstruction;
+import com.kieral.cryptomon.service.PollingService;
 import com.kieral.cryptomon.service.arb.ArbMonitorService;
 import com.kieral.cryptomon.service.arb.SimpleArbInspector;
+import com.kieral.cryptomon.service.arb.execution.GloballyExclusiveExecutionController;
 import com.kieral.cryptomon.service.arb.ArbInspector;
 import com.kieral.cryptomon.service.arb.ArbInstructionHandler;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
@@ -123,6 +127,11 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 
 	@Bean
+	PollingService pollingService() {
+		return new CommonPollingService();
+	}
+	
+	@Bean
 	OrderService orderService() {
 		return new OrderServiceImpl();
 	}
@@ -133,9 +142,9 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 	
 	@Bean
-	BalanceService balanceHandler() {
-		BalanceService balanceHandler = new BalanceService();
-		return balanceHandler;
+	BalanceService balanceService() {
+		BalanceService balanceService = new BalanceService();
+		return balanceService;
 	}
 	
 	@Bean
@@ -145,13 +154,7 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	
 	@Bean
 	ArbInstructionHandler arbInstructionHandler() {
-		// TODO: implement this
-		return new ArbInstructionHandler() {
-			@Override
-			public boolean onArbInstruction(ArbInstruction instruction) {
-				return true;
-			}
-		};
+		return new GloballyExclusiveExecutionController();
 	}
 
 	@Override
@@ -176,6 +179,12 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	ArbInspector arbInspector() {
 		return new SimpleArbInspector();
 	}
+
+	@Bean
+	BackOfficeService backOfficeService() {
+		return new BackOfficeServiceImpl();
+	}
+
 	/**
 	 * Set additional logging properties
 	 */

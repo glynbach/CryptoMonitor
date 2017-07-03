@@ -22,11 +22,11 @@ public interface OrderService {
 
 	public List<Order> getAllOrders(String market);
 	
-	public void placeOrder(Order order);
+	public boolean placeOrder(Order order);
 
-	public void placeMarketOrder(Order order);
+	public boolean placeMarketOrder(Order order);
 
-	public void cancelOrder(String market, String clientOrderId) throws OrderNotExistsException;
+	public boolean cancelOrder(String market, String clientOrderId) throws OrderNotExistsException;
 
 	public OrderStatus forceCancelOrder(String market, String orderId) throws OrderNotExistsException;
 
