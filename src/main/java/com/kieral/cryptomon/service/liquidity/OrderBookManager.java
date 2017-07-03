@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PostConstruct;
 
@@ -38,6 +39,7 @@ public class OrderBookManager {
 	private static final PriceComparer ASK_COMPARER = new PriceComparer(Side.ASK);  
 
 	private final ConcurrentMap<OrderBookKey, OrderBook> orderBooks = new ConcurrentHashMap<OrderBookKey, OrderBook>(); 
+	private final ConcurrentMap<OrderBookKey, AtomicInteger> orderBookSequencers = new ConcurrentHashMap<OrderBookKey, AtomicInteger>(); 
 	private final ConcurrentMap<OrderBookKey, Object> orderBookLocks = new ConcurrentHashMap<OrderBookKey, Object>(); 
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -101,6 +103,8 @@ public class OrderBookManager {
 		OrderBookKey key = new OrderBookKey(market, currencyPair.getName());
 		orderBooks.putIfAbsent(key, new OrderBook(market, currencyPair, 
 				sequenceNumber == AUTO_INCREMENT_SEQUENCE ? 0 : sequenceNumber, updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime, valid));
+		if (sequenceNumber == AUTO_INCREMENT_SEQUENCE)
+			orderBookSequencers.putIfAbsent(key, new AtomicInteger(0));
 		OrderBook orderBook = orderBooks.get(key);
 		orderBookLocks.putIfAbsent(key, new Object());
 		Object lock = orderBookLocks.get(key);
@@ -169,7 +173,7 @@ public class OrderBookManager {
 			}
 			orderBook.setSnapshotReceived(updatesReceiedTime <= 0 ? System.currentTimeMillis() : updatesReceiedTime);
 			if (sequenceNumber == AUTO_INCREMENT_SEQUENCE)
-				sequenceNumber = orderBook.getSnapshotSequence() + 1;
+				sequenceNumber = orderBookSequencers.getOrDefault(key, new AtomicInteger()).incrementAndGet();
 			orderBook.setSnapshotSequence(sequenceNumber);
 			if (valid && orderBookSanityChecker != null)
 				valid = orderBookSanityChecker.isValid(orderBook);

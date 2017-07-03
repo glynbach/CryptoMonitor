@@ -20,28 +20,28 @@ public class TestSimpleArbInspector {
 
 	SimpleArbInspector arbInspector;
 	OrderBookConfig orderBookConfig;
-	BalanceService balanceHandler;
+	BalanceService balanceService;
 	OrderBookManager orderBookManager;
 	
 	@Before
 	public void setUp() {
 		arbInspector = new SimpleArbInspector();
 		orderBookConfig = TestUtils.obConfig();
-		balanceHandler = new BalanceService();
+		balanceService = new BalanceService();
 		orderBookManager = new OrderBookManager();
-		ReflectionTestUtils.setField(arbInspector, "balanceHandler", balanceHandler);
+		ReflectionTestUtils.setField(arbInspector, "balanceService", balanceService);
 		ReflectionTestUtils.setField(arbInspector, "orderBookManager", orderBookManager);
 		ReflectionTestUtils.setField(arbInspector, "orderBookConfig", orderBookConfig);
 		ReflectionTestUtils.setField(orderBookManager, "orderBookConfig", orderBookConfig);
-		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test1", Currency.LTC, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test1", Currency.ETH, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test2", Currency.BTC, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test2", Currency.ETH, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test3", Currency.BTC, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test3", Currency.LTC, new BigDecimal(100), true);
-		balanceHandler.setConfirmedBalance("Test3", Currency.ETH, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test1", Currency.LTC, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test1", Currency.ETH, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test2", Currency.BTC, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test2", Currency.ETH, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test3", Currency.BTC, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test3", Currency.LTC, new BigDecimal(100), true);
+		balanceService.setConfirmedBalance("Test3", Currency.ETH, new BigDecimal(100), true);
 	}
 	
 	@Test
@@ -96,7 +96,7 @@ public class TestSimpleArbInspector {
 
 	@Test
 	public void testSomethingThereCrossedMarketsUsesLowestSellBalance() {
-		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(20), true);
+		balanceService.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(20), true);
 		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
@@ -117,7 +117,7 @@ public class TestSimpleArbInspector {
 
 	@Test
 	public void testSomethingThereCrossedMarketsUsesLowestBuyBalance() {
-		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(1), true);
+		balanceService.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(1), true);
 		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
@@ -139,7 +139,7 @@ public class TestSimpleArbInspector {
 	
 	@Test
 	public void testNothingThereCrossedMarketsNoBalanceSellSide() {
-		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(0), true);
+		balanceService.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(0), true);
 		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
@@ -150,7 +150,7 @@ public class TestSimpleArbInspector {
 
 	@Test
 	public void testNothingThereCrossedMarketsNoBalanceBuySide() {
-		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(0), true);
+		balanceService.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(0), true);
 		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
@@ -161,7 +161,7 @@ public class TestSimpleArbInspector {
 
 	@Test
 	public void testNothingThereCrossedMarketsInsignificantBalanceSellSide() {
-		balanceHandler.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(0.001), true);
+		balanceService.setConfirmedBalance("Test2", Currency.LTC, new BigDecimal(0.001), true);
 		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 
@@ -172,7 +172,7 @@ public class TestSimpleArbInspector {
 
 	@Test
 	public void testNothingThereCrossedMarketsInsignificantBalanceBuySide() {
-		balanceHandler.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(0.0001), true);
+		balanceService.setConfirmedBalance("Test1", Currency.BTC, new BigDecimal(0.0001), true);
 		ArbInstruction instruction = arbInspector.examine(
 				TestUtils.ob("Test1", cp(Currency.LTC, Currency.BTC), 
 						new String[]{"0.01950100"}, new String[]{"10000"}, new String[]{"0.01960100"}, new String[]{"10000"}), 

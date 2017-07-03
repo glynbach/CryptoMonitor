@@ -11,6 +11,8 @@ import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.util.CommonUtils;
+import com.kieral.cryptomon.service.util.Tuple2;
+import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.general.LiquidityEntry;
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
@@ -22,11 +24,12 @@ import com.kieral.cryptomon.model.trading.TradeAmount;
 public class SimpleArbInspector implements ArbInspector {
 
 	private final static ArbInstruction NO_ARB = ArbInstructionFactory.createNoArbInstruction(null);
+	private final static BigDecimal NINETY_NINE = new BigDecimal("99");
 	
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
 	@Autowired
-	BalanceService balanceHandler;
+	BalanceService balanceService;
 	@Autowired
 	OrderBookManager orderBookManager;
 	@Autowired
@@ -42,8 +45,22 @@ public class SimpleArbInspector implements ArbInspector {
 			logger.warn("Given arb to examine for different currencies {} {}", market1, market2);
 			return NO_ARB;
 		}
-		if (!market1.isValid() || !market2.isValid() || market1.isStale(5000) || market2.isStale(5000)) {
-			logger.warn("Invalid or stale orderbook detected in {} and {}", market1, market2);
+		if (!market1.isValid()) {
+			logger.warn("Orderbook {} is invalid", market1);
+			return NO_ARB;
+		}
+		if (!market2.isValid()) {
+			logger.warn("Orderbook {} is invalid", market2);
+			return NO_ARB;
+		}
+		if (market1.isStale(1000)) {
+			if (logger.isDebugEnabled())
+				logger.debug("Orderbook {} is stale - time now in millis {}", market1, System.currentTimeMillis());
+			return NO_ARB;
+		}
+		if (market2.isStale(1000)) {
+			if (logger.isDebugEnabled())
+				logger.debug("Orderbook {} is stale - time now in millis {}", market2, System.currentTimeMillis());
 			return NO_ARB;
 		}
 		// basic top of the books check
@@ -67,18 +84,26 @@ public class SimpleArbInspector implements ArbInspector {
 		}
 	}
 
+	private BigDecimal getBaseAmount(LiquidityEntry entry, Side side) {
+		return entry.getBidAskAmount().get(side).getBaseAmount().setScale(8, RoundingMode.HALF_DOWN);
+	}
+
+	private BigDecimal getRoundedNinetyNinePercentOf(BigDecimal amount) {
+		return CommonUtils.getPercentageOf(amount, NINETY_NINE).setScale(8, RoundingMode.HALF_DOWN);
+	}
+
 	private ArbInstruction checkOpportunity(OrderBook buyBook, OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide) {
 		// check available balances
 		// what maximum amount can we do on both sides
-		BigDecimal commonAmount = buySide.getBidAskAmount().get(Side.ASK).getBaseAmount()
-				.compareTo(sellSide.getBidAskAmount().get(Side.BID).getBaseAmount()) > 0
-						? sellSide.getBidAskAmount().get(Side.BID).getBaseAmount() 
-						: buySide.getBidAskAmount().get(Side.ASK).getBaseAmount(); 
+		BigDecimal commonAmount = getBaseAmount(buySide, Side.ASK).compareTo(getBaseAmount(sellSide, Side.BID)) > 0
+						? getBaseAmount(sellSide, Side.BID) : getBaseAmount(buySide, Side.ASK);
+		commonAmount = getRoundedNinetyNinePercentOf(commonAmount);
 		// check sell side first
 		// if we're selling to market we will be be a taker of their bid price and will be paying with balance from quoted currency
-		BigDecimal sellFunds = balanceHandler.getWorkingAmount(sellBook.getMarket(), sellBook.getCurrencyPair().getBaseCurrency());
+		BigDecimal sellFunds = balanceService.getWorkingAmount(sellBook.getMarket(), sellBook.getCurrencyPair().getBaseCurrency());
 		if (sellFunds.compareTo(commonAmount) < 0) {
 			commonAmount = sellFunds;
+			commonAmount = getRoundedNinetyNinePercentOf(commonAmount);
 		}
 		// is this a significant amount?
 		if (!orderBookConfig.isSignificant(sellBook.getMarket(), sellBook.getCurrencyPair().getBaseCurrency(), sellFunds)) {
@@ -87,7 +112,7 @@ public class SimpleArbInspector implements ArbInspector {
 		// now check buy side		
 		// if we're buying from market we will be be a taker of their ask price and will be paying with balance from other currency
 		BigDecimal buyAmountNeeded = buySide.getBidAskPrice().get(Side.ASK).multiply(commonAmount);
-		BigDecimal buyFunds = balanceHandler.getWorkingAmount(buyBook.getMarket(), buyBook.getCurrencyPair().getQuotedCurrency());
+		BigDecimal buyFunds = getRoundedNinetyNinePercentOf(balanceService.getWorkingAmount(buyBook.getMarket(), buyBook.getCurrencyPair().getQuotedCurrency()));
 		buyFunds = buyFunds.compareTo(buyAmountNeeded) < 0 ? buyFunds : buyAmountNeeded;
 		// is this still a significant amount?
 		if (!orderBookConfig.isSignificant(buyBook.getMarket(), buyBook.getCurrencyPair().getQuotedCurrency(), buyFunds)) {
@@ -101,7 +126,7 @@ public class SimpleArbInspector implements ArbInspector {
 				return NO_ARB;
 			}
 		}
-		return checkOpportunity(commonAmount, commonAmount, buyBook, sellBook, buySide, sellSide, false);
+		return checkOpportunity(commonAmount, commonAmount, buyBook, sellBook, buySide, sellSide, false, true);
 	}
 	
 	/**
@@ -110,7 +135,7 @@ public class SimpleArbInspector implements ArbInspector {
 	 * @return
 	 */
 	private ArbInstruction checkOpportunity(BigDecimal longAmount, BigDecimal shortAmount, OrderBook buyBook, 
-			     OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide, boolean baseProfitOnGreatest) {
+			     OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide, boolean baseProfitOnGreatest, boolean validate) {
 		// check opportunity after fees
 		BigDecimal greatestAmount = longAmount.compareTo(shortAmount) > 0 ? longAmount : shortAmount;
 		BigDecimal longReferenceAmount = baseProfitOnGreatest ? greatestAmount : longAmount;
@@ -123,12 +148,15 @@ public class SimpleArbInspector implements ArbInspector {
 				.setScale(sellBook.getCurrencyPair().getPriceScale(), RoundingMode.HALF_DOWN);
 		BigDecimal profit = amountSoldWithFees.subtract(amountBoughtWithFees);
 		if (profit.compareTo(BigDecimal.ZERO) > 0) {
-			return ArbInstructionFactory.createArbInstruction(rateIt(profit), profit, buyBook.getCurrencyPair().getQuotedCurrency(), buyBook.getCurrencyPair(),
+			return ArbInstructionFactory.createArbInstruction(rateIt(profit), profit, buyBook.getCurrencyPair().getQuotedCurrency(), 
+					new Tuple2<CurrencyPair, CurrencyPair>(buyBook.getCurrencyPair(), sellBook.getCurrencyPair()),
 					new BidAskPrice(buySide.getBidAskPrice().get(Side.ASK), sellSide.getBidAskPrice().get(Side.BID)), 
 					new BidAskAmount(
 							new TradeAmount(longAmount, buySide.getBidAskPrice().get(Side.ASK), buyBook.getCurrencyPair().getPriceScale()), 
-							new TradeAmount(shortAmount, sellSide.getBidAskPrice().get(Side.BID), buyBook.getCurrencyPair().getPriceScale())), 
-					new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()));
+							new TradeAmount(shortAmount, sellSide.getBidAskPrice().get(Side.BID), sellBook.getCurrencyPair().getPriceScale())), 
+					new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()),
+					new Tuple2<OrderBook, OrderBook>(buyBook, sellBook),
+					validate);
 		}
 		if (logger.isDebugEnabled())
 			logger.debug("No profit in {} USD after fees for {} and {} prices {} amd {}", profit.multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP), buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
@@ -155,7 +183,7 @@ public class SimpleArbInspector implements ArbInspector {
 		LiquidityEntry shortBest = orderBookManager.getBestBidAsk(shortBook, shortAmountRemaining);
 		if (longBest != null && shortBest != null && longBest.getBidAskPrice() != null && shortBest.getBidAskPrice() != null
 				&& longBest.getBidAskPrice().get(Side.ASK) != null && shortBest.getBidAskPrice().get(Side.BID) != null)
-			return checkOpportunity(longAmountRemaining, shortAmountRemaining, longBook, shortBook, longBest, shortBest, true);
+			return checkOpportunity(longAmountRemaining, shortAmountRemaining, longBook, shortBook, longBest, shortBest, true, false);
 		return NO_ARB;
 	}
 	

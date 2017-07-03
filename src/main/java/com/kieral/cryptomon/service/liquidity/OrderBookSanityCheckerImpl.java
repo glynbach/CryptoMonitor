@@ -1,7 +1,7 @@
 package com.kieral.cryptomon.service.liquidity;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+//import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -88,22 +88,22 @@ public class OrderBookSanityCheckerImpl implements OrderBookSanityChecker{
 			count++;
 			lastPrice = entry.getPrice();
 		}
-		totalJumps.sort((BigDecimal o1, BigDecimal o2) -> o1.compareTo(o2));
-		BigDecimal averageJump = totalJumps.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
-				.divide(new BigDecimal(totalJumps.size()), 8, RoundingMode.HALF_UP);
-		BigDecimal medianJump = totalJumps.get(totalJumps.size() / 2);
-		if (largestTopOfBookJump.compareTo(averageJump.multiply(new BigDecimal("5.00000000"))) > 0) {
-			logger.warn("largest jump at the top of the book {} was more than 5 times "
-					+ "higher than average jump {} for entries {}",
-					largestTopOfBookJump.toPlainString(), averageJump.toPlainString(), entries);
-			// taking no action beyond logging a warning as this is a common occurrence
-		}
-		if (largestTopOfBookJump.compareTo(medianJump.multiply(new BigDecimal("10.00000000"))) > 0) {
-			logger.warn("largest jump at the top of the book {} was more than 10 times "
-					+ "higher than median jump {} for entries {}",
-					largestTopOfBookJump.toPlainString(), medianJump.toPlainString(), entries);
-			// taking no action beyond logging a warning as this is a common occurrence
-		}
+//		totalJumps.sort((BigDecimal o1, BigDecimal o2) -> o1.compareTo(o2));
+//		BigDecimal averageJump = totalJumps.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+//				.divide(new BigDecimal(totalJumps.size()), 8, RoundingMode.HALF_UP);
+//		BigDecimal medianJump = totalJumps.get(totalJumps.size() / 2);
+//		if (largestTopOfBookJump.compareTo(averageJump.multiply(new BigDecimal("5.00000000"))) > 0) {
+//			logger.warn("largest jump at the top of the book {} was more than 5 times "
+//					+ "higher than average jump {} for entries {}",
+//					largestTopOfBookJump.toPlainString(), averageJump.toPlainString(), entries);
+//			// taking no action beyond logging a warning as this is a common occurrence
+//		}
+//		if (largestTopOfBookJump.compareTo(medianJump.multiply(new BigDecimal("10.00000000"))) > 0) {
+//			logger.warn("largest jump at the top of the book {} was more than 10 times "
+//					+ "higher than median jump {} for entries {}",
+//					largestTopOfBookJump.toPlainString(), medianJump.toPlainString(), entries);
+//			// taking no action beyond logging a warning as this is a common occurrence
+//		}
 		return true;
 	}
 

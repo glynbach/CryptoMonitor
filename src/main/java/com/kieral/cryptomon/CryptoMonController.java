@@ -70,9 +70,10 @@ public class CryptoMonController {
 	    if(result.hasErrors()) {
 	    	return "orders";
 	    }
-    	result.rejectValue("market", "Test Mode", "Test Mode");
 	    try {
-	    	orderService.placeOrder(order);
+	    	if (!orderService.placeOrder(order)) {
+	    		throw new IllegalStateException("Placing order failed");
+	    	}
 	    	model.addAttribute("info", String.format("Order placed for %s", order.toStringFundamentals()));
 	    } catch (Exception e) {
 	    	logger.error("Error placing order {}", order, e);
@@ -87,7 +88,9 @@ public class CryptoMonController {
     public String cancelOrder(@PathVariable String market, @PathVariable String clientOrderId, Model model) {
     	logger.info("Received cancel order for clientOrderId {}", clientOrderId);
     	try {
-			orderService.cancelOrder(market, clientOrderId);
+			if (!orderService.cancelOrder(market, clientOrderId)) {
+				throw new IllegalStateException("Cancel failed");
+			}
 		} catch (OrderNotExistsException e) {
 			logger.error("Received cancel order request {} {} for unrecognised order", market, clientOrderId);
 			model.addAttribute("error", String.format("Unrecognised clientOrderId %s for market %s", clientOrderId, market));

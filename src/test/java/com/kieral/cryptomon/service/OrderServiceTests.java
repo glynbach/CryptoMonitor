@@ -45,7 +45,7 @@ public class OrderServiceTests {
 		assertNotNull(order);
 		assertNotNull(order.getClientOrderId());
 		assertNull(order.getOrderId());
-		assertEquals(OrderStatus.PENDING, order.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, order.getOrderStatus());
 		order = os.pollOrderUpdate(1000);
 		assertNotNull(order);
 		assertNotNull(order.getClientOrderId());
@@ -62,7 +62,7 @@ public class OrderServiceTests {
 		assertNotNull(order);
 		assertNotNull(order.getClientOrderId());
 		assertNull(order.getOrderId());
-		assertEquals(OrderStatus.PENDING, order.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, order.getOrderStatus());
 		order = os.pollOrderUpdate(1000);
 		assertNotNull(order);
 		assertNotNull(order.getClientOrderId());
@@ -80,7 +80,7 @@ public class OrderServiceTests {
 		assertNotNull(order);
 		assertNotNull(order.getClientOrderId());
 		assertNull(order.getOrderId());
-		assertEquals(OrderStatus.PENDING, order.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, order.getOrderStatus());
 		order = os.pollOrderUpdate(1000);
 		assertNotNull(order);
 		assertNotNull(order.getClientOrderId());
@@ -102,7 +102,7 @@ public class OrderServiceTests {
 		os.setDefaultDesiredOrderId("AAA");
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.BIT));
 		Order firstOrder = os.pollOrderUpdate(1000);
-		assertEquals(OrderStatus.PENDING, firstOrder.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, firstOrder.getOrderStatus());
 		firstOrder = os.pollOrderUpdate(1000);
 		assertEquals("AAA", firstOrder.getOrderId());
 		assertEquals(OrderStatus.OPEN, firstOrder.getOrderStatus());
@@ -117,7 +117,7 @@ public class OrderServiceTests {
 		os.addDesiredExchangeOpenOrder(exchangeOrder2);
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.BIT, "LTCBTC"));
 		Order secondOrder = os.pollOrderUpdate(1000);
-		assertEquals(OrderStatus.PENDING, secondOrder.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, secondOrder.getOrderStatus());
 		secondOrder = os.pollOrderUpdate(1000);
 		assertEquals(OrderStatus.OPEN, secondOrder.getOrderStatus());
 		assertEquals("BBB", secondOrder.getOrderId());
@@ -129,7 +129,7 @@ public class OrderServiceTests {
 		os.setDefaultDesiredOrderId("AAA");
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.BIT));
 		Order firstOrder = os.pollOrderUpdate(1000);
-		assertEquals(OrderStatus.PENDING, firstOrder.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, firstOrder.getOrderStatus());
 		firstOrder = os.pollOrderUpdate(1000);
 		assertEquals("AAA", firstOrder.getOrderId());
 		assertEquals(OrderStatus.OPEN, firstOrder.getOrderStatus());
@@ -140,7 +140,7 @@ public class OrderServiceTests {
 		os.addDesiredExchangeOpenOrder(exchangeOrder1);
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.BIT, "LTCBTC"));
 		Order secondOrder = os.pollOrderUpdate(1000);
-		assertEquals(OrderStatus.PENDING, secondOrder.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, secondOrder.getOrderStatus());
 		secondOrder = os.pollOrderUpdate(1000);
 		assertEquals(OrderStatus.CANCELLED, secondOrder.getOrderStatus());
 		assertNull(secondOrder.getOrderId());
@@ -152,7 +152,7 @@ public class OrderServiceTests {
 		os.setDefaultDesiredOrderId("AAA");
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.BIT));
 		Order firstOrder = os.pollOrderUpdate(1000);
-		assertEquals(OrderStatus.PENDING, firstOrder.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, firstOrder.getOrderStatus());
 		firstOrder = os.pollOrderUpdate(1000);
 		assertEquals("AAA", firstOrder.getOrderId());
 		assertEquals(OrderStatus.OPEN, firstOrder.getOrderStatus());
@@ -183,7 +183,7 @@ public class OrderServiceTests {
 		os.addDesiredExchangeOpenOrder(exchangeOrder6);
 		os.placeOrder(MockOrderService.newOrder(MockOrderService.POL, "LTCBTC", "0.01", "0.123567", true));
 		Order secondOrder = os.pollOrderUpdate(1000);
-		assertEquals(OrderStatus.PENDING, secondOrder.getOrderStatus());
+		assertEquals(OrderStatus.SENDING, secondOrder.getOrderStatus());
 		secondOrder = os.pollOrderUpdate(1000);
 		assertEquals(OrderStatus.CANCELLED, secondOrder.getOrderStatus());
 		assertNull(secondOrder.getOrderId());

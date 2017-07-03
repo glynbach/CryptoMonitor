@@ -50,17 +50,14 @@ public class ClientMessagingController {
 		}
 	}; 
 
-	private static final Comparator<BalanceEntryMessage> balanceComparator = new Comparator<BalanceEntryMessage>(){
-		@Override
-		public int compare(BalanceEntryMessage o1, BalanceEntryMessage o2) {
-			return o1.getCurrency().compareTo(o2.getCurrency());
-		}
-	};
+	private static final Comparator<BalanceEntryMessage> balanceComparator = Comparator.comparing(BalanceEntryMessage::getCurrency);
+
+	private static Comparator<Order> orderComparator = Comparator.comparing(Order::getCreatedTime);
 	
 	@Autowired 
 	ExchangeManagerService exchangeManager;
 	@Autowired
-	BalanceService balanceHandler;
+	BalanceService balanceService;
 	@Autowired
 	OrderService orderService;
 
@@ -97,6 +94,7 @@ public class ClientMessagingController {
     		}
     	});
     	// TODO: register with arb monitor
+    	// TODO: only hold last n of each list
     }
 
     @MessageMapping("/exchangeStatus")
@@ -142,7 +140,7 @@ public class ClientMessagingController {
     			orderBookMessages.sort(obComparator);
     			boolean connected = statuses.get(name) == ConnectionStatus.CONNECTED;
     			boolean tradingEnabled = exchange.isTradingEnabled();
-    			BalanceMessage balances = balanceMessageFor(name, balanceHandler.getBalances(name));
+    			BalanceMessage balances = balanceMessageFor(name, balanceService.getBalances(name));
     			rtn.add(new ExchangeStatusMessage(name, connected, tradingEnabled, balances, orderBookMessages, 
     					ordersFor(orderService.getOpenOrders(name)), ordersFor(orderService.getClosedOrders(name))));
     		}
@@ -181,6 +179,7 @@ public class ClientMessagingController {
     	return new BalanceMessage(market, entries);
     }
     
+    
     Function<Order, OrderMessage> orderMessageFromOrder = new Function<Order, OrderMessage>() {
     	public OrderMessage apply(Order order) {
     		return new OrderMessage(order);
@@ -190,9 +189,11 @@ public class ClientMessagingController {
     private List<OrderMessage> ordersFor(List<Order> orders) {
     	if (orders == null)
     		return Collections.emptyList();
+    	int maxSize = orders.size() > 20 ? 20 : orders.size();
     	return orders.stream()
+    			.sorted(orderComparator.reversed())
     			.map(orderMessageFromOrder)
-    			.collect(Collectors.<OrderMessage>toList());
+    			.collect(Collectors.<OrderMessage>toList()).subList(0, maxSize);
     }
     
     Function<ArbInstruction, ArbStatusMessage> arbMessageFromArb = new Function<ArbInstruction, ArbStatusMessage>() {

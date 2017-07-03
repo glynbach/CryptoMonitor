@@ -178,7 +178,6 @@ public abstract class ServiceExchangeProperties {
 		String[] pairs = splitPair(currencyPair.getPair());
 		Currency baseCurrency = Currency.valueOf(pairs[0].trim());
 		Currency quotedCurrency = Currency.valueOf(pairs[1].trim());
-		// TODO: add trading fees and currency
 		return new CurrencyPair(pairs[0].trim() + pairs[1].trim(), baseCurrency, quotedCurrency, topic.trim(),
 				currencyPair.getPriceScale(), currencyPair.getTradingFee() != null ? new BigDecimal(currencyPair.getTradingFee()) : BigDecimal.ZERO, 
 				getTradingFeeType());

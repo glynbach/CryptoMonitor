@@ -53,7 +53,7 @@ public class OrderValidator implements Validator {
 		else
 			order.setCurrencyPair(currencyPair);
 		if (order.getOrderStatus() == null)
-			order.setOrderStatus(OrderStatus.PENDING);
+			order.setOrderStatus(OrderStatus.INITIALISED);
 	}
 	
 }

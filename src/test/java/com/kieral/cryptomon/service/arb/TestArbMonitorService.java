@@ -15,16 +15,17 @@ import org.mockito.stubbing.Answer;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.kieral.cryptomon.model.general.Currency;
+import com.kieral.cryptomon.model.general.CurrencyPair;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskMarket;
 import com.kieral.cryptomon.model.sided.BidAskPrice;
 import com.kieral.cryptomon.model.trading.TradeAmount;
-import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.liquidity.OrderBookListener;
+import com.kieral.cryptomon.service.util.Tuple2;
 import com.kieral.cryptomon.test.utlil.TestUtils;
 
 public class TestArbMonitorService {
@@ -37,7 +38,6 @@ public class TestArbMonitorService {
 	final static BidAskAmount amounts = new BidAskAmount(new TradeAmount(BigDecimal.ONE, BigDecimal.ONE), new TradeAmount(BigDecimal.ONE, BigDecimal.ONE));
 	
 	ExchangeManagerService exchangeManager;
-	BalanceService balanceHandler;
 	ArbInspector arbInspector;
 	ArbInstructionHandler instructionHandler;
 	
@@ -131,7 +131,6 @@ public class TestArbMonitorService {
 
 	@Before
 	public void setUp() {
-		balanceHandler = new BalanceService();
 		exchangeManager = Mockito.mock(ExchangeManagerService.class);
 		ExchangeService exchange1 = Mockito.mock(ExchangeService.class);
 		ExchangeService exchange2 = Mockito.mock(ExchangeService.class);
@@ -190,15 +189,18 @@ public class TestArbMonitorService {
 					}
 					if (CANCEL_MAGIC_NUMBER.compareTo(magicNumber) == 0) {
 						return ArbInstructionFactory.createArbInstruction(ArbDecision.CANCEL, BigDecimal.ZERO, 
-								Currency.BTC, orderBook1.getCurrencyPair(), prices, amounts, markets);
+								Currency.BTC, new Tuple2<CurrencyPair, CurrencyPair>(orderBook1.getCurrencyPair(), orderBook2.getCurrencyPair()), 
+								prices, amounts, markets, null, true);
 					}
 					if (HIGH_MAGIC_NUMBER.compareTo(magicNumber) == 0) {
 						return ArbInstructionFactory.createArbInstruction(ArbDecision.HIGH, BigDecimal.ZERO, 
-								Currency.BTC, orderBook1.getCurrencyPair(), prices, amounts, markets);
+								Currency.BTC, new Tuple2<CurrencyPair, CurrencyPair>(orderBook1.getCurrencyPair(), orderBook2.getCurrencyPair()), 
+								prices, amounts, markets, null, true);
 					}
 					if (LOW_MAGIC_NUMBER.compareTo(magicNumber) == 0) {
 						return ArbInstructionFactory.createArbInstruction(ArbDecision.LOW, BigDecimal.ZERO, 
-								Currency.BTC, orderBook1.getCurrencyPair(), prices, amounts, markets);
+								Currency.BTC, new Tuple2<CurrencyPair, CurrencyPair>(orderBook1.getCurrencyPair(), orderBook2.getCurrencyPair()), 
+								prices, amounts, markets, null, true);
 					}
 				}
 				return ArbInstructionFactory.createNoArbInstruction("");
@@ -213,7 +215,6 @@ public class TestArbMonitorService {
 			}}).when(instructionHandler).onArbInstruction(Mockito.any(ArbInstruction.class));
 		arbMonitorService = new ArbMonitorService();
 		ReflectionTestUtils.setField(arbMonitorService, "exchangeManager", exchangeManager);
-		ReflectionTestUtils.setField(arbMonitorService, "balanceHandler", balanceHandler);
 		ReflectionTestUtils.setField(arbMonitorService, "arbInspector", arbInspector);
 		ReflectionTestUtils.setField(arbMonitorService, "arbInstructionHandler", instructionHandler);
 		arbMonitorService.init();

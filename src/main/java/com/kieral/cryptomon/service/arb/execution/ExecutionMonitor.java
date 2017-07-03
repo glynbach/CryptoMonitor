@@ -23,8 +23,10 @@ import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.BackOfficeService;
+import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.OrderService;
 import com.kieral.cryptomon.service.arb.ArbService;
+import com.kieral.cryptomon.service.exception.NotEnoughFundsException;
 import com.kieral.cryptomon.service.exception.OrderNotExistsException;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
@@ -68,6 +70,7 @@ public class ExecutionMonitor {
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
 	private final OrderService orderService;	
+	private final BalanceService balanceService;
 	private final ArbService arbService;	
 	private final BackOfficeService backOfficeService;
 	private final ArbInstruction arbInstruction;
@@ -77,11 +80,13 @@ public class ExecutionMonitor {
 	private OrderBook shortOrderBook;
 	private final ReentrantLock statusLock = new ReentrantLock();
 	
-	public ExecutionMonitor(OrderService orderService, ArbService arbService, 
+	public ExecutionMonitor(OrderService orderService, BalanceService balanceService, ArbService arbService, 
 			BackOfficeService backOfficeService, ArbInstruction arbInstruction, 
-			long pollingIntervalMillis) {
+			long pollingIntervalMillis) throws NotEnoughFundsException {
 		if (orderService == null)
 			throw new IllegalArgumentException("orderService can not be null");
+		if (balanceService == null)
+			throw new IllegalArgumentException("balanceService can not be null");
 		if (arbService == null)
 			throw new IllegalArgumentException("arbService can not be null");
 		if (backOfficeService == null)
@@ -89,6 +94,7 @@ public class ExecutionMonitor {
 		if (pollingIntervalMillis < MINIMUM_POLLING_INTERVAL)
 			pollingIntervalMillis = MINIMUM_POLLING_INTERVAL;
 		this.orderService = orderService;
+		this.balanceService = balanceService;
 		this.arbService = arbService;
 		this.backOfficeService = backOfficeService;
 		this.arbInstruction = arbInstruction;
@@ -103,6 +109,7 @@ public class ExecutionMonitor {
 			cancelOrder(longOrders.get(0));
 			throw new IllegalStateException("Not able to place order for " + arbInstruction.getLeg(Side.ASK));
 		}
+		reserveBalances(arbInstruction);
 		executionMonitorDaemon.submit(new StatusCheckTask());
 	}
 	
@@ -130,6 +137,22 @@ public class ExecutionMonitor {
 	
 	public BigDecimal getEstimatedRemainingProfit() {
 		return BigDecimal.ZERO;
+	}
+	
+	private void reserveBalances(ArbInstruction arbInstruction) throws NotEnoughFundsException {
+		ArbInstructionLeg longLeg = arbInstruction.getLeg(Side.BID);
+		ArbInstructionLeg shortLeg = arbInstruction.getLeg(Side.ASK);
+		balanceService.adiustWorkingAmount(longLeg.getMarket(), longLeg.getCurrencyPair().getQuotedCurrency(), 
+				longLeg.getAmount().getQuotedAmount().negate());
+		try {
+			balanceService.adiustWorkingAmount(shortLeg.getMarket(), shortLeg.getCurrencyPair().getBaseCurrency(), 
+					shortLeg.getAmount().getBaseAmount().negate());
+		} catch (NotEnoughFundsException e) {
+			// restore the long amount
+			balanceService.adiustWorkingAmount(longLeg.getMarket(), longLeg.getCurrencyPair().getQuotedCurrency(), 
+					longLeg.getAmount().getQuotedAmount());
+			throw e;
+		}
 	}
 	
 	private void validateArbInstruction(ArbInstruction arbInstruction) {
@@ -163,7 +186,8 @@ public class ExecutionMonitor {
 	private boolean placeOrder(String market, CurrencyPair pair, BigDecimal amount, BigDecimal price, Side side) {
 		Order order = new Order(market, pair, amount, price, side);
 		try {
-			orderService.placeOrder(order);
+			if (!orderService.placeOrder(order))
+				return false;
 			if (order.getSide() == Side.BID)
 				longOrders.add(order);
 			else
@@ -243,8 +267,8 @@ public class ExecutionMonitor {
 		BigDecimal desiredShortLegAmount = shortLeg.getAmount().getBaseAmount();
 		Order longOrder =  longOrders.size() == 0 ? null : longOrders.get(longOrders.size() - 1); 
 		Order shortOrder =  shortOrders.size() == 0 ? null : shortOrders.get(shortOrders.size() - 1); 
-		OrderStatus longLegStatus = longOrder == null ? OrderStatus.PENDING : longOrder.getOrderStatus();
-		OrderStatus shortLegStatus = shortOrder == null ? OrderStatus.PENDING : shortOrder.getOrderStatus();
+		OrderStatus longLegStatus = longOrder == null ? OrderStatus.INITIALISED : longOrder.getOrderStatus();
+		OrderStatus shortLegStatus = shortOrder == null ? OrderStatus.INITIALISED : shortOrder.getOrderStatus();
 		BigDecimal longAmount = BigDecimal.ZERO;
 		for (Order order : longOrders)
 			longAmount = longAmount.add(TradingUtils.getFilledAmount(order));
@@ -350,7 +374,8 @@ public class ExecutionMonitor {
 									if (OrderStatus.OPEN_ORDER.contains(placedOrder.getOrderStatus())) {
 										try {
 											logger.info("Cancelling balancing order {}", placedOrder);
-											orderService.cancelOrder(placedOrder.getMarket(), placedOrder.getClientOrderId());
+											if (!orderService.cancelOrder(placedOrder.getMarket(), placedOrder.getClientOrderId()))
+												throw new IllegalStateException("Cancel failed");
 										} catch (Exception e) {
 											logger.error("Error cancelling balancing order {}", placedOrder);
 										}
@@ -404,8 +429,6 @@ public class ExecutionMonitor {
 					replace = new boolean[]{false, false};
 					break;
 			}
-			// TODO: sanity check on cancel and no replace; have we left ourselves long on something we'd rather
-			// trade out and take the loss on than be unbalanced
 			logger.info("Decision is long cancel={} replace={} short cancel={} replace={}", 
 								cancel[0], replace[0], cancel[1], replace[1]);
 			AtomicBoolean soFarSoGood = new AtomicBoolean(true);
@@ -438,7 +461,7 @@ public class ExecutionMonitor {
 	private boolean cancelOrder(Order order) {
 		if (order != null) {
 			try {
-				orderService.cancelOrder(order.getMarket(), order.getClientOrderId());
+				return orderService.cancelOrder(order.getMarket(), order.getClientOrderId());
 			} catch (Exception e) {
 				logger.error("Error cancelling order", e);
 				return false;

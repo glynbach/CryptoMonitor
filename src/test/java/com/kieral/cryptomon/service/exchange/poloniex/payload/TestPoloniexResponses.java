@@ -49,7 +49,7 @@ public class TestPoloniexResponses {
 	public void testPlaceOrderFailure() throws JsonParseException, JsonMappingException, IOException {
 		PoloniexActionResponse response = objectMapper.readValue(this.getClass().getResourceAsStream("/poloniex/placeOrderFailure.json"), PoloniexActionResponse.class);
 		System.out.println(response);
-		assertEquals(OrderStatus.CANCELLED, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.PENDING));
+		assertEquals(OrderStatus.CANCELLED, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.SENDING));
 		assertEquals("Nonce must be greater than 1497900264856. You provided 1497900264854.", response.getExchangeMessage());
 	}
 
@@ -57,7 +57,7 @@ public class TestPoloniexResponses {
 	public void testPlaceOrderSuccess() throws JsonParseException, JsonMappingException, IOException {
 		PoloniexActionResponse response = objectMapper.readValue(this.getClass().getResourceAsStream("/poloniex/placeOrderSuccess.json"), PoloniexActionResponse.class);
 		System.out.println(response);
-		assertEquals(OrderStatus.OPEN, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.PENDING));
+		assertEquals(OrderStatus.OPEN, response.getOrderStatus(PlaceOrderResponse.class, OrderStatus.SENDING));
 		assertEquals("305476436929", response.getOrderId());
 	}
 

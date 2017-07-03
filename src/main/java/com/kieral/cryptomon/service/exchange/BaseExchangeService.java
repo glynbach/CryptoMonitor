@@ -12,11 +12,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -43,6 +38,8 @@ import com.kieral.cryptomon.model.trading.Trade;
 import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.OrderServiceImpl;
+import com.kieral.cryptomon.service.PollListener;
+import com.kieral.cryptomon.service.PollingService;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.ApiRequestException;
@@ -69,7 +66,7 @@ import com.kieral.cryptomon.streaming.OrderedStreamingEmitter;
 import com.kieral.cryptomon.streaming.ParsingPayloadException;
 import com.kieral.cryptomon.streaming.StreamingPayload;
 
-public abstract class BaseExchangeService implements ExchangeService, OrderedStreamingListener {
+public abstract class BaseExchangeService implements ExchangeService, OrderedStreamingListener, PollListener {
 
 	protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -78,15 +75,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		CHECK_BY_OPEN_ORDERS,
 		CHECK_BY_TRADE_HISTORY
 	}
-	
-	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-		@Override
-		public Thread newThread(Runnable r) {
-			Thread thread = new Thread(r, "ServiceScheduler-" + getName());
-			thread.setDaemon(true);
-			return thread;
-		}});
-	private ScheduledFuture<?> marketDataPoller;
+
+	private boolean pollMarketData;
 	private final List<ConnectionStatusListener> statusListeners = new CopyOnWriteArrayList<ConnectionStatusListener>();
 	private final List<OrderBookListener> orderBookListeners = new CopyOnWriteArrayList<OrderBookListener>();
 	private final List<TradingStatusListener> tradingStatusListeners = new CopyOnWriteArrayList<TradingStatusListener>();
@@ -94,10 +84,12 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	@Autowired
 	protected OrderBookManager orderBookManager;
 	@Autowired
-	protected BalanceService balanceHandler;
+	protected BalanceService balanceService;
 	@Autowired
 	protected RestTemplate restTemplate;
-
+	@Autowired
+	protected PollingService pollingService;
+	
 	protected final ServiceExchangeProperties serviceProperties;
 	protected final ServiceSecurityModule securityModule;
 	private final OrderedStreamingEmitter streamingEmitter;
@@ -212,15 +204,26 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		if (serviceProperties.getSubscriptionMode() == SubscriptionMode.STREAMING)
 			subscribeMarketDataTopics();
 		else {
-			long delay = serviceProperties.getPollingInterval() <= 0 ? 2000L : serviceProperties.getPollingInterval(); 
-			marketDataPoller = scheduler.scheduleWithFixedDelay(new Runnable(){
-				@Override
-				public void run() {
-					requestOrderBookSnapshots(serviceProperties.getPairs());
-				}}, delay, delay, TimeUnit.MILLISECONDS);
+			this.pollingService.registerListener(getName(), this);
+			pollMarketData = true;
 		}
 	}
-	
+
+	/**
+	 * Called by an external scheduler to allow common polling calls to be
+	 * applied at the same time
+	 */
+	@Override
+	public void polled() {
+		if (pollMarketData)
+			requestOrderBookSnapshots(serviceProperties.getPairs());
+	}
+
+	@Override
+	public void polledException(Exception e) {
+		logger.error("Unhandled exception during polled event", e);
+	}
+
 	private void requestOrderBookSnapshots(List<CurrencyPair> pairs) {
 		List<OrderBookResponse> orderBookResponses = null;
 		try {
@@ -247,9 +250,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		if (serviceProperties.getSubscriptionMode() == SubscriptionMode.STREAMING)
 			unsubscribeMarketDataTopics();
 		else {
-			if (marketDataPoller != null) {
-				marketDataPoller.cancel(true);
-			}
+			pollMarketData = false;
 		}
 	}
 	
@@ -342,21 +343,6 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		tradingStatusListeners.forEach(listener -> {
 			listener.onTradingEnabled(enabled);
 		});
-		if (enabled) {
-			// TODO - DEBUG REMOVE THIS
-			Thread thread = new Thread() {
-				public void run() {
-					try {
-						Thread.sleep(6000);
-						if (BaseExchangeService.this.getName().equals("gdax"))
-							BaseExchangeService.this.cancelOrder("bb4ef795-2be9-4d20-9f5c-549de0a5b3ec");
-					} catch (Exception e) {
-						logger.error("Error cancelling order 3d0fb74e-e4b5-43b5-98cd-a79cdfb1381", e);
-					}
-				}
-			};
-			thread.start();
-		}
 		return enabled;
 	}
 
@@ -369,8 +355,9 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 			if (response.getAccountResponses() != null) {
 				response.getAccountResponses().forEach(account -> {
 					if (account.getAvailableBalance() != null) {
-						if (serviceProperties.isInterestingCurrency(account.getAccountCurrency()))
-							balanceHandler.setConfirmedBalance(getName(), account.getAccountCurrency(), account.getAvailableBalance(), overrideWorkingBalance);
+						if (serviceProperties.isInterestingCurrency(account.getAccountCurrency())) {
+							balanceService.setConfirmedBalance(getName(), account.getAccountCurrency(), account.getAvailableBalance(), overrideWorkingBalance);
+						}
 					} else {
 						logger.warn("No balance returned from exchange for {}", account.getAccountCurrency());
 					}
@@ -465,10 +452,16 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		if (order == null)
 			throw new IllegalArgumentException("order can not be null");
 		AtomicReference<String> message = new AtomicReference<String>();
-		OrderStatus newOrderStatus = cancelOrder(order.getOrderId(), order.getOrderStatus(), message);
+		OrderStatus orderStatus = cancelOrder(order.getOrderId(), order.getOrderStatus(), message);
+		if (orderStatus == OrderStatus.ERROR) {
+			// try next if its in another state already
+			orderStatus = getOrderStatus(order);
+			if (orderStatus != OrderStatus.ERROR)
+				return orderStatus;
+		}
 		if (message.get() != null)
 			order.setMessage(message.get());
-		return newOrderStatus;
+		return orderStatus;
 	}
 
 	@Override
@@ -521,6 +514,15 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				return currentOrderStatus;
 			} 
 		}
+	}
+	
+	private OrderStatus getOrderStatus(Order order) {
+		if (order == null || order.getClientOrderId() == null)
+			return OrderStatus.ERROR;
+		Map<String, OrderStatus> statuses = getOpenOrderStatuses(Arrays.asList(new Order[]{order}));
+		if (statuses.containsKey(order.getClientOrderId()))
+			return statuses.get(order.getClientOrderId());
+		return OrderStatus.ERROR;
 	}
 	
 	@Override
