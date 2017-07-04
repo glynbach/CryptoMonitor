@@ -8,28 +8,32 @@ import com.kieral.cryptomon.service.exception.OrderNotExistsException;
 
 public interface OrderService {
 
-	public void init();
+	void init();
 
-	public boolean isTradingEnabled(String market);
+	boolean isTradingEnabled(String market);
 
-	public void registerOrderListener(OrderListener listener);
+	void registerOrderListener(OrderListener listener);
 	
-	public List<Order> getClosedOrders(String market);
+	List<Order> getClosedOrders(String market);
 
-	public List<Order> getOpenOrders(String market);
+	List<Order> getOpenOrders(String market);
 
-	public Order getOrder(String market, String clientOrderId);
+	Order getOrder(String market, String clientOrderId);
 
-	public List<Order> getAllOrders(String market);
+	List<Order> getAllOrders(String market);
 	
-	public boolean placeOrder(Order order);
+	OrderStatus placeOrder(Order order);
 
-	public boolean placeMarketOrder(Order order);
+	OrderStatus placeMarketOrder(Order order);
 
-	public boolean cancelOrder(String market, String clientOrderId) throws OrderNotExistsException;
+	OrderStatus cancelOrder(String market, String clientOrderId) throws OrderNotExistsException;
 
-	public OrderStatus forceCancelOrder(String market, String orderId) throws OrderNotExistsException;
+	OrderStatus forceCancelOrder(String market, String orderId) throws OrderNotExistsException;
 
-	public void checkStatus(String market, String clientOrderId) throws OrderNotExistsException;
+	void checkStatus(String market, String clientOrderId) throws OrderNotExistsException;
 
+	void checkStatuses(String market, List<Order> orders);
+	
+	void requestBalances();
+	
 }

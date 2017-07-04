@@ -6,14 +6,19 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
+import com.kieral.cryptomon.model.general.Side;
+
 public class CommonUtils {
 
 	public static final BigDecimal ONE_HUNDRED = new BigDecimal("100.00000000");
 	public static final DateTimeFormatter SECONDS_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm:ss");
 	public static final DateTimeFormatter MILLIS_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm:ss.SSS");
 	
-	public static BigDecimal getTradingfeeMultiplier(BigDecimal fee) {
-		return ONE_HUNDRED.subtract(fee).divide(ONE_HUNDRED, RoundingMode.HALF_UP);
+	public static BigDecimal getTradingfeeMultiplier(Side side, BigDecimal fee) {
+		if (side == Side.BID)
+			return ONE_HUNDRED.add(fee).divide(ONE_HUNDRED, RoundingMode.HALF_UP);
+		else
+			return ONE_HUNDRED.subtract(fee).divide(ONE_HUNDRED, RoundingMode.HALF_UP);
 	}
 
 	public static boolean isEmpty(String value) {

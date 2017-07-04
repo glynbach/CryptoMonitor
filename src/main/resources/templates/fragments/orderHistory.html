@@ -20,7 +20,7 @@
 						<th>Status</th>
 						<th>Message</th>
 						<th>Created</th>
-						<th>Closed</th>
+						<th colspan="2">Closed</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -35,6 +35,11 @@
 						<td>{{order.message}}</td>
 						<td>{{order.createdTime}}</td>
 						<td>{{order.closedTime}}</td>
+						<td>
+							<a class="btn btn-sm btn-primary" href="/cancelOrder/{{order.market}}/{{order.clientOrderId}}">Cancel</a>
+							&nbsp;
+							<a class="btn btn-sm btn-primary" href="/checkOrderStatus/{{order.market}}/{{order.clientOrderId}}">Check</a>
+						</td>
 					</tr>										
 					<tr ng-repeat="order in exchange.closedOrders">
 						<td>{{order.orderId}}</td>
@@ -47,6 +52,11 @@
 						<td>{{order.message}}</td>
 						<td>{{order.createdTime}}</td>
 						<td>{{order.closedTime}}</td>
+						<td>
+							<a class="btn btn-sm btn-primary" href="/cancelOrder/{{order.market}}/{{order.clientOrderId}}">Cancel</a>
+							&nbsp;
+							<a class="btn btn-sm btn-primary" href="/checkOrderStatus/{{order.market}}/{{order.clientOrderId}}">Check</a>
+						</td>
 					</tr>										
 				</tbody>
 			</table>

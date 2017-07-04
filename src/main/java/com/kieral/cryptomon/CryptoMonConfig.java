@@ -26,7 +26,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter
 import com.kieral.cryptomon.service.BackOfficeService;
 import com.kieral.cryptomon.service.BackOfficeServiceImpl;
 import com.kieral.cryptomon.service.BalanceService;
-import com.kieral.cryptomon.service.CommonPollingService;
 import com.kieral.cryptomon.service.OrderService;
 import com.kieral.cryptomon.service.OrderServiceImpl;
 import com.kieral.cryptomon.service.PollingService;
@@ -36,6 +35,7 @@ import com.kieral.cryptomon.service.arb.execution.GloballyExclusiveExecutionCont
 import com.kieral.cryptomon.service.arb.ArbInspector;
 import com.kieral.cryptomon.service.arb.ArbInstructionHandler;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
+import com.kieral.cryptomon.service.exchange.ExchangePollingService;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexSecurityModule;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexService;
@@ -128,7 +128,7 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 
 	@Bean
 	PollingService pollingService() {
-		return new CommonPollingService();
+		return new ExchangePollingService();
 	}
 	
 	@Bean

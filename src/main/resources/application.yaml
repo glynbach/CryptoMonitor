@@ -41,7 +41,7 @@ orderbook:
       default-significant-amount: 0.5
       currencies:
         - currency: "BTC"
-          significant-amount: 0.0995
+          significant-amount: 0.0005
         - currency: "LTC"
           significant-amount: 0.5
         - currency: "ETH"
@@ -70,9 +70,13 @@ POLONIEX:
     - pair: "BTC_LTC"
       price-scale: 8
       trading-fee: "0.25"
+      min-desired-base-balance: 40
+      min-desired-quoted-balance: 0.8
     - pair: "BTC_ETH"
       price-scale: 8
       trading-fee: "0.25"
+      min-desired-base-balance: 8
+      min-desired-quoted-balance: 0.8
 BITTREX: 
   exchange: bittrex
   enabled: true
@@ -92,9 +96,13 @@ BITTREX:
     - pair: "BTC-LTC"
       price-scale: 8
       trading-fee: "0.25"
+      min-desired-base-balance: 40
+      min-desired-quoted-balance: 0.8
     - pair: "BTC-ETH"
       price-scale: 8
       trading-fee: "0.25"
+      min-desired-base-balance: 8
+      min-desired-quoted-balance: 0.8
 GDAX: 
   exchange: gdax
   enabled: true
@@ -115,6 +123,10 @@ GDAX:
     - pair: "LTC-BTC"
       price-scale: 8
       trading-fee: "0.3"
+      min-desired-base-balance: 40
+      min-desired-quoted-balance: 0.8
     - pair: "ETH-BTC"
       price-scale: 8
       trading-fee: "0.3"
+      min-desired-base-balance: 8
+      min-desired-quoted-balance: 0.8

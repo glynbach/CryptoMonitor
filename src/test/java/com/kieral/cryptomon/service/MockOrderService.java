@@ -7,11 +7,14 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -30,6 +33,7 @@ import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
 import com.kieral.cryptomon.service.exchange.TradingStatusListener;
 import com.kieral.cryptomon.service.util.TradingUtils;
+import com.kieral.cryptomon.service.util.Tuple2;
 import com.kieral.cryptomon.test.utlil.TestUtils;
 
 public class MockOrderService implements OrderService {
@@ -56,6 +60,8 @@ public class MockOrderService implements OrderService {
 
 	final BlockingQueue<OrderStatus> actionOrderStatuses = new ArrayBlockingQueue<OrderStatus>(512);
 	final BlockingQueue<Order> orderUpdates = new ArrayBlockingQueue<Order>(512);
+	final ConcurrentMap<String, BlockingQueue<Order>> orderUpdatesByClientOrderId = new ConcurrentHashMap<String, BlockingQueue<Order>>();
+	public final Map<String, Order> orders = new LinkedHashMap<String, Order>();
 
 	public void setDesiredOrderId(String clientOrderId, String orderId) {
 		desiredOrderIds.put(clientOrderId, orderId);
@@ -129,6 +135,34 @@ public class MockOrderService implements OrderService {
 		return orderUpdates.poll(timeout, TimeUnit.MILLISECONDS);
 	}
 	
+	public Order pollOrderUpdate(String clientOrderId, long timeout) throws InterruptedException {
+		if (orderUpdatesByClientOrderId.containsKey(clientOrderId)) {
+			return orderUpdatesByClientOrderId.get(clientOrderId).poll(timeout, TimeUnit.MILLISECONDS);
+		}
+		return null;
+	}
+	
+	public int getNumPlacedOrders() {
+		return orders.size();
+	}
+	
+	public Tuple2<Order, Order> getLastOrders() {
+		if (orders.size() < 2)
+			throw new IllegalStateException("No orders avaialable for getting last orders");
+		Order order1 = new ArrayList<Order>(orders.values()).get(orders.size() - 2);
+		Order order2 = new ArrayList<Order>(orders.values()).get(orders.size() - 1);
+		if (order1.getSide() == order2.getSide())
+			throw new IllegalStateException("Last orders are not a bid and ask pair");
+		return new Tuple2<Order, Order>(order1.getSide() == Side.BID ? order1 : order2, 
+				order1.getSide() == Side.BID ? order2 : order1);
+	}
+
+	public Order getLastOrder() {
+		if (orders.size() < 1)
+			throw new IllegalStateException("No orders avaialable for getting last order");
+		return new ArrayList<Order>(orders.values()).get(orders.size() - 1);
+	}
+
 	public Map<String, TradingStatusListener> getTradingStatusListeners() {
 		return tradingStatusListeners;
 	}
@@ -187,6 +221,7 @@ public class MockOrderService implements OrderService {
 			@Override
 			public OrderStatus answer(InvocationOnMock invocation) throws Throwable {
 				Order order = (Order)invocation.getArgument(0);
+				orders.put(order.getClientOrderId(), order);
 				OrderStatus orderStatus = getActionOrderStatus(order.getClientOrderId());
 				if (OrderStatus.CANCELLED != orderStatus) {
 					order.setOrderId(getActionOrderId(order.getClientOrderId()));
@@ -197,6 +232,7 @@ public class MockOrderService implements OrderService {
 			@Override
 			public OrderStatus answer(InvocationOnMock invocation) throws Throwable {
 				Order order = (Order)invocation.getArgument(0);
+				orders.put(order.getClientOrderId(), order);
 				OrderStatus orderStatus = getActionOrderStatus(order.getClientOrderId());
 				if (OrderStatus.CANCELLED != orderStatus) {
 					order.setOrderId(getActionOrderId(order.getClientOrderId()));
@@ -257,6 +293,8 @@ public class MockOrderService implements OrderService {
 			try {
 				clientOrderIdToMarketMap.put(order.getClientOrderId(), order.getMarket());
 				orderUpdates.put(new Order(order));
+				orderUpdatesByClientOrderId.putIfAbsent(order.getClientOrderId(), new ArrayBlockingQueue<Order>(512));
+				orderUpdatesByClientOrderId.get(order.getClientOrderId()).put(new Order(order));
 			} catch (Exception e) {
 				e.printStackTrace();
 				fail("Cant place order " + order + " on test result queue " + e.getMessage());
@@ -330,17 +368,17 @@ public class MockOrderService implements OrderService {
 	}
 
 	@Override
-	public boolean placeOrder(Order order) {
+	public OrderStatus placeOrder(Order order) {
 		return orderService.placeOrder(order);
 	}
 
 	@Override
-	public boolean placeMarketOrder(Order order) {
+	public OrderStatus placeMarketOrder(Order order) {
 		return orderService.placeMarketOrder(order);
 	}
 
 	@Override
-	public boolean cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
+	public OrderStatus cancelOrder(String market, String clientOrderId) throws OrderNotExistsException {
 		return orderService.cancelOrder(market, clientOrderId);
 	}
 
@@ -355,12 +393,22 @@ public class MockOrderService implements OrderService {
 	}
 
 	@Override
+	public void checkStatuses(String market, List<Order> orders) {
+		orderService.checkStatuses(market, orders);
+	}
+
+	@Override
 	public void init() {
 	}
 
 	@Override
 	public Order getOrder(String market, String clientOrderId) {
 		return orderService.getOrder(market, clientOrderId);
+	}
+
+	@Override
+	public void requestBalances() {
+		orderService.requestBalances();
 	}
 
 }

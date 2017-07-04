@@ -43,7 +43,8 @@ public class TestUtils {
 	}
 	public static CurrencyPair cp(Currency currency1, Currency currency2, BigDecimal fee) {
 		return new CurrencyPair(currency1.name() + currency2.name(), currency1, currency2, 
-				currency1.name() + "-" + currency2.name(), 8, fee,TradingFeeType.PERCENTAGE);
+				currency1.name() + "-" + currency2.name(), 8, fee, TradingFeeType.PERCENTAGE,
+				BigDecimal.ZERO, BigDecimal.ZERO);
 	}
 	
 	public static OrderBook ob(String market, CurrencyPair currency) {

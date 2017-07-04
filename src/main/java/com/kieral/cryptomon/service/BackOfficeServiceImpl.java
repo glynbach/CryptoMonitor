@@ -8,10 +8,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.trading.Order;
@@ -22,24 +24,27 @@ import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.util.CommonUtils;
 import com.kieral.cryptomon.service.util.Tuple2;
 
+@Component
 public class BackOfficeServiceImpl implements BackOfficeService {
 
-	private final Logger logger = LoggerFactory.getLogger(this.getClass());
-	private final List<BackOfficeListener> listeners = new CopyOnWriteArrayList<BackOfficeListener>();
+	private final static AtomicInteger counter = new AtomicInteger(0);
 	
 	@Autowired
 	private ExchangeManagerService exchangeManagerService;
 	@Autowired
 	private ArbService arbService;
 
-	private final ExecutorService processor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+	private final ExecutorService processor = Executors.newCachedThreadPool(new ThreadFactory() {
 		@Override
 		public Thread newThread(Runnable r) {
-			Thread thread = new Thread(r, "BackOfficeDaemon");
+			Thread thread = new Thread(r, "BackOfficeDaemon-" + counter.incrementAndGet());
 			thread.setDaemon(true);
 			return thread;
 		}});
-	
+
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+	private final List<BackOfficeListener> listeners = new CopyOnWriteArrayList<BackOfficeListener>();
+
 	@Override
 	public void onExecutionCompletion(ArbInstruction instruction, List<Order> longOrders, List<Order> shortOrders,
 			boolean interventionRequired) {
@@ -69,12 +74,9 @@ public class BackOfficeServiceImpl implements BackOfficeService {
 		BigDecimal quotedAmountTotal = BigDecimal.ZERO;
 		for (Trade trade : order.getTrades()) {
 			BigDecimal baseAmount = trade.getAmount();
-			if (!trade.isFeeOnQuotedCurrency())
-				baseAmount = baseAmount.multiply(CommonUtils.getTradingfeeMultiplier(order.getCurrencyPair().getTradingFee())); 
 			BigDecimal quotedAmount = trade.getAmount().multiply(trade.getRate())
 					.setScale(8, RoundingMode.HALF_DOWN);
-			if (!trade.isFeeOnQuotedCurrency())
-				quotedAmount = quotedAmount.multiply(CommonUtils.getTradingfeeMultiplier(order.getCurrencyPair().getTradingFee()));
+			quotedAmount = quotedAmount.multiply(CommonUtils.getTradingfeeMultiplier(order.getSide(), order.getCurrencyPair().getTradingFee()));
 			baseAmountTotal = baseAmountTotal.add(baseAmount);
 			quotedAmountTotal = quotedAmountTotal.add(quotedAmount);
 		}

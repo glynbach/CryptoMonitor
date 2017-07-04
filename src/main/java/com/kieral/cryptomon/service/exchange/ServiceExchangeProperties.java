@@ -180,7 +180,7 @@ public abstract class ServiceExchangeProperties {
 		Currency quotedCurrency = Currency.valueOf(pairs[1].trim());
 		return new CurrencyPair(pairs[0].trim() + pairs[1].trim(), baseCurrency, quotedCurrency, topic.trim(),
 				currencyPair.getPriceScale(), currencyPair.getTradingFee() != null ? new BigDecimal(currencyPair.getTradingFee()) : BigDecimal.ZERO, 
-				getTradingFeeType());
+				getTradingFeeType(), currencyPair.getMinDesiredBaseBalance(), currencyPair.getMinDesiredQuotedBalance());
 	}
 
 	public List<CurrencyPair> getPairs() {

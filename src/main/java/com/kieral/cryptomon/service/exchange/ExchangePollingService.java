@@ -1,4 +1,4 @@
-package com.kieral.cryptomon.service;
+package com.kieral.cryptomon.service.exchange;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -13,8 +13,12 @@ import javax.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.kieral.cryptomon.service.CommonConfig;
+import com.kieral.cryptomon.service.PollListener;
+import com.kieral.cryptomon.service.PollingService;
+
 @Component
-public class CommonPollingService implements PollingService {
+public class ExchangePollingService implements PollingService {
 
 	private final ScheduledExecutorService commonScheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
 	@Override
@@ -30,7 +34,7 @@ public class CommonPollingService implements PollingService {
 	
 	@PostConstruct
 	public void init() {
-		commonScheduler.scheduleAtFixedRate(() -> {callPollers();}, commonConfig.pollingInterval, commonConfig.pollingInterval, TimeUnit.MILLISECONDS);
+		commonScheduler.scheduleAtFixedRate(() -> {callPollers();}, commonConfig.getPollingInterval(), commonConfig.getPollingInterval(), TimeUnit.MILLISECONDS);
 	}
 
 	@Override

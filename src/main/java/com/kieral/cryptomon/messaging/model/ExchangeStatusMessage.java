@@ -7,6 +7,7 @@ public class ExchangeStatusMessage {
 	private String name;
 	private boolean connected;
 	private boolean tradingEnabled;
+	private boolean arbServiceSuspended;
 	private BalanceMessage balances;
 	private List<OrderBookMessage> orderBooks;
 	private List<OrderMessage> openOrders;
@@ -15,11 +16,12 @@ public class ExchangeStatusMessage {
 	public ExchangeStatusMessage() {
 	}
 	
-	public ExchangeStatusMessage(String name, boolean connected, boolean tradingEnabled, BalanceMessage balances,
+	public ExchangeStatusMessage(String name, boolean connected, boolean tradingEnabled, boolean arbServiceSuspended, BalanceMessage balances,
 			List<OrderBookMessage> orderBooks, List<OrderMessage> openOrders, List<OrderMessage> closedOrders) {
 		this.name = name;
 		this.connected = connected;
 		this.tradingEnabled = tradingEnabled;
+		this.arbServiceSuspended = arbServiceSuspended;
 		this.balances = balances;
 		this.orderBooks = orderBooks;
 		this.openOrders = openOrders;
@@ -60,6 +62,18 @@ public class ExchangeStatusMessage {
 
 	public void setTradingEnabled(boolean tradingEnabled) {
 		this.tradingEnabled = tradingEnabled;
+	}
+
+	public boolean isArbServiceSuspended() {
+		return arbServiceSuspended;
+	}
+
+	public String getArbServiceStatus() {
+		return arbServiceSuspended ? "Arbitration Disabled" : "Arbitration Enabled";
+	}
+
+	public void setArbServiceSuspended(boolean arbServiceSuspended) {
+		this.arbServiceSuspended = arbServiceSuspended;
 	}
 
 	public BalanceMessage getBalances() {
