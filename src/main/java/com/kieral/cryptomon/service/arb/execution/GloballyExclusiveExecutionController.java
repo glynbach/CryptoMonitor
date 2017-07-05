@@ -105,7 +105,7 @@ public class GloballyExclusiveExecutionController implements ExecutionController
 	}
 	
 	private ArbInstruction getInterest(ArbInstruction instruction) {
-		if (instruction.getEstimatedValue().compareTo(executionConfig.getMinValue()) >= 0)
+		if (instruction.getEstimatedValue().compareTo(executionConfig.getMinValue()) < 0)
 			return null;
 		// check if we want to rebalance on this
 		ArbInstructionLeg longLeg = instruction.getLeg(Side.BID);

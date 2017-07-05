@@ -70,7 +70,7 @@ POLONIEX:
     - pair: "BTC_LTC"
       price-scale: 8
       trading-fee: "0.25"
-      min-desired-base-balance: 40
+      min-desired-base-balance: 35
       min-desired-quoted-balance: 0.8
     - pair: "BTC_ETH"
       price-scale: 8
@@ -96,7 +96,7 @@ BITTREX:
     - pair: "BTC-LTC"
       price-scale: 8
       trading-fee: "0.25"
-      min-desired-base-balance: 40
+      min-desired-base-balance: 35
       min-desired-quoted-balance: 0.8
     - pair: "BTC-ETH"
       price-scale: 8
@@ -123,7 +123,7 @@ GDAX:
     - pair: "LTC-BTC"
       price-scale: 8
       trading-fee: "0.3"
-      min-desired-base-balance: 40
+      min-desired-base-balance: 35
       min-desired-quoted-balance: 0.8
     - pair: "ETH-BTC"
       price-scale: 8
