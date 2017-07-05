@@ -4,6 +4,8 @@ var wsUrl = 'https://localhost/marketdata-websocket';
 var controllers = {};
 var orderScope;
 var exchangeScope;
+var backOfficeScope;
+var arbProspectScope;
 cryptoApp.run(function ($stomp, $rootScope) {
 	$stomp.connect(wsUrl, {}).then(function (frame) {
 		console.log('Stomp connected to ' + wsUrl);
@@ -21,8 +23,26 @@ cryptoApp.run(function ($stomp, $rootScope) {
 				exchangeScope.exchanges = payload;
 				exchangeScope.$apply(exchangeScope.exchanges);
 	        });
+		    $stomp.send("/app/exchangeStatus", market);
 		}
-	    $stomp.send("/app/exchangeStatus", market);
+		if (backOfficeScope !== undefined && backOfficeScope !== null) {
+			console.log('Subscribing to back office updated');
+			var subscription = $stomp.subscribe('/topic/backOfficeUpdates', function (payload, headers, res) {
+				backOfficeScope.backOfficeUpdates = payload;
+				backOfficeScope.lastBackOfficeUpdate = backOfficeScope.backOfficeUpdates[0];
+				backOfficeScope.$apply(backOfficeScope.backOfficeUpdates);
+				backOfficeScope.$apply(backOfficeScope.lastBackOfficeUpdate);
+	        });
+		    $stomp.send("/app/exchangeStatus", market);
+		}
+		if (arbProspectScope !== undefined && arbProspectScope !== null) {
+			console.log('Subscribing to arb prospects');
+			var subscription = $stomp.subscribe('/topic/arbProspects', function (payload, headers, res) {
+				arbProspectScope.arbProspects = payload;
+				arbProspectScope.$apply(exchangeScope.arbProspects);
+	        });
+		    $stomp.send("/app/arbProspectScope", market);
+		}
 	});
 	$rootScope.placeOrder = function placeOrder(market, pair, price, side) {
 		$('#placeOrder_market').val(market);
@@ -44,6 +64,16 @@ controllers.OpenOrderController = function ($stomp, $scope) {
 controllers.ExchangeController = function ($stomp, $scope) {
 	console.log("Creating statusController");
 	exchangeScope = $scope;
+};
+
+controllers.BackOfficeController = function ($stomp, $scope) {
+	console.log("Creating backOfficeController");
+	backOfficeScope = $scope;
+};
+
+controllers.ArbProspectController = function ($stomp, $scope) {
+	console.log("Creating arbProspectController");
+	arbProspectScope = $scope;
 };
 
 cryptoApp.controller(controllers);

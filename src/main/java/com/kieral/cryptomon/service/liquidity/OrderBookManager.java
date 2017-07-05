@@ -194,14 +194,14 @@ public class OrderBookManager {
 	public LiquidityEntry getBestBidAsk(String market, CurrencyPair currencyPair, BigDecimal amount) {
 		if (market == null || currencyPair == null)
 			return null;
-		return getBestBidAsk(orderBooks.get(new OrderBookKey(market, currencyPair.getName())), amount);
+		return OrderBookManager.getBestBidAsk(orderBooks.get(new OrderBookKey(market, currencyPair.getName())), amount);
 	}
 
 	public LiquidityEntry getBestBidAsk(OrderBook orderBook) {
-		return getBestBidAsk(orderBook, null);
+		return OrderBookManager.getBestBidAsk(orderBook, orderBookConfig.getSignificantAmount(orderBook.getMarket(), orderBook.getCurrencyPair().getBaseCurrency()));
 	}
 
-	public LiquidityEntry getBestBidAsk(OrderBook orderBook, BigDecimal desiredAmount) {
+	public static LiquidityEntry getBestBidAsk(OrderBook orderBook, BigDecimal desiredAmount) {
 		if (orderBook == null)
 			return null;
 		List<OrderBookEntry> bidEntries = getDepthNeeded(Side.BID, orderBook.getMarket(), 
@@ -209,29 +209,23 @@ public class OrderBookManager {
 		BigDecimal bidAmount = bidEntries == null ? BigDecimal.ZERO :
 			bidEntries.stream().map(OrderBookEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 		BigDecimal bidPrice = bidEntries == null ? null : bidEntries.get(bidEntries.size() - 1).getPrice();
-		if (logger.isDebugEnabled() && bidPrice == null)
-			logger.debug("No best bid price from orderbook {} " + orderBook);
 		List<OrderBookEntry> askEntries = getDepthNeeded(Side.ASK, orderBook.getMarket(), 
 				orderBook.getCurrencyPair().getBaseCurrency(), orderBook.getAsks(), desiredAmount);
 		BigDecimal askAmount = askEntries == null ? BigDecimal.ZERO :
 			askEntries.stream().map(OrderBookEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 		BigDecimal askPrice = askEntries == null ? null : askEntries.get(askEntries.size() - 1).getPrice();
-		if (logger.isDebugEnabled() && askPrice == null)
-			logger.debug("No best ask price from orderbook {} " + orderBook);
 		return new LiquidityEntry(new BidAskPrice(bidPrice, askPrice), new BidAskAmount(new TradeAmount(bidAmount, askPrice, orderBook.getCurrencyPair().getPriceScale())
 				, new TradeAmount(askAmount, bidPrice, orderBook.getCurrencyPair().getPriceScale())));
 	}
 
-	private List<OrderBookEntry> getDepthNeeded(Side side, String market, Currency baseCurrency, List<OrderBookEntry> entries, BigDecimal desiredAmount) {
+	private static List<OrderBookEntry> getDepthNeeded(Side side, String market, Currency baseCurrency, List<OrderBookEntry> entries, BigDecimal desiredAmount) {
 		List<OrderBookEntry> rtn = new ArrayList<OrderBookEntry>();
 		BigDecimal cumulativeAmount = BigDecimal.ZERO;
 		for (OrderBookEntry entry : entries) {
 			rtn.add(entry);
 			cumulativeAmount = cumulativeAmount.add(entry.getAmount());
 			if (desiredAmount == null) {
-				if (orderBookConfig.isSignificant(market, baseCurrency, entry.getAmount())) {
-					return rtn;
-				}
+				return rtn;
 			} else if (desiredAmount.compareTo(cumulativeAmount) < 0) {
 				return rtn;
 			}

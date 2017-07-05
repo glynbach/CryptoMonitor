@@ -22,11 +22,13 @@ public class BalanceService {
 	private final Comparator<Balance> byMarket = Comparator.comparing(balance -> balance.getMarket());
 	private final Comparator<Balance> byCurrency = Comparator.comparing(balance -> balance.getCurrency());
 	
+	private final ConcurrentMap<BalanceService.BalanceKey, BigDecimal> openingBalances = new ConcurrentHashMap<BalanceService.BalanceKey, BigDecimal>();
 	private final ConcurrentMap<BalanceKey, Balance> balances = new ConcurrentHashMap<BalanceKey, Balance>();
 	private final ConcurrentMap<BalanceKey, ReentrantLock> locks = new ConcurrentHashMap<BalanceKey, ReentrantLock>();
 	
 	public void setConfirmedBalance(String market, Currency currency, BigDecimal confirmedAmount, boolean forceReconcileWorkingAmount) {
 		BalanceKey key = keyFor(market, currency);
+		openingBalances.putIfAbsent(key, confirmedAmount);
 		if (balances.putIfAbsent(key, new Balance(market, currency, confirmedAmount, confirmedAmount)) != null) {
 			Lock lock = getLock(market, currency);
 			lock.lock();
@@ -88,6 +90,28 @@ public class BalanceService {
 		return rtnBalances;
 	}
 
+	public Balance getNetBalance(Currency currency) {
+		if (currency == null)
+			return null;
+		BigDecimal confirmedAmountTotal = BigDecimal.ZERO;
+		BigDecimal workingAmountTotal = BigDecimal.ZERO;
+		for (Balance balance : balances.values()) {
+			if (balance.getCurrency() == currency) {
+				confirmedAmountTotal = confirmedAmountTotal.add(balance.getConfirmedAmount());
+				workingAmountTotal = workingAmountTotal.add(balance.getWorkingAmount());
+			}
+		}
+		return new Balance(null, currency, confirmedAmountTotal, workingAmountTotal);
+	}
+
+	public List<Balance> getOpeningBalances() {
+		List<Balance> rtn = new ArrayList<Balance>();
+		openingBalances.keySet().forEach(key -> {
+			rtn.add(new Balance(key.getMarket(), key.getCurrency(), openingBalances.get(key), openingBalances.get(key)));
+		});
+		return rtn;
+	}
+	
 	public BigDecimal getConfirmedAmount(String market, Currency currency) {
 		BalanceKey key = keyFor(market, currency);
 		if (balances.containsKey(key))

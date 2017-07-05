@@ -3,6 +3,7 @@ package com.kieral.cryptomon.service.exchange;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import org.springframework.http.HttpMethod;
@@ -16,6 +17,7 @@ import com.kieral.cryptomon.service.exception.ApiRequestException;
 public class ExchangeApiRequest {
 
 	private static final ObjectMapper objectMapper = new ObjectMapper();
+	private static final AtomicInteger idGenerator = new AtomicInteger();
 
 	public enum BodyType {
 		JSON,
@@ -28,6 +30,7 @@ public class ExchangeApiRequest {
 		RAISE_EXCEPTION
 	}
 	
+	private final int apiRequestId = idGenerator.incrementAndGet();
 	private final String endPoint;
 	private final String requestPath;
 	private final HttpMethod method;
@@ -49,6 +52,10 @@ public class ExchangeApiRequest {
 		this.method = method;
 		this.bodyType = bodyType;
 		this.responseErrorCheckers = responseErrorCheckers;
+	}
+
+	public int getApiRequestId() {
+		return apiRequestId;
 	}
 
 	public String getEndPoint() {
@@ -120,9 +127,9 @@ public class ExchangeApiRequest {
 
 	@Override
 	public String toString() {
-		return "ApiRequest [endPoint=" + endPoint + ", requestPath=" + requestPath + ", method=" + method
-				+ ", bodyType=" + bodyType + ", postParameters=" + postParameters + ", responseErrorCheckers="
-				+ Arrays.toString(responseErrorCheckers) + "]";
+		return "ExchangeApiRequest [apiRequestId=" + apiRequestId + ", endPoint=" + endPoint + ", requestPath="
+				+ requestPath + ", method=" + method + ", bodyType=" + bodyType + ", postParameters=" + postParameters
+				+ ", responseErrorCheckers=" + Arrays.toString(responseErrorCheckers) + "]";
 	}
 
 	public static class ResponseErrorChecker {

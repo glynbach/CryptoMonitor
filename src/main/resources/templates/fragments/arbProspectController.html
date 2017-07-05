@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+
+</head>
+<body>
+
+<div th:fragment="arbProspectController">
+	<div class="arbProspect-container card" ng-controller="ArbProspectController">
+		<div class="card-header">
+			<p class="card-title">ArbProspects</p>
+		</div>
+		<div class="card-text">
+			<table width="100%" class="table table-striped table-condensed">
+				<thead>
+					<tr>
+						<th>Market</th>
+						<th colspan="2">Prospects</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr ng-repeat="prospect in arbProspects.prospects">
+						<td>{{prospect.market}}</td>
+						<td ng-repeat="currencyProspect in prospect.currencyProspects">
+							<span>{{currencyProspect.currencyPair}} BestAsk: {{currencyProspect.bestAskPrice}}</span>
+							<span ng-repeat="bid in currencyProspect.marketBids">
+								<span ng-class="{'badge-primary' : !bid.opportunity, 'badge-success' : bid.opportunity, 'badge' : true}">
+									{{bid.market}}&nbsp;{{bid.bestBidPrice}}&nbsp;[{{bid.quotedProfit}}/{{bid.quotedProfitWithFees}}]
+								</span>
+								&nbsp;
+							</span>
+						</td>
+					</tr>										
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>

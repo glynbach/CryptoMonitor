@@ -126,7 +126,7 @@ public class SimpleArbInspector implements ArbInspector {
 				return NO_ARB;
 			}
 		}
-		return checkOpportunity(commonAmount, commonAmount, buyBook, sellBook, buySide, sellSide, false, true);
+		return checkOpportunity(commonAmount, commonAmount, buyBook, sellBook, buySide, sellSide, false);
 	}
 	
 	/**
@@ -135,16 +135,17 @@ public class SimpleArbInspector implements ArbInspector {
 	 * @return
 	 */
 	private ArbInstruction checkOpportunity(BigDecimal longAmount, BigDecimal shortAmount, OrderBook buyBook, 
-			     OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide, boolean baseProfitOnGreatest, boolean validate) {
-		// check opportunity after fees
+			     OrderBook sellBook, LiquidityEntry buySide, LiquidityEntry sellSide, boolean resolvingOpenArb) {
+		// if resolving an open arb, force the decision as if on the greatest of the remaining amounts
 		BigDecimal greatestAmount = longAmount.compareTo(shortAmount) > 0 ? longAmount : shortAmount;
-		BigDecimal longReferenceAmount = baseProfitOnGreatest ? greatestAmount : longAmount;
-		BigDecimal shortReferenceAmount = baseProfitOnGreatest ? greatestAmount : shortAmount;
+		BigDecimal longReferenceAmount = resolvingOpenArb ? greatestAmount : longAmount;
+		BigDecimal shortReferenceAmount = resolvingOpenArb ? greatestAmount : shortAmount;
+		// check opportunity after fees
 		BigDecimal amountBoughtWithFees = longReferenceAmount.multiply(buySide.getBidAskPrice().get(Side.ASK))
-				.multiply(CommonUtils.getTradingfeeMultiplier(buyBook.getCurrencyPair().getTradingFee()))
+				.multiply(CommonUtils.getTradingfeeMultiplier(Side.BID, buyBook.getCurrencyPair().getTradingFee()))
 				.setScale(buyBook.getCurrencyPair().getPriceScale(), RoundingMode.HALF_UP);
 		BigDecimal amountSoldWithFees = shortReferenceAmount.multiply(sellSide.getBidAskPrice().get(Side.BID))
-				.multiply(CommonUtils.getTradingfeeMultiplier(sellBook.getCurrencyPair().getTradingFee()))
+				.multiply(CommonUtils.getTradingfeeMultiplier(Side.ASK, sellBook.getCurrencyPair().getTradingFee()))
 				.setScale(sellBook.getCurrencyPair().getPriceScale(), RoundingMode.HALF_DOWN);
 		BigDecimal profit = amountSoldWithFees.subtract(amountBoughtWithFees);
 		if (profit.compareTo(BigDecimal.ZERO) > 0) {
@@ -156,7 +157,7 @@ public class SimpleArbInspector implements ArbInspector {
 							new TradeAmount(shortAmount, sellSide.getBidAskPrice().get(Side.BID), sellBook.getCurrencyPair().getPriceScale())), 
 					new BidAskMarket(buyBook.getMarket(), sellBook.getMarket()),
 					new Tuple2<OrderBook, OrderBook>(buyBook, sellBook),
-					validate);
+					resolvingOpenArb);
 		}
 		if (logger.isDebugEnabled())
 			logger.debug("No profit in {} USD after fees for {} and {} prices {} amd {}", profit.multiply(new BigDecimal("2500")).setScale(4, RoundingMode.HALF_UP), buyBook.getMarket(), sellBook.getMarket(), buySide, sellSide);
@@ -179,11 +180,11 @@ public class SimpleArbInspector implements ArbInspector {
 	@Override
 	public ArbInstruction resolve(OrderBook longBook, OrderBook shortBook, BigDecimal longAmountRemaining,
 			BigDecimal shortAmountRemaining) {
-		LiquidityEntry longBest = orderBookManager.getBestBidAsk(longBook, longAmountRemaining);
-		LiquidityEntry shortBest = orderBookManager.getBestBidAsk(shortBook, shortAmountRemaining);
+		LiquidityEntry longBest = OrderBookManager.getBestBidAsk(longBook, longAmountRemaining);
+		LiquidityEntry shortBest = OrderBookManager.getBestBidAsk(shortBook, shortAmountRemaining);
 		if (longBest != null && shortBest != null && longBest.getBidAskPrice() != null && shortBest.getBidAskPrice() != null
 				&& longBest.getBidAskPrice().get(Side.ASK) != null && shortBest.getBidAskPrice().get(Side.BID) != null)
-			return checkOpportunity(longAmountRemaining, shortAmountRemaining, longBook, shortBook, longBest, shortBest, true, false);
+			return checkOpportunity(longAmountRemaining, shortAmountRemaining, longBook, shortBook, longBest, shortBest, true);
 		return NO_ARB;
 	}
 	

@@ -32,6 +32,7 @@ import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
 import com.kieral.cryptomon.service.util.CommonUtils;
 import com.kieral.cryptomon.service.util.TradingUtils;
+import com.kieral.cryptomon.service.util.Tuple2;
 
 public class ExecutionMonitor {
 
@@ -101,15 +102,15 @@ public class ExecutionMonitor {
 		if (arbService.isSuspended())
 			throw new IllegalStateException("Not able to execute when arbService is suspended");
 		validateArbInstruction(arbInstruction);
-		logger.info("Executing arb instruction {}", arbInstruction);
-		if (!placeOrder(arbInstruction.getLeg(Side.BID))) {
-			throw new IllegalStateException("Not able to place order for " + arbInstruction.getLeg(Side.BID));
-		}
-		if (!placeOrder(arbInstruction.getLeg(Side.ASK))) {
-			cancelOrder(longOrders.get(0));
-			throw new IllegalStateException("Not able to place order for " + arbInstruction.getLeg(Side.ASK));
-		}
 		reserveBalances(arbInstruction);
+		logger.info("Executing arb instruction {}", arbInstruction);
+		Tuple2<OrderStatus, OrderStatus> orderStatuses = placeOrders(arbInstruction.getLeg(Side.BID), arbInstruction.getLeg(Side.ASK));
+		if (orderStatuses.getA() != OrderStatus.OPEN || orderStatuses.getB() != OrderStatus.OPEN) {
+			logger.warn("Not all the orders have been placed; long status={} short stataus={} - run an immediate review",
+					orderStatuses.getA(), orderStatuses.getB());
+			queryStatus();
+			reviewStatus();
+		}
 		executionMonitorDaemon.submit(new StatusCheckTask());
 	}
 	
@@ -178,24 +179,58 @@ public class ExecutionMonitor {
 		}
 	}
 	
-	private boolean placeOrder(ArbInstructionLeg leg) {
-		return placeOrder(leg.getMarket(), leg.getCurrencyPair(), leg.getAmount().getBaseAmount(), leg.getPrice(), 
-				leg.getSide());
+	private Tuple2<OrderStatus, OrderStatus> placeOrders(ArbInstructionLeg longLeg, ArbInstructionLeg shortLeg) {
+		final AtomicReference<OrderStatus> longStatus = new AtomicReference<OrderStatus>(OrderStatus.ERROR);
+		final AtomicReference<OrderStatus> shortStatus = new AtomicReference<OrderStatus>(OrderStatus.ERROR);
+		int legs = 0;
+		if (longLeg != null && longLeg.getAmount().getBaseAmount().compareTo(BigDecimal.ZERO) > 0)
+			legs++;
+		if (shortLeg != null && shortLeg.getAmount().getBaseAmount().compareTo(BigDecimal.ZERO) > 0)
+			legs++;
+		final CountDownLatch latch = new CountDownLatch(legs);
+		if (longLeg != null && longLeg.getAmount().getBaseAmount().compareTo(BigDecimal.ZERO) > 0) {
+			executionMonitorPriorityDaemon.submit(() -> {
+				try {
+					longStatus.set(placeOrder(longLeg.getMarket(), longLeg.getCurrencyPair(), longLeg.getAmount().getBaseAmount(), 
+							longLeg.getPrice(), longLeg.getSide()));
+				} finally {
+					latch.countDown();
+				}
+			});
+		} else
+			longStatus.set(null);
+		if (shortLeg != null && shortLeg.getAmount().getBaseAmount().compareTo(BigDecimal.ZERO) > 0) {
+			executionMonitorPriorityDaemon.submit(() -> {
+				try {
+					shortStatus.set(placeOrder(shortLeg.getMarket(), shortLeg.getCurrencyPair(), shortLeg.getAmount().getBaseAmount(), 
+							shortLeg.getPrice(), shortLeg.getSide()));
+				} finally {
+					latch.countDown();
+				}
+			});
+		} else
+			shortStatus.set(null);
+		try {
+			latch.await(10000, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+		}
+		return new Tuple2<OrderStatus, OrderStatus>(longStatus.get(), shortStatus.get());
 	}
 
-	private boolean placeOrder(String market, CurrencyPair pair, BigDecimal amount, BigDecimal price, Side side) {
+	private OrderStatus placeOrder(String market, CurrencyPair pair, BigDecimal amount, BigDecimal price, Side side) {
 		Order order = new Order(market, pair, amount, price, side);
 		try {
-			if (!orderService.placeOrder(order))
-				return false;
+			OrderStatus rtn = orderService.placeOrder(order);
+			if (rtn != OrderStatus.OPEN)
+				return rtn;
 			if (order.getSide() == Side.BID)
 				longOrders.add(order);
 			else
 				shortOrders.add(order);
-			return true;
+			return rtn;
 		} catch (Exception e) {
 			logger.error("Error placing order for " + market + " " + pair + " " + amount + " " + price + " " + side, e);
-			return false;
+			return OrderStatus.ERROR;
 		}
 	}
 
@@ -283,30 +318,60 @@ public class ExecutionMonitor {
 	private void queryStatus() {
 		statusLock.lock();
 		try {
+			final List<Order> longOrdersToCheck = new ArrayList<Order>();
+			final List<Order> shortOrdersToCheck = new ArrayList<Order>();
 			longOrders.forEach(order -> {
-				try {
-					if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
-						logger.info("Checking order status for long order {}", order);
-						orderService.checkStatus(order.getMarket(), order.getClientOrderId());
-					}
-					longOrderBook = arbService.getOrderBook(order.getMarket(), order.getCurrencyPair().getName());
-					logger.info("Latest orderbook for {} on {} {}", order.getCurrencyPair().getName(), order.getMarket(), longOrderBook);
-				} catch (Exception e) {
-					logger.error("Error checking order status for {}", order, e);
+				if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
+					logger.info("Long order to be checked {}", order);
+					longOrdersToCheck.add(order);
 				}
+				longOrderBook = arbService.getOrderBook(order.getMarket(), order.getCurrencyPair().getName());
+				logger.info("Latest orderbook for {} on {} {}", order.getCurrencyPair().getName(), order.getMarket(), longOrderBook);
 			});
 			shortOrders.forEach(order -> {
-				try {
-					if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
-						orderService.checkStatus(order.getMarket(), order.getClientOrderId());
-						logger.info("Checking order status for short order {}", order);
-					}
-					shortOrderBook = arbService.getOrderBook(order.getMarket(), order.getCurrencyPair().getName());
-					logger.info("Latest orderbook for {} on {} {}", order.getCurrencyPair().getName(), order.getMarket(), shortOrderBook);
-				} catch (Exception e) {
-					logger.error("Error checking order status for {}", order, e);
+				if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
+					logger.info("Short order to be checked {}", order);
+					shortOrdersToCheck.add(order);
 				}
+				shortOrderBook = arbService.getOrderBook(order.getMarket(), order.getCurrencyPair().getName());
+				logger.info("Latest orderbook for {} on {} {}", order.getCurrencyPair().getName(), order.getMarket(), shortOrderBook);
 			});
+			if (longOrdersToCheck.size() > 0 || shortOrdersToCheck.size() > 0) {
+				int numChecks = 0;
+				if (longOrdersToCheck.size() > 0)
+					numChecks++;
+				if (shortOrdersToCheck.size() > 0)
+					numChecks++;
+				CountDownLatch latch = new CountDownLatch(numChecks);
+				if (longOrdersToCheck.size() > 0) {
+					executionMonitorPriorityDaemon.submit(() -> {
+						try {
+							orderService.checkStatuses(longOrdersToCheck.get(0).getMarket(), longOrdersToCheck);
+						} catch (Exception e) {
+							logger.error("Error checking long order statuses for {}", longOrdersToCheck, e);
+						} finally {
+							latch.countDown();
+						}
+					});
+				}
+				if (shortOrdersToCheck.size() > 0) {
+					executionMonitorPriorityDaemon.submit(() -> {
+						try {
+							orderService.checkStatuses(shortOrdersToCheck.get(0).getMarket(), shortOrdersToCheck);
+						} catch (Exception e) {
+							logger.error("Error checking short order statuses for {}", shortOrdersToCheck, e);
+						} finally {
+							latch.countDown();
+						}
+					});
+				}
+				try {
+					latch.await(10000, TimeUnit.MILLISECONDS);
+				} catch (InterruptedException e) {
+				}
+				if (latch.getCount() > 0)
+					logger.error("Awaiting order checking timed out");
+			}
 		} finally {
 			statusLock.unlock();
 		}
@@ -322,6 +387,7 @@ public class ExecutionMonitor {
 				if (tries > 5) {
 					logger.error("Tried 5 times to review arb status - suspending arbService");
 					arbService.suspend(true);
+					cancelAllOpenOrders();
 					return;
 				}
 			}
@@ -374,7 +440,8 @@ public class ExecutionMonitor {
 									if (OrderStatus.OPEN_ORDER.contains(placedOrder.getOrderStatus())) {
 										try {
 											logger.info("Cancelling balancing order {}", placedOrder);
-											if (!orderService.cancelOrder(placedOrder.getMarket(), placedOrder.getClientOrderId()))
+											if (OrderStatus.OPEN_ORDER.contains(
+													orderService.cancelOrder(placedOrder.getMarket(), placedOrder.getClientOrderId())))
 												throw new IllegalStateException("Cancel failed");
 										} catch (Exception e) {
 											logger.error("Error cancelling balancing order {}", placedOrder);
@@ -403,7 +470,7 @@ public class ExecutionMonitor {
 			switch (updatedInstruction.getDecision()) {
 				case NOTHING_THERE:
 				case CANCEL:
-					cancel = new boolean[]{true, true};
+					cancel = new boolean[]{OrderStatus.OPEN_ORDER.contains(status.longLegStatus), OrderStatus.OPEN_ORDER.contains(status.shortLegStatus)};
 					replace = new boolean[]{false, false};
 					break;
 				case HIGH:
@@ -412,12 +479,12 @@ public class ExecutionMonitor {
 						Side side = i==0 ? Side.BID : Side.ASK;
 						ArbInstructionLeg updatedLeg = updatedInstruction.getLeg(side);
 						if (side == Side.BID) {
-							if (updatedLeg.getPrice().compareTo(status.longOrder.getPrice()) > 0) {
+							if (OrderStatus.OPEN_ORDER.contains(status.longLegStatus) && updatedLeg.getPrice().compareTo(status.longOrder.getPrice()) > 0) {
 								cancel[0] = true;
 								replace[0] = true;
 							}
 						} else {
-							if (updatedLeg.getPrice().compareTo(status.shortOrder.getPrice()) < 0) {
+							if (OrderStatus.OPEN_ORDER.contains(status.shortLegStatus) && updatedLeg.getPrice().compareTo(status.shortOrder.getPrice()) < 0) {
 								cancel[1] = true;
 								replace[1] = true;
 							}
@@ -425,7 +492,7 @@ public class ExecutionMonitor {
 					}
 					break;
 				default:
-					cancel = new boolean[]{true, true};
+					cancel = new boolean[]{OrderStatus.OPEN_ORDER.contains(status.longLegStatus), OrderStatus.OPEN_ORDER.contains(status.shortLegStatus)};
 					replace = new boolean[]{false, false};
 					break;
 			}
@@ -433,21 +500,20 @@ public class ExecutionMonitor {
 								cancel[0], replace[0], cancel[1], replace[1]);
 			AtomicBoolean soFarSoGood = new AtomicBoolean(true);
 			if (cancel[0]) {
-				boolean cancelled = cancelOrder(status.longOrder);
-				soFarSoGood.compareAndSet(true, cancelled);
+				OrderStatus cancelStatus = cancelOrder(status.longOrder);
+				soFarSoGood.compareAndSet(true, cancelStatus == OrderStatus.CANCELLED);
 			}
 			if (cancel[1]) {
-				boolean cancelled = cancelOrder(status.shortOrder);
-				soFarSoGood.compareAndSet(true, cancelled);
+				OrderStatus cancelStatus = cancelOrder(status.shortOrder);
+				soFarSoGood.compareAndSet(true, cancelStatus == OrderStatus.CANCELLED);
 			}
 			if (soFarSoGood.get()) {
-				if (replace[0]) {
-					boolean placed = placeOrder(updatedInstruction.getLeg(Side.BID));
-					soFarSoGood.compareAndSet(true, placed);
-				}
-				if (replace[1]) {
-					boolean placed = placeOrder(updatedInstruction.getLeg(Side.ASK));
-					soFarSoGood.compareAndSet(true, placed);
+				if (replace[0] || replace[1]) {
+					Tuple2<OrderStatus, OrderStatus> statuses = placeOrders(
+							replace[0] ? updatedInstruction.getLeg(Side.BID) : null,
+							replace[1] ? updatedInstruction.getLeg(Side.ASK) : null);
+					soFarSoGood.compareAndSet(true, statuses.getA() == OrderStatus.OPEN);
+					soFarSoGood.compareAndSet(true, statuses.getB() == OrderStatus.OPEN);
 				}
 			} 
 			if (!soFarSoGood.get()) {
@@ -458,16 +524,24 @@ public class ExecutionMonitor {
 		return true;
 	}
 	
-	private boolean cancelOrder(Order order) {
-		if (order != null) {
-			try {
-				return orderService.cancelOrder(order.getMarket(), order.getClientOrderId());
-			} catch (Exception e) {
-				logger.error("Error cancelling order", e);
-				return false;
-			}
-		} 
-		return true;
+	private void cancelAllOpenOrders() {
+		for (Order order : longOrders) {
+			if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus()))
+				cancelOrder(order);
+		}
+		for (Order order : shortOrders) {
+			if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) 
+				cancelOrder(order);
+		}
+	}
+	
+	private OrderStatus cancelOrder(Order order) {
+		try {
+			return orderService.cancelOrder(order.getMarket(), order.getClientOrderId());
+		} catch (Exception e) {
+			logger.error("Error cancelling order", e);
+		}
+		return OrderStatus.ERROR;
 	}
 	
 	public class StatusCheckTask implements Runnable {

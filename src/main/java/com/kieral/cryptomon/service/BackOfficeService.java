@@ -8,5 +8,6 @@ import com.kieral.cryptomon.service.arb.ArbInstruction;
 public interface BackOfficeService {
 
 	void onExecutionCompletion(ArbInstruction instruction, List<Order> longOrders, List<Order> shortOrders, boolean interventionRequired);
+	void registerListener(BackOfficeListener listener);
 	
 }

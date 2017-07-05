@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.kieral.cryptomon.model.trading.Order;
+import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.OrderService;
 import com.kieral.cryptomon.service.exception.OrderNotExistsException;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
@@ -71,7 +72,7 @@ public class CryptoMonController {
 	    	return "orders";
 	    }
 	    try {
-	    	if (!orderService.placeOrder(order)) {
+	    	if (orderService.placeOrder(order) != OrderStatus.OPEN) {
 	    		throw new IllegalStateException("Placing order failed");
 	    	}
 	    	model.addAttribute("info", String.format("Order placed for %s", order.toStringFundamentals()));
@@ -88,7 +89,7 @@ public class CryptoMonController {
     public String cancelOrder(@PathVariable String market, @PathVariable String clientOrderId, Model model) {
     	logger.info("Received cancel order for clientOrderId {}", clientOrderId);
     	try {
-			if (!orderService.cancelOrder(market, clientOrderId)) {
+			if (orderService.cancelOrder(market, clientOrderId) == OrderStatus.ERROR) {
 				throw new IllegalStateException("Cancel failed");
 			}
 		} catch (OrderNotExistsException e) {
@@ -106,6 +107,7 @@ public class CryptoMonController {
     	logger.info("Received check order status for clientOrderId {}", clientOrderId);
     	try {
 			orderService.checkStatus(market, clientOrderId);
+			orderService.requestBalances();
 		} catch (OrderNotExistsException e) {
 			logger.error("Received check order status {} {} for unrecognised order", market, clientOrderId);
 			model.addAttribute("error", String.format("Unrecognised clientOrderId %s for market %s", clientOrderId, market));

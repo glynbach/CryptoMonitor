@@ -12,6 +12,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -45,6 +50,7 @@ import com.kieral.cryptomon.service.connection.ConnectionStatusListener;
 import com.kieral.cryptomon.service.exception.ApiRequestException;
 import com.kieral.cryptomon.service.exception.BalanceRequestException;
 import com.kieral.cryptomon.service.exception.ExpectedResponseException;
+import com.kieral.cryptomon.service.exception.ResponseTimedOutException;
 import com.kieral.cryptomon.service.exception.SecurityModuleException;
 import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.BodyType;
 import com.kieral.cryptomon.service.exchange.ExchangeApiRequest.ResponseErrorAction;
@@ -93,6 +99,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	protected final ServiceExchangeProperties serviceProperties;
 	protected final ServiceSecurityModule securityModule;
 	private final OrderedStreamingEmitter streamingEmitter;
+	private final ExecutorService requestProcessor;
 	
 	private final ConcurrentMap<String, AtomicBoolean> initialisedStreams = new ConcurrentHashMap<String, AtomicBoolean>();
 	
@@ -114,6 +121,13 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		if (securityModule == null)
 			throw new IllegalArgumentException("securityModule can not be null");
 		logger.info("Creating service with properties {}", serviceProperties);
+		this.requestProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread thread = new Thread(r, getName() + "-requestProcessor");
+				thread.setDaemon(true);
+				return thread;
+			}});
 		this.serviceProperties = serviceProperties;
 		this.securityModule = securityModule;
 		this.skipHeartbeats = serviceProperties.isSkipHearbeats();
@@ -204,7 +218,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		if (serviceProperties.getSubscriptionMode() == SubscriptionMode.STREAMING)
 			subscribeMarketDataTopics();
 		else {
-			this.pollingService.registerListener(getName(), this);
+			this.pollingService.registerListener(this.getName(), this);
 			pollMarketData = true;
 		}
 	}
@@ -297,14 +311,18 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	}
 
 	protected OrderBookResponse getOrderBookResponse(CurrencyPair currencyPair) {
-		ExchangeApiRequest url = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
-		if (logger.isDebugEnabled())
-			logger.debug("Requesting orderbook snapshot from {}", url.getUrl());
-		OrderBookResponse response = restTemplate.getForObject(url.getUrl(), getOrderBookResponseClazz());
-		response.setCurrencyPair(currencyPair);
-		if (logger.isDebugEnabled())
-			logger.debug("Orderbook snapshot response {}", response);
-		LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), response));
+		ExchangeApiRequest apiRequest = serviceProperties.getOrderBookSnapshotQuery(currencyPair.getTopic());
+		OrderBookResponse response = null;
+		try {
+			response = this.getMarketResponse(apiRequest, "Orderbook snapshot", getOrderBookResponseClazz());
+		} catch (SecurityModuleException | ApiRequestException | ExpectedResponseException
+				| ResponseTimedOutException e) {
+			logger.error("Error getting snapshot response for {}", currencyPair.getName(), e);
+		}
+		if (response != null) {
+			response.setCurrencyPair(currencyPair);
+			LoggingUtils.logRawData(String.format("%s: snapshot: %s", getName(), response));
+		}
 		return response;
 	}
 
@@ -444,6 +462,10 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				order.setMessage(e.getResponseBody());
 				return OrderStatus.ERROR;
 			} 
+		} catch (ResponseTimedOutException e) {
+			logger.error("Timed out placing order {}", order, e);
+			order.setMessage("Timed out sending to exchange");
+			return OrderStatus.ERROR;
 		} 
 	}
 
@@ -511,9 +533,14 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 				return OrderStatus.CANCELLED;
 			} else {
 				logger.info("Response with status code {} and body {} for cancellation of {} can not be cancelled", e.getStatus(), e.getResponseBody(), orderId);
-				return currentOrderStatus;
+				// unknown status so return ERROR
+				return OrderStatus.ERROR;
 			} 
-		}
+		} catch (ResponseTimedOutException e) {
+			logger.error("Timed out trying to cancel order {}", orderId, e);
+			message.set("Timed out sending to exchange");
+			return OrderStatus.ERROR;
+		} 
 	}
 	
 	private OrderStatus getOrderStatus(Order order) {
@@ -773,8 +800,16 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		return getTradingResponse(apiRequest, "accounts", getAccountsResponseClazz());	
 	}
 
+
+	private <T> T getMarketResponse(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, 
+																					ApiRequestException, ExpectedResponseException, ResponseTimedOutException {
+		HttpHeaders headers = new HttpHeaders();
+		HttpEntity<?> entity = new HttpEntity<>(headers);
+		return processResponse(logger.isDebugEnabled(), apiRequest.getUrl(), entity, apiRequest, descr, clazz);
+	}
+
 	private <T> T getTradingResponse(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, 
-																								ApiRequestException, ExpectedResponseException {
+																								ApiRequestException, ExpectedResponseException, ResponseTimedOutException {
 		if (apiRequest.getMethod() == HttpMethod.POST)
 			return getTradingResponseForPut(apiRequest, descr, clazz);
 		else {
@@ -783,42 +818,63 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 		}
 	}
 	
-	private <T> T getTradingResponseForPut(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException, ExpectedResponseException {
+	private <T> T getTradingResponseForPut(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ApiRequestException, ExpectedResponseException, ResponseTimedOutException {
 		securityModule.appendApiPostParameterEntries(apiRequest.getPostParameters());
 		logger.info("Requesting {} from POST {}", descr, apiRequest);
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), apiRequest.getRequestPath(), apiRequest.getBodyAsString());
 		HttpEntity<?> entity = new HttpEntity<>(apiRequest.getBodyType() == BodyType.URLENCODED ? apiRequest.getBodyAsString() : apiRequest.getPostParameters(), headers);
-		return processResponse(apiRequest.getUrl(), entity, apiRequest, descr, clazz);
+		return processResponse(true, apiRequest.getUrl(), entity, apiRequest, descr, clazz);
 	}
 	
-	private <T> T getTradingResponseForMethod(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ExpectedResponseException {
+	private <T> T getTradingResponseForMethod(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, ExpectedResponseException, ResponseTimedOutException {
 		ExchangeApiRequest securityEnrichedUrl = new ExchangeApiRequest(apiRequest.getEndPoint(), securityModule.appendApiRequestPathEntries(apiRequest.getRequestPath()), apiRequest.getMethod());
 		logger.info("Requesting {} from {}", descr, securityEnrichedUrl.getUrl());
 		HttpHeaders headers = securityModule.sign(System.currentTimeMillis(), apiRequest.getMethod(), securityEnrichedUrl.getRequestPath(), null);
 		HttpEntity<?> entity = new HttpEntity<>(headers);
-		return processResponse(securityEnrichedUrl.getUrl(), entity, apiRequest, descr, clazz);
+		return processResponse(true, securityEnrichedUrl.getUrl(), entity, apiRequest, descr, clazz);
 	}
 	
-	private <T> T processResponse(String url, HttpEntity<?> entity, ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws ExpectedResponseException {
-		try {
-			ResponseEntity<? extends T> response = null;
-			if (HttpMethod.POST == apiRequest.getMethod())
-				response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
-			else
-				response = restTemplate.exchange(url, apiRequest.getMethod(), entity, clazz);
-			logger.info("{} response {}", descr, response.getBody());
-			LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
-			return response.getBody();
-		} catch (HttpClientErrorException e) {
-			ResponseErrorAction action = apiRequest.checkResponseError(e.getStatusCode(), e.getResponseBodyAsString());
-			if (action != null && action != ResponseErrorAction.RAISE_EXCEPTION) {
-				if (logger.isDebugEnabled())
-					logger.debug("{} is expected by apiRequest {}", e.getStatusCode(), apiRequest);
-				throw new ExpectedResponseException(e, action, e.getStatusCode(), e.getResponseBodyAsString());
-			} else {
-				logger.error("Received rest exception with status {} and response body {}", e.getStatusCode(), e.getResponseBodyAsString());
-				throw e;
+	private <T> T processResponse(boolean log, String url, HttpEntity<?> entity, ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws ExpectedResponseException, ResponseTimedOutException {
+		final CountDownLatch responseLatch = new CountDownLatch(1);
+		final AtomicReference<T> body = new AtomicReference<T>();
+		final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+		this.requestProcessor.submit(() -> {
+			try {
+				ResponseEntity<? extends T> response = null;
+				if (HttpMethod.POST == apiRequest.getMethod())
+					response = restTemplate.postForEntity(apiRequest.getUrl(), entity, clazz);
+				else
+					response = restTemplate.exchange(url, apiRequest.getMethod(), entity, clazz);
+				if (log)
+					logger.info("{} response {}", descr, response.getBody());
+				LoggingUtils.logRawData(String.format("%s: %s: %s", getName(), descr, response.getBody()));
+				body.set(response.getBody());
+			} catch (HttpClientErrorException e) {
+				ResponseErrorAction action = apiRequest.checkResponseError(e.getStatusCode(), e.getResponseBodyAsString());
+				if (action != null && action != ResponseErrorAction.RAISE_EXCEPTION) {
+					if (logger.isDebugEnabled())
+						logger.debug("{} is expected by apiRequest {}", e.getStatusCode(), apiRequest);
+					exception.set(new ExpectedResponseException(e, action, e.getStatusCode(), e.getResponseBodyAsString()));
+				} else {
+					logger.error("Received rest exception with status {} and response body {}", e.getStatusCode(), e.getResponseBodyAsString());
+					exception.set(e);
+				}
+			} finally {
+				responseLatch.countDown();
 			}
+		});
+		try {
+			responseLatch.await(10000, TimeUnit.MILLISECONDS);
+			if (exception.get() != null) {
+				if (exception.get().getClass().isAssignableFrom(ExpectedResponseException.class))
+					throw (ExpectedResponseException)exception.get();
+				if (exception.get().getClass().isAssignableFrom(RuntimeException.class))
+					throw (RuntimeException)exception.get();
+				throw new IllegalStateException(exception.get());
+			}
+			return body.get();
+		} catch (InterruptedException e) {
+			throw new ResponseTimedOutException(apiRequest, descr);
 		}
 	}
 	

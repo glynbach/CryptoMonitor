@@ -13,6 +13,8 @@ public class CurrencyPair {
 	private final int priceScale;
 	private final BigDecimal tradingFee;
 	private final TradingFeeType tradingFeeType;
+	private final BigDecimal minDesiredBaseBalance;
+	private final BigDecimal minDesiredQuotedBalance;
 
 	/**
 	 * E.g. LTC/BTC 
@@ -21,7 +23,8 @@ public class CurrencyPair {
 	 * price of 0.091 means 1 LTC is exchanged for 0.091 BTC 
 	 */
 	public CurrencyPair(String name, Currency baseCurrency, Currency quotedCurrency, String topic,
-			int priceScale, BigDecimal tradingFee, TradingFeeType tradingFeeType) {
+			int priceScale, BigDecimal tradingFee, TradingFeeType tradingFeeType, BigDecimal minDesiredBaseBalance,
+			BigDecimal minDesiredQuotedBalance) {
 		this.name = name;
 		this.baseCurrency = baseCurrency;
 		this.quotedCurrency = quotedCurrency;
@@ -29,6 +32,8 @@ public class CurrencyPair {
 		this.priceScale = priceScale;
 		this.tradingFee = tradingFee;
 		this.tradingFeeType = tradingFeeType;
+		this.minDesiredBaseBalance = minDesiredBaseBalance;
+		this.minDesiredQuotedBalance = minDesiredQuotedBalance;
 	}
 
 	public CurrencyPair(String name, String topic) {
@@ -39,6 +44,8 @@ public class CurrencyPair {
 		this.priceScale = 0;
 		this.tradingFee = null;
 		this.tradingFeeType = null;
+		this.minDesiredBaseBalance = null;
+		this.minDesiredQuotedBalance = null;
 	}
 
 	public String getName() {
@@ -69,11 +76,20 @@ public class CurrencyPair {
 		return tradingFeeType;
 	}
 
+	public BigDecimal getMinDesiredBaseBalance() {
+		return minDesiredBaseBalance;
+	}
+
+	public BigDecimal getMinDesiredQuotedBalance() {
+		return minDesiredQuotedBalance;
+	}
+
 	@Override
 	public String toString() {
-		return "CurrencyPair [name=" + name + ", baseCurrency=" + baseCurrency + ", quotedCurrency="
-				+ quotedCurrency + ", topic=" + topic + ", priceScale=" + priceScale + ", tradingFee=" + tradingFee
-				+ ", tradingFeeType=" + tradingFeeType + "]";
+		return "CurrencyPair [name=" + name + ", baseCurrency=" + baseCurrency + ", quotedCurrency=" + quotedCurrency
+				+ ", topic=" + topic + ", priceScale=" + priceScale + ", tradingFee=" + tradingFee + ", tradingFeeType="
+				+ tradingFeeType + ", minDesiredBaseBalance=" + minDesiredBaseBalance + ", minDesiredQuotedBalance="
+				+ minDesiredQuotedBalance + "]";
 	}
 
 	@Override

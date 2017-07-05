@@ -110,6 +110,14 @@ public class ArbInstruction {
 		
 	}
 
+	public String toSummaryString() {
+		return "decision=" + decision + " estimatedValue=" + estimatedValue + 
+				" -" + legs.get(Side.BID).getAmount().getQuotedAmount().toPlainString() + legs.get(Side.BID).getCurrencyPair().getQuotedCurrency() +
+					" @" + legs.get(Side.BID).getMarket() +
+				" +" + legs.get(Side.ASK).getAmount().getBaseAmount().toPlainString() + legs.get(Side.ASK).getCurrencyPair().getBaseCurrency() +
+					" @" + legs.get(Side.ASK).getMarket();
+	}
+	
 	@Override
 	public String toString() {
 		return "ArbInstruction [decision=" + decision + ", estimatedValue=" + estimatedValue + ", legs=" + legs

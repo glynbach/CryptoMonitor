@@ -65,13 +65,14 @@ public class TestSimpleArbInspector {
 		assertNotNull(instruction.getLegs());
 		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
 		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
-		assertEquals("100", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		// we're only taking 99% of the opportunity
+		TestUtils.assertEquals("99", instruction.getLeg(Side.BID).getAmount().getBaseAmount());
 		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
 		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
 		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
-		assertEquals("100", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		TestUtils.assertEquals("99", instruction.getLeg(Side.ASK).getAmount().getBaseAmount());
 		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
-		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.01007475")));
+		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00027150")));
 	}
 
 	@Test
@@ -85,13 +86,14 @@ public class TestSimpleArbInspector {
 		assertNotNull(instruction.getLegs());
 		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
 		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
-		assertEquals("50", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		// we're only taking 99% of the opportunity
+		TestUtils.assertEquals("49.5", instruction.getLeg(Side.BID).getAmount().getBaseAmount());
 		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
 		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
 		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
-		assertEquals("50", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		TestUtils.assertEquals("49.5", instruction.getLeg(Side.ASK).getAmount().getBaseAmount());
 		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
-		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00503737")));
+		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00013576")));
 	}
 
 	@Test
@@ -106,13 +108,14 @@ public class TestSimpleArbInspector {
 		assertNotNull(instruction.getLegs());
 		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
 		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
-		assertEquals("20", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		// we're only taking 99% of the opportunity
+		TestUtils.assertEquals("19.8", instruction.getLeg(Side.BID).getAmount().getBaseAmount());
 		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
 		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
 		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
-		assertEquals("20", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		TestUtils.assertEquals("19.8", instruction.getLeg(Side.ASK).getAmount().getBaseAmount());
 		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
-		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00201495")));
+		assertEquals(0, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00005430")));
 	}
 
 	@Test
@@ -127,14 +130,15 @@ public class TestSimpleArbInspector {
 		assertNotNull(instruction.getLegs());
 		assertEquals("Test1", instruction.getLeg(Side.BID).getMarket());
 		assertEquals("0.01960100", instruction.getLeg(Side.BID).getPrice().toPlainString());
-		assertEquals("51.01780521", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
+		// we're only taking 99% of the opportunity
+		assertEquals("50.50762716", instruction.getLeg(Side.BID).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.BID, instruction.getLeg(Side.BID).getSide());
 		assertEquals("Test2", instruction.getLeg(Side.ASK).getMarket());
 		assertEquals("0.01970200", instruction.getLeg(Side.ASK).getPrice().toPlainString());
-		assertEquals("51.01780521", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
+		assertEquals("50.50762716", instruction.getLeg(Side.ASK).getAmount().getBaseAmount().toPlainString());
 		assertEquals(Side.ASK, instruction.getLeg(Side.ASK).getSide());
 		assertEquals("Unexpected estimation " + instruction.getEstimatedValue(), 0
-				, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00513992")));
+				, instruction.getEstimatedValue().compareTo(new BigDecimal("0.00013852")));
 	}
 	
 	@Test

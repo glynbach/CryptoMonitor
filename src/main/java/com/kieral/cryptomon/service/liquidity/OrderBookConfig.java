@@ -77,31 +77,19 @@ public class OrderBookConfig {
 	}
 
 	public boolean isSignificant(String market, Currency currency, BigDecimal amount) {
-		if (amount == null)
-			return false;
+		return amount.compareTo(getSignificantAmount(market, currency)) >= 0;
+	}
+	
+	public BigDecimal getSignificantAmount(String market, Currency currency) {
 		if (marketSignificantAmounts.containsKey(market)) {
-			if (marketSignificantAmounts.get(market).containsKey(currency)) {
-				if (amount.compareTo(marketSignificantAmounts.get(market).get(currency)) >= 0)
-					return true;
-				else
-					return false;
-			}
+			if (marketSignificantAmounts.get(market).containsKey(currency))
+				return marketSignificantAmounts.get(market).get(currency);
 		}
-		if (marketDefaultSignificantAmounts.containsKey(market)) {
-			if (amount.compareTo(marketDefaultSignificantAmounts.get(market)) >= 0)
-				return true;
-			else
-				return false;
-		}
-		if (significantAmounts.containsKey(currency)) {
-			if (amount.compareTo(significantAmounts.get(currency)) >= 0)
-				return true;
-			else
-				return false;
-		}
-		if (amount.compareTo(defaultSignificantAmount) >= 0)
-			return true;
-		return false;
+		if (marketDefaultSignificantAmounts.containsKey(market))
+			return marketDefaultSignificantAmounts.get(market);
+		if (significantAmounts.containsKey(currency))
+			return significantAmounts.get(currency);
+		return defaultSignificantAmount;
 	}
 	
 	public static class MarketProperties {
