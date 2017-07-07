@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.LiquidityEntry;
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.trading.Order;
@@ -25,33 +26,26 @@ import com.kieral.cryptomon.model.trading.OrderStatus;
 import com.kieral.cryptomon.service.BackOfficeService;
 import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.OrderService;
+import com.kieral.cryptomon.service.PollListener;
+import com.kieral.cryptomon.service.PollingService;
 import com.kieral.cryptomon.service.arb.ArbService;
 import com.kieral.cryptomon.service.exception.NotEnoughFundsException;
-import com.kieral.cryptomon.service.exception.OrderNotExistsException;
+import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
+import com.kieral.cryptomon.service.arb.ArbInstructionFactory;
 import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
 import com.kieral.cryptomon.service.util.CommonUtils;
 import com.kieral.cryptomon.service.util.TradingUtils;
 import com.kieral.cryptomon.service.util.Tuple2;
 
-public class ExecutionMonitor {
+public class ExecutionMonitor implements PollListener {
 
-	interface Sleeper {
-		void sleep(long millis) throws InterruptedException;
-	}
-	static Sleeper sleeper = new Sleeper() {
-		@Override
-		public void sleep(long millis) throws InterruptedException {
-			Thread.sleep(millis);
-		} 
-	};
-	
 	// Todo; pull these from a config
 	private static BigDecimal MAXIMUM_DISCREPANCY = new BigDecimal("0.1");
+	private static BigDecimal INCREMENT = new BigDecimal("0.01");
 	private static BigDecimal MINIMUM_AMOUNT = new BigDecimal("0.0001");
 	private static BigDecimal MINIMUM_PRICE = new BigDecimal("0.00000001");
 	private static long MINIMUM_POLLING_INTERVAL = 500;
-	private static long BLOCKING_ORDER_POLLING_INTERVAL = 1000;
 	
 	private final ExecutorService executionMonitorDaemon = Executors.newSingleThreadExecutor(new ThreadFactory() {
 		@Override
@@ -69,20 +63,20 @@ public class ExecutionMonitor {
 			return thread;
 		}});
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+	private CountDownLatch pollingLatch = new CountDownLatch(1);
 
 	private final OrderService orderService;	
 	private final BalanceService balanceService;
 	private final ArbService arbService;	
 	private final BackOfficeService backOfficeService;
 	private final ArbInstruction arbInstruction;
+	private final PollingService pollingService;
 	private final List<Order> longOrders = new LinkedList<Order>();
 	private final List<Order> shortOrders = new LinkedList<Order>();
-	private OrderBook longOrderBook;
-	private OrderBook shortOrderBook;
 	private final ReentrantLock statusLock = new ReentrantLock();
 	
 	public ExecutionMonitor(OrderService orderService, BalanceService balanceService, ArbService arbService, 
-			BackOfficeService backOfficeService, ArbInstruction arbInstruction, 
+			BackOfficeService backOfficeService, ArbInstruction arbInstruction, PollingService pollingService,
 			long pollingIntervalMillis) throws NotEnoughFundsException {
 		if (orderService == null)
 			throw new IllegalArgumentException("orderService can not be null");
@@ -92,6 +86,8 @@ public class ExecutionMonitor {
 			throw new IllegalArgumentException("arbService can not be null");
 		if (backOfficeService == null)
 			throw new IllegalArgumentException("backOfficeService can not be null");
+		if (pollingService == null)
+			throw new IllegalArgumentException("pollingService can not be null");
 		if (pollingIntervalMillis < MINIMUM_POLLING_INTERVAL)
 			pollingIntervalMillis = MINIMUM_POLLING_INTERVAL;
 		this.orderService = orderService;
@@ -99,6 +95,7 @@ public class ExecutionMonitor {
 		this.arbService = arbService;
 		this.backOfficeService = backOfficeService;
 		this.arbInstruction = arbInstruction;
+		this.pollingService = pollingService;
 		if (arbService.isSuspended())
 			throw new IllegalStateException("Not able to execute when arbService is suspended");
 		validateArbInstruction(arbInstruction);
@@ -112,6 +109,8 @@ public class ExecutionMonitor {
 			reviewStatus();
 		}
 		executionMonitorDaemon.submit(new StatusCheckTask());
+		pollingService.changePollingInterval(pollingIntervalMillis);
+		pollingService.registerListener("ExecutionMonitor", this);
 	}
 	
 	public boolean isClosed() {
@@ -234,67 +233,6 @@ public class ExecutionMonitor {
 		}
 	}
 
-	private List<Order> placeMarketOrderBlocking(final Order order, long timeout) {
-		final List<Order> placedOrders = new ArrayList<Order>();
-		final CountDownLatch latch = new CountDownLatch(1);
-		try {
-			final AtomicReference<Order> orderRef = new AtomicReference<Order>(order); 
-			orderService.placeMarketOrder(order);
-			placedOrders.add(order);
-			executionMonitorPriorityDaemon.submit(new Runnable() {
-				@Override
-				public void run() {
-					while (latch.getCount() > 0) {
-						try {
-							sleeper.sleep(BLOCKING_ORDER_POLLING_INTERVAL);
-						} catch (InterruptedException e) {
-						}
-						if (latch.getCount() > 0) {
-							try {
-								orderService.checkStatus(orderRef.get().getMarket(), orderRef.get().getClientOrderId());
-							} catch (OrderNotExistsException e) {
-							}
-							OrderStatus orderStatus = orderRef.get().getOrderStatus();
-							logger.info("Order status {} for balancing order {}", orderStatus, orderRef.get());
-							switch (orderStatus) {
-								case FILLED:
-									latch.countDown();
-									break;
-								default:
-									// replace the order
-									if (OrderStatus.OPEN_ORDER.contains(orderStatus)) {
-										try {
-											logger.info("Cancelling unfilled balancing order {}", orderRef.get());
-											orderService.cancelOrder(orderRef.get().getMarket(), orderRef.get().getClientOrderId());
-										} catch (OrderNotExistsException e) {
-										}
-									}
-									BigDecimal remainingAmount = orderRef.get().getAmount()
-											.subtract(TradingUtils.getFilledAmount(orderRef.get()));
-									if (remainingAmount.compareTo(MAXIMUM_DISCREPANCY) > 0) {
-										Order newOrder = new Order(orderRef.get().getMarket(), orderRef.get().getCurrencyPair(),
-												remainingAmount, null, orderRef.get().getSide());
-										logger.info("Placing new balancing order {}", newOrder);
-										orderService.placeMarketOrder(newOrder);
-										placedOrders.add(newOrder);
-										orderRef.set(newOrder);
-									} else 
-										latch.countDown();
-									break;
-							}
-						} 
-					}
-				}});
-			try {
-				latch.await(timeout, TimeUnit.MILLISECONDS);
-			} catch (InterruptedException e) {
-			}
-			return placedOrders;
-		} finally {
-			latch.countDown();
-		}
-	}
-	
 	public OrderStatusSummary getStatus() {
 		ArbInstructionLeg longLeg = arbInstruction.getLeg(Side.BID); 
 		ArbInstructionLeg shortLeg = arbInstruction.getLeg(Side.ASK);
@@ -315,27 +253,76 @@ public class ExecutionMonitor {
 				desiredLongLegAmount.subtract(longAmount), desiredShortLegAmount.subtract(shortAmount));
 	}
 
+	private Tuple2<List<Order>, List<Order>> getOpenOrders() {
+		final List<Order> longOrdersToCheck = new ArrayList<Order>();
+		final List<Order> shortOrdersToCheck = new ArrayList<Order>();
+		longOrders.forEach(order -> {
+			if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
+				logger.info("Long order to be checked {}", order);
+				longOrdersToCheck.add(order);
+			}
+		});
+		shortOrders.forEach(order -> {
+			if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
+				logger.info("Short order to be checked {}", order);
+				shortOrdersToCheck.add(order);
+			}
+		});
+		return new Tuple2<List<Order>, List<Order>>(longOrdersToCheck, shortOrdersToCheck);
+	}
+
+	private boolean isPriceStillThere(Side side, String market, CurrencyPair pair, BigDecimal maxPrice) {
+		LiquidityEntry entry = OrderBookManager.getBestBidAsk(arbService.getOrderBook(market, pair.getName()), null);
+		if (side == Side.BID) {
+			if (entry != null && entry.getBidAskPrice().get(Side.ASK) != null && 
+					entry.getBidAskPrice().get(Side.ASK).compareTo(maxPrice) <= 0) {
+				return true;
+			}
+		} else {
+			if (entry != null && entry.getBidAskPrice().get(Side.BID) != null && 
+					entry.getBidAskPrice().get(Side.BID).compareTo(maxPrice) >= 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private Tuple2<BigDecimal, BigDecimal> getMarketStillThere(Side side, String market, CurrencyPair pair, BigDecimal maxPrice, BigDecimal maxAmount) {
+		BigDecimal maxAmountStillThere = INCREMENT;
+		BigDecimal bestPrice = BigDecimal.ZERO;
+		if (isPriceStillThere(side, market, pair, maxPrice)) {
+			while (maxAmountStillThere.compareTo(BigDecimal.ZERO) > 0) {
+				LiquidityEntry entry = OrderBookManager.getBestBidAsk(arbService.getOrderBook(market, pair.getName()), maxAmount);
+				if (side == Side.BID) {
+					if (entry != null && entry.getBidAskPrice().get(Side.ASK) != null && 
+							entry.getBidAskPrice().get(Side.ASK).compareTo(maxPrice) <= 0) {
+						maxAmountStillThere = maxAmount;
+						bestPrice = entry.getBidAskPrice().get(Side.ASK);
+						break;
+					}
+				} else {
+					if (entry != null && entry.getBidAskPrice().get(Side.BID) != null && 
+							entry.getBidAskPrice().get(Side.BID).compareTo(maxPrice) >= 0) {
+						maxAmountStillThere = maxAmount;
+						bestPrice = entry.getBidAskPrice().get(Side.BID);
+						break;
+					}
+				}
+				maxAmount = maxAmount.subtract(INCREMENT);
+			}
+		}
+		if (!CommonUtils.isZero(bestPrice) && CommonUtils.isAtLeast(maxAmountStillThere, INCREMENT)) {
+			return new Tuple2<BigDecimal, BigDecimal>(bestPrice, maxAmountStillThere);
+		}
+		return new Tuple2<BigDecimal, BigDecimal>(BigDecimal.ZERO, BigDecimal.ZERO); 
+	}
+
 	private void queryStatus() {
 		statusLock.lock();
 		try {
-			final List<Order> longOrdersToCheck = new ArrayList<Order>();
-			final List<Order> shortOrdersToCheck = new ArrayList<Order>();
-			longOrders.forEach(order -> {
-				if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
-					logger.info("Long order to be checked {}", order);
-					longOrdersToCheck.add(order);
-				}
-				longOrderBook = arbService.getOrderBook(order.getMarket(), order.getCurrencyPair().getName());
-				logger.info("Latest orderbook for {} on {} {}", order.getCurrencyPair().getName(), order.getMarket(), longOrderBook);
-			});
-			shortOrders.forEach(order -> {
-				if (OrderStatus.OPEN_ORDER.contains(order.getOrderStatus())) {
-					logger.info("Short order to be checked {}", order);
-					shortOrdersToCheck.add(order);
-				}
-				shortOrderBook = arbService.getOrderBook(order.getMarket(), order.getCurrencyPair().getName());
-				logger.info("Latest orderbook for {} on {} {}", order.getCurrencyPair().getName(), order.getMarket(), shortOrderBook);
-			});
+			Tuple2<List<Order>, List<Order>> ordersToCheck = getOpenOrders();
+			List<Order> longOrdersToCheck = ordersToCheck.getA();
+			List<Order> shortOrdersToCheck = ordersToCheck.getB();
 			if (longOrdersToCheck.size() > 0 || shortOrdersToCheck.size() > 0) {
 				int numChecks = 0;
 				if (longOrdersToCheck.size() > 0)
@@ -400,59 +387,8 @@ public class ExecutionMonitor {
 					longsFilled = longsFilled.add(TradingUtils.getFilledAmount(order));
 				for (Order order : shortOrders)
 					shortsFilled = shortsFilled.add(TradingUtils.getFilledAmount(order));
-				if (longsFilled.compareTo(shortsFilled) != 0) {
-					logger.info("Filled amounts differ long {} and short {}", longsFilled.toPlainString(), shortsFilled.toPlainString());
-					// ended up in an imbalanced state
-					BigDecimal discrepancy = longsFilled.subtract(shortsFilled).abs();
-					if (discrepancy.compareTo(MAXIMUM_DISCREPANCY) > 0) {
-						Side side = longsFilled.compareTo(shortsFilled) > 0 ? Side.ASK : Side.BID;
-						Order referenceOrder = null;
-						if (side == Side.ASK) {
-							if (shortOrders.size() == 0) {
-								// very unexpected situation
-								logger.error("No reference order available for balancing short side - suspending arbService");
-								arbService.suspend(true);
-							} else {
-								referenceOrder = shortOrders.get(shortOrders.size() - 1);
-							}
-						} else {
-							if (longOrders.size() == 0) {
-								// very unexpected situation
-								logger.error("No reference order available for balancing long side - suspending arbService");
-								arbService.suspend(true);
-							} else {
-								referenceOrder = longOrders.get(longOrders.size() - 1);
-							}
-						}
-						if (referenceOrder != null) {
-							Order balancingOrder = new Order(referenceOrder.getMarket(), referenceOrder.getCurrencyPair(), discrepancy, null, side);
-							logger.info("Placing balancing order {}", balancingOrder);
-							List<Order> placedOrders = placeMarketOrderBlocking(balancingOrder, 5000);
-							logger.info("Resulting balancing orders {}", placedOrders);
-							if (referenceOrder.getSide() == Side.BID) 
-								longOrders.addAll(placedOrders);
-							else
-								shortOrders.addAll(placedOrders);
-							BigDecimal filledAmount = TradingUtils.getFilledAmount(placedOrders.toArray(new Order[placedOrders.size()]));
-							if (balancingOrder.getAmount().subtract(filledAmount).compareTo(MAXIMUM_DISCREPANCY) > 0) {
-								logger.error("Not able to fill balancing order {} - suspending arbService", balancingOrder);
-								for (Order placedOrder : placedOrders) {
-									if (OrderStatus.OPEN_ORDER.contains(placedOrder.getOrderStatus())) {
-										try {
-											logger.info("Cancelling balancing order {}", placedOrder);
-											if (OrderStatus.OPEN_ORDER.contains(
-													orderService.cancelOrder(placedOrder.getMarket(), placedOrder.getClientOrderId())))
-												throw new IllegalStateException("Cancel failed");
-										} catch (Exception e) {
-											logger.error("Error cancelling balancing order {}", placedOrder);
-										}
-									}
-								}
-								arbService.suspend(true);
-							}
-						}
-					}
-				}
+				if (longsFilled.compareTo(shortsFilled) != 0) 
+					logger.warn("Ended up in an imbalanced state - filled amounts differ long {} and short {}", longsFilled.toPlainString(), shortsFilled.toPlainString());
 			}
 		} finally {
 			statusLock.unlock();
@@ -462,13 +398,57 @@ public class ExecutionMonitor {
 	private boolean doReview() {
 		OrderStatusSummary status = getStatus();
 		if (!isDone(status)) {
-			logger.info("Current status is not done; reviewing arb against latest orderbooks");
-			ArbInstruction updatedInstruction = arbService.calculateArb(longOrderBook, shortOrderBook, status.longLegRemaining, status.shortLegRemaining);
-			logger.info("Updated arb instruction is {}", updatedInstruction);
-			boolean[] cancel = new boolean[]{false, false};
+			logger.info("Current status is not done - reviewing current market");
+			// check if we are on sided
+			ArbInstruction arbInstruction = this.arbInstruction;
+			boolean[] cancel = new boolean[]{OrderStatus.OPEN_ORDER.contains(status.longLegStatus), OrderStatus.OPEN_ORDER.contains(status.shortLegStatus)};
 			boolean[] replace = new boolean[]{false, false};
-			switch (updatedInstruction.getDecision()) {
+			OrderBook longOrderBook = arbService.getOrderBook(status.getLongOrder().getMarket(), status.getLongOrder().getCurrencyPair().getName());
+			OrderBook shortOrderBook = arbService.getOrderBook(status.getShortOrder().getMarket(), status.getShortOrder().getCurrencyPair().getName());
+			logger.info("Current status is not done; reviewing status {} against long book {} and shortBook {}", status, longOrderBook, shortOrderBook);
+			arbInstruction = arbService.calculateArb(longOrderBook, shortOrderBook, status.longLegRemaining, status.shortLegRemaining);
+			logger.info("Updated arb instruction is {}", arbInstruction);
+			switch (arbInstruction.getDecision()) {
 				case NOTHING_THERE:
+					if (isLopSided(status)) {
+						// check if there is anything we can do
+						logger.info("Fills are not balanced - checking to see if there is a price to rebalance");
+						Side side = null;
+						BigDecimal discrepancy = null;
+						Tuple2<BigDecimal, BigDecimal> marketStillThere = null;
+						if (isLopSidedLong(status)) {
+							if (OrderStatus.OPEN_ORDER.contains(status.longOrder.getOrderStatus())) {
+								side = Side.BID;
+								discrepancy = status.longLegRemaining.subtract(status.shortLegRemaining);
+								marketStillThere = this.getMarketStillThere(side, longOrderBook.getMarket(), longOrderBook.getCurrencyPair(), 
+										status.shortOrder.getPrice(), discrepancy);
+							}
+						} else {
+							if (OrderStatus.OPEN_ORDER.contains(status.shortOrder.getOrderStatus())) {
+								side = Side.ASK;
+								discrepancy = status.shortLegRemaining.subtract(status.longLegRemaining);
+								marketStillThere = getMarketStillThere(side, shortOrderBook.getMarket(), shortOrderBook.getCurrencyPair(), 
+										status.longOrder.getPrice(), discrepancy);
+							}
+						}
+						// can we hit anything on it
+						if (marketStillThere != null && !CommonUtils.isZero(marketStillThere.getA()) && !CommonUtils.isZero(marketStillThere.getB())) {
+							arbInstruction = ArbInstructionFactory.createArbInstruction(this.arbInstruction, side, marketStillThere);
+							logger.info("{} side can rebalance with {}", side == Side.BID ? "Long" : "Short", arbInstruction);
+							if (side == Side.BID) {
+								boolean doReplace = arbInstruction.getLeg(Side.BID).getPrice().compareTo(status.longOrder.getPrice()) > 0
+										|| arbInstruction.getLeg(Side.BID).getAmount().getBaseAmount().compareTo(status.longOrder.getAmount()) != 0; 
+								cancel = new boolean[]{doReplace, OrderStatus.OPEN_ORDER.contains(status.shortLegStatus)};
+								replace = new boolean[]{doReplace, false};
+							} else {
+								boolean doReplace = arbInstruction.getLeg(Side.ASK).getPrice().compareTo(status.shortOrder.getPrice()) < 0
+										|| arbInstruction.getLeg(Side.ASK).getAmount().getBaseAmount().compareTo(status.shortOrder.getAmount()) != 0; 
+								cancel = new boolean[]{OrderStatus.OPEN_ORDER.contains(status.longLegStatus), doReplace};
+								replace = new boolean[]{false, doReplace};
+							}
+						}
+					}
+					break;
 				case CANCEL:
 					cancel = new boolean[]{OrderStatus.OPEN_ORDER.contains(status.longLegStatus), OrderStatus.OPEN_ORDER.contains(status.shortLegStatus)};
 					replace = new boolean[]{false, false};
@@ -477,17 +457,15 @@ public class ExecutionMonitor {
 				case LOW:
 					for (int i=0; i<2; i++) {
 						Side side = i==0 ? Side.BID : Side.ASK;
-						ArbInstructionLeg updatedLeg = updatedInstruction.getLeg(side);
+						ArbInstructionLeg updatedLeg = arbInstruction.getLeg(side);
 						if (side == Side.BID) {
-							if (OrderStatus.OPEN_ORDER.contains(status.longLegStatus) && updatedLeg.getPrice().compareTo(status.longOrder.getPrice()) > 0) {
-								cancel[0] = true;
-								replace[0] = true;
-							}
+							boolean priceMoved = OrderStatus.OPEN_ORDER.contains(status.longLegStatus) && updatedLeg.getPrice().compareTo(status.longOrder.getPrice()) > 0;
+							cancel[0] = priceMoved;
+							replace[0] = priceMoved;
 						} else {
-							if (OrderStatus.OPEN_ORDER.contains(status.shortLegStatus) && updatedLeg.getPrice().compareTo(status.shortOrder.getPrice()) < 0) {
-								cancel[1] = true;
-								replace[1] = true;
-							}
+							boolean priceMoved = OrderStatus.OPEN_ORDER.contains(status.shortLegStatus) && updatedLeg.getPrice().compareTo(status.shortOrder.getPrice()) < 0;
+							cancel[1] = priceMoved;
+							replace[1] = priceMoved;
 						}
 					}
 					break;
@@ -510,10 +488,12 @@ public class ExecutionMonitor {
 			if (soFarSoGood.get()) {
 				if (replace[0] || replace[1]) {
 					Tuple2<OrderStatus, OrderStatus> statuses = placeOrders(
-							replace[0] ? updatedInstruction.getLeg(Side.BID) : null,
-							replace[1] ? updatedInstruction.getLeg(Side.ASK) : null);
-					soFarSoGood.compareAndSet(true, statuses.getA() == OrderStatus.OPEN);
-					soFarSoGood.compareAndSet(true, statuses.getB() == OrderStatus.OPEN);
+							replace[0] ? arbInstruction.getLeg(Side.BID) : null,
+							replace[1] ? arbInstruction.getLeg(Side.ASK) : null);
+					if (replace[0])
+						soFarSoGood.compareAndSet(true, statuses.getA() == OrderStatus.OPEN);
+					if (replace[1])
+						soFarSoGood.compareAndSet(true, statuses.getB() == OrderStatus.OPEN);
 				}
 			} 
 			if (!soFarSoGood.get()) {
@@ -522,6 +502,14 @@ public class ExecutionMonitor {
 			return soFarSoGood.get();
 		}
 		return true;
+	}
+	
+	private boolean isLopSided(OrderStatusSummary status) {
+		return status.longLegRemaining.subtract(status.shortLegAmount).abs().compareTo(MAXIMUM_DISCREPANCY) > 0;
+	}
+	
+	private boolean isLopSidedLong(OrderStatusSummary status) {
+		return status.longLegRemaining.compareTo(status.shortLegRemaining) > 0;
 	}
 	
 	private void cancelAllOpenOrders() {
@@ -549,11 +537,13 @@ public class ExecutionMonitor {
 		public void run() {
 			while (!isClosed() && !arbService.isSuspended()) {
 				try {
-					sleeper.sleep(MINIMUM_POLLING_INTERVAL);
-				} catch (InterruptedException e) {
-					logger.warn("Interrupted", e);
+					pollingLatch.await(2000, TimeUnit.MILLISECONDS);
+				} catch (InterruptedException e1) {
 				}
-				if (!isClosed()) {
+				if (pollingLatch.getCount() > 0)
+					logger.warn("pollingLatch did not get counted down for 2 seconds");
+				pollingLatch = new CountDownLatch(1);
+				if (!isClosed() && !arbService.isSuspended()) {
 					statusLock.lock();
 					try {
 						queryStatus();
@@ -566,6 +556,7 @@ public class ExecutionMonitor {
 					}
 				}
 			}
+			pollingService.restorePollingInterval();
 			backOfficeService.onExecutionCompletion(arbInstruction, longOrders, shortOrders, arbService.isSuspended());
 		}
 	}
@@ -636,6 +627,16 @@ public class ExecutionMonitor {
 					+ ", shortLegRemaining=" + shortLegRemaining + "]";
 		}
 		
+	}
+
+	@Override
+	public void polled() {
+		pollingLatch.countDown();
+	}
+
+	@Override
+	public void polledException(Exception e) {
+		logger.error("Uncaught exception while polling", e);
 	}
 
 }

@@ -33,11 +33,12 @@ public class ArbInstructionFactory {
 				prices, amounts, markets, referenceBooks, resolvingOpenArb);
 	}
 
-	/**
-	 * Used for low value rebalancing arbs
-	 */
-	public static ArbInstruction createArbInstruction(ArbInstruction instruction, BigDecimal desiredNewBaseAmount) {
-		return getInstance().doCreateArbInstruction(instruction, desiredNewBaseAmount);
+	public static ArbInstruction createArbInstruction(ArbInstruction instruction, BigDecimal newBaseAmount) {
+		return getInstance().doCreateArbInstruction(instruction, null, new Tuple2<BigDecimal, BigDecimal>(BigDecimal.ZERO, newBaseAmount));
+	}
+
+	public static ArbInstruction createArbInstruction(ArbInstruction instruction, Side side, Tuple2<BigDecimal, BigDecimal> newFundamentals) {
+		return getInstance().doCreateArbInstruction(instruction, side, newFundamentals);
 	}
 
 	private static ArbInstructionFactory getInstance() {
@@ -50,27 +51,33 @@ public class ArbInstructionFactory {
 		return new ArbInstruction(ArbDecision.NOTHING_THERE, BigDecimal.ZERO, null, reason, null); 
 	}
 
-	private ArbInstruction doCreateArbInstruction(ArbInstruction instruction, BigDecimal desiredNewBaseAmount) {
+	private ArbInstruction doCreateArbInstruction(ArbInstruction instruction, Side side, Tuple2<BigDecimal, BigDecimal> newFundamentals) {
 		if (instruction == null)
 			throw new IllegalStateException("instruction can not be null");
-		if (desiredNewBaseAmount == null || CommonUtils.isZero(desiredNewBaseAmount)) {
-			throw new IllegalStateException("invalid desiredNewBaseAmount " + desiredNewBaseAmount);
+		if (newFundamentals == null || CommonUtils.isZero(newFundamentals.getB())) {
+			throw new IllegalStateException("invalid new base amount in new fundamentals " + newFundamentals);
 		}
 		ArbInstructionLeg longLeg = instruction.getLeg(Side.BID);
 		TradeAmount longAmount = longLeg.getAmount();
-		if (longAmount.getBaseAmount().compareTo(desiredNewBaseAmount) <= 0)
-			return instruction;
 		ArbInstructionLeg shortLeg = instruction.getLeg(Side.ASK);
 		TradeAmount shortAmount = shortLeg.getAmount();
-		if (shortAmount.getBaseAmount().compareTo(desiredNewBaseAmount) <= 0)
-			return instruction;
-		BigDecimal price = longLeg.getPrice();
-		TradeAmount newLongTradeAmount = new TradeAmount(desiredNewBaseAmount, desiredNewBaseAmount.multiply(price).setScale(8, RoundingMode.HALF_DOWN)); 
-		price = shortLeg.getPrice();
-		TradeAmount newShortTradeAmount = new TradeAmount(desiredNewBaseAmount, desiredNewBaseAmount.multiply(price).setScale(8, RoundingMode.HALF_DOWN)); 
+		BigDecimal longPrice = Side.BID == side && !CommonUtils.isZero(newFundamentals.getA()) ? newFundamentals.getA() : longLeg.getPrice();
+		BigDecimal shortPrice = Side.ASK == side && !CommonUtils.isZero(newFundamentals.getA()) ? newFundamentals.getA() : shortLeg.getPrice();
+		if (side == null || side == Side.BID) {
+			BigDecimal baseAmount = newFundamentals.getB();
+			longAmount = new TradeAmount(baseAmount, baseAmount.multiply(longPrice).setScale(8, RoundingMode.HALF_DOWN));
+			if (side == Side.BID)
+				shortAmount = new TradeAmount(BigDecimal.ZERO, BigDecimal.ZERO);
+		}
+		if (side == null || side == Side.ASK) {
+			BigDecimal baseAmount = newFundamentals.getB();
+			shortAmount = new TradeAmount(baseAmount, baseAmount.multiply(shortPrice).setScale(8, RoundingMode.HALF_DOWN));
+			if (side == Side.ASK)
+				longAmount = new TradeAmount(BigDecimal.ZERO, BigDecimal.ZERO);
+		}
 		SidedArbInstructionLeg legs = new SidedArbInstructionLeg(
-				new ArbInstructionLeg(longLeg.getMarket(), Side.BID, longLeg.getCurrencyPair(), longLeg.getPrice(), newLongTradeAmount),
-				new ArbInstructionLeg(shortLeg.getMarket(), Side.ASK, shortLeg.getCurrencyPair(), shortLeg.getPrice(), newShortTradeAmount));
+				new ArbInstructionLeg(longLeg.getMarket(), Side.BID, longLeg.getCurrencyPair(), longPrice, longAmount),
+				new ArbInstructionLeg(shortLeg.getMarket(), Side.ASK, shortLeg.getCurrencyPair(), shortPrice, shortAmount));
 		return new ArbInstruction(instruction.getDecision(), BigDecimal.ZERO, legs, null, instruction.getOrderBooks());
 	}
 	

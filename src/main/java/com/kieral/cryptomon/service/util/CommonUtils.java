@@ -56,7 +56,7 @@ public class CommonUtils {
 	}
 
 	public static boolean isZero(BigDecimal value) {
-		return BigDecimal.ZERO.compareTo(value) == 0;
+		return BigDecimal.ZERO.compareTo(value == null ? BigDecimal.ZERO : value) == 0;
 	}
 
 	public static boolean isAtLeast(BigDecimal value, BigDecimal minimum) {

@@ -157,6 +157,7 @@ public class TestUtils {
 			return;
 		if (!isNumber(expected)) 
 			Assert.fail("Expected " + expected + " but got " + value);
+		TestUtils.assertEquals(new BigDecimal(expected), value);
 	}
 	
 	public static void assertEquals(BigDecimal expected, BigDecimal value) {

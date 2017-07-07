@@ -16,6 +16,7 @@ import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.service.BackOfficeService;
 import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.OrderService;
+import com.kieral.cryptomon.service.PollingService;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbInstruction.ArbInstructionLeg;
 import com.kieral.cryptomon.service.arb.ArbInstructionFactory;
@@ -51,6 +52,8 @@ public class GloballyExclusiveExecutionController implements ExecutionController
 	BackOfficeService backOfficeService;
 	@Autowired
 	ExecutionConfig executionConfig;
+	@Autowired
+	PollingService pollingService;
 
 	private AtomicInteger numArbs = new AtomicInteger(0);
 
@@ -65,7 +68,7 @@ public class GloballyExclusiveExecutionController implements ExecutionController
 		try {
 			ExecutionMonitor currentExecution = this.currentExecution.get();
 			if (numArbs.get() < MAX_PERMITTED_ARBS) {
-				if (currentExecution == null || currentExecution.isDone()) {
+				if (currentExecution == null || currentExecution.isClosed()) {
 					ArbInstruction instruction = getInterest(originalInstruction);
 					if (instruction != null) {
 						ExecutionMonitor executionMonitor = null;
@@ -74,7 +77,7 @@ public class GloballyExclusiveExecutionController implements ExecutionController
 							logger.info("{} vs {} executing arb instruction {}", instruction.getLeg(Side.BID).getMarket(), 
 									instruction.getLeg(Side.ASK).getMarket(), instruction);
 							executionMonitor = new ExecutionMonitor(orderService, balanceService, arbService, backOfficeService, 
-								instruction, executionConfig.getPollingInterval());
+								instruction, pollingService, executionConfig.getPollingInterval());
 							this.currentExecution.set(executionMonitor);
 						} catch (Exception e) {
 							logger.error("Error attempting to execute arb instruction {}", instruction, e);
