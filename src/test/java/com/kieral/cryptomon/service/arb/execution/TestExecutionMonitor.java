@@ -8,17 +8,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.TestWatcher;
+import org.junit.runner.Description;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.kieral.cryptomon.model.general.CurrencyPair;
+import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.orderbook.OrderBook;
 import com.kieral.cryptomon.model.sided.BidAskAmount;
 import com.kieral.cryptomon.model.sided.BidAskMarket;
@@ -29,13 +34,14 @@ import com.kieral.cryptomon.model.trading.TradeAmount;
 import com.kieral.cryptomon.service.BackOfficeService;
 import com.kieral.cryptomon.service.BalanceService;
 import com.kieral.cryptomon.service.MockOrderService;
+import com.kieral.cryptomon.service.PollListener;
+import com.kieral.cryptomon.service.PollingService;
 import com.kieral.cryptomon.service.arb.ArbDecision;
 import com.kieral.cryptomon.service.arb.ArbInspector;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbInstructionFactory;
 import com.kieral.cryptomon.service.arb.ArbService;
 import com.kieral.cryptomon.service.arb.SimpleArbInspector;
-import com.kieral.cryptomon.service.arb.execution.ExecutionMonitor.Sleeper;
 import com.kieral.cryptomon.service.connection.ConnectionStatus;
 import com.kieral.cryptomon.service.exception.NotEnoughFundsException;
 import com.kieral.cryptomon.service.liquidity.MockOrderBookConfig;
@@ -50,10 +56,16 @@ public class TestExecutionMonitor {
 	BalanceService balanceService;
 	TestArbService arbService;
 	BackOfficeService backOfficeService;
-	AtomicBoolean canProceed = new AtomicBoolean(false);
-	CountDownLatch proceedLatch = new CountDownLatch(1);
+	TestPollingService pollingService;
 	CountDownLatch testLatch = new CountDownLatch(1);
 	
+	@Rule
+	public TestRule watcher = new TestWatcher() {
+	   protected void starting(Description description) {
+	      System.out.println("Running " + description.getMethodName());
+	   }
+	};
+
 	@SuppressWarnings("unchecked")
 	@Before
 	public void init() {
@@ -73,6 +85,7 @@ public class TestExecutionMonitor {
 		orderService.setDesiredExchangeTradingEnabled(MockOrderService.POL, true);
 		orderService.setDesiredExchangeTradingEnabled(MockOrderService.GDAX, true);
 		backOfficeService = Mockito.mock(BackOfficeService.class);
+		pollingService = new TestPollingService();
 		Mockito.doAnswer(new Answer<Void>() {
 			@Override
 			public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -80,15 +93,12 @@ public class TestExecutionMonitor {
 				return null;
 			}}).when(backOfficeService).onExecutionCompletion(Mockito.any(ArbInstruction.class), 
 				Mockito.any(List.class), Mockito.any(List.class), Mockito.anyBoolean());
-		ExecutionMonitor.sleeper = new Sleeper() {
-			@Override
-			public void sleep(long millis) throws InterruptedException {
-				while(!canProceed.compareAndSet(true, false)) {
-					if (proceedLatch.getCount() == 0)
-						proceedLatch = new CountDownLatch(1);
-					proceedLatch.await();
-				}
-			}};
+	}
+	
+	@After
+	public void tearDown() {
+		pollingService.listeners.clear();
+		arbService.suspend(true);
 	}
 
 	@Test
@@ -119,8 +129,7 @@ public class TestExecutionMonitor {
 		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.FILLED);
 		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.FILLED);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		testLatch.await(1000, TimeUnit.MILLISECONDS);
@@ -145,8 +154,7 @@ public class TestExecutionMonitor {
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13500"}, new String[]{"1"}, new String[]{"0.13600"}, new String[]{"2"}));
 		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNull(longOrder);
@@ -172,8 +180,7 @@ public class TestExecutionMonitor {
 		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
 		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -217,8 +224,7 @@ public class TestExecutionMonitor {
 		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
 		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -259,8 +265,7 @@ public class TestExecutionMonitor {
 						new String[]{"0.13450"}, new String[]{"1"}, new String[]{"0.13550"}, new String[]{"2"}));
 		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
 		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -293,8 +298,7 @@ public class TestExecutionMonitor {
 				OrderStatus.OPEN, OrderStatus.OPEN});
 		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
 		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -343,8 +347,7 @@ public class TestExecutionMonitor {
 				OrderStatus.OPEN, OrderStatus.OPEN});
 		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
 		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -375,14 +378,15 @@ public class TestExecutionMonitor {
 		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
-						new String[]{"0.13350"}, new String[]{"3"}, new String[]{"0.13450"}, new String[]{"5"}));
+						new String[]{"0.13450"}, new String[]{"3"}, new String[]{"0.13550"}, new String[]{"5"}));
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
 						new String[]{"0.13450"}, new String[]{"1"}, new String[]{"0.13550"}, new String[]{"2"}));
 		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
-		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		canProceed.set(true);
-		proceedLatch.countDown();
+		orderService.clearDesiredOrderStatus();
+		orderService.setDesiredOrderStatus(newLongOrder.getClientOrderId(), OrderStatus.OPEN);
+		orderService.setDesiredOrderStatus(newShortOrder.getClientOrderId(), OrderStatus.OPEN);
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -396,27 +400,26 @@ public class TestExecutionMonitor {
 		assertFalse(executionMonitor.isDone());
 		assertTrue(executionMonitor.isClosed());
 	}
-
+	
 	@Test
-	public void resolvesInbalancedPartialFillsCreatesBalanceTrade() throws InterruptedException, NotEnoughFundsException {
+	public void testMisMatchedPartialFillsBidFillsLargerBothOpenCanStillBalance() throws InterruptedException, NotEnoughFundsException {
 		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
-		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "2.5", "2.5", openingOrders);
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
 		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
 		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
 		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
-						new String[]{"0.13310"}, new String[]{"13"}, new String[]{"0.13410"}, new String[]{"15"}));
+						new String[]{"0.13310"}, new String[]{"3"}, new String[]{"0.13410"}, new String[]{"5"}));
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
-						new String[]{"0.13490"}, new String[]{"11"}, new String[]{"0.13590"}, new String[]{"12"}));
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
 		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
-		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.4"));
-		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("1.1"));
-		canProceed.set(true);
-		proceedLatch.countDown();
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.2"));
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -438,24 +441,24 @@ public class TestExecutionMonitor {
 		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
 		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
 		TestUtils.assertEquals("0.13410", newLongOrder.getPrice());
-		assertTrue(longOrder.getAmount().compareTo(newLongOrder.getAmount()) > 0);
+		TestUtils.assertEquals("0.2", newLongOrder.getAmount());
 		assertEquals(MockOrderService.BIT, newLongOrder.getMarket());
 		assertEquals(OrderStatus.OPEN, newLongOrder.getOrderStatus());
 		TestUtils.assertEquals("0.13490", newShortOrder.getPrice());
-		assertTrue(shortOrder.getAmount().compareTo(newShortOrder.getAmount()) > 0);
+		TestUtils.assertEquals("0.3", newShortOrder.getAmount());
 		assertEquals(MockOrderService.POL, newShortOrder.getMarket());
 		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
-						new String[]{"0.13350"}, new String[]{"13"}, new String[]{"0.13450"}, new String[]{"15"}));
+						new String[]{"0.13450"}, new String[]{"3"}, new String[]{"0.13550"}, new String[]{"5"}));
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
-						new String[]{"0.13450"}, new String[]{"11"}, new String[]{"0.13550"}, new String[]{"12"}));
+						new String[]{"0.13410"}, new String[]{"1"}, new String[]{"0.13450"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, OrderStatus.OPEN});
 		orderService.clearDesiredOrderStatus();
-		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
-		canProceed.set(true);
-		proceedLatch.countDown();
+		orderService.setDesiredOrderStatus(newLongOrder.getClientOrderId(), OrderStatus.OPEN);
+		orderService.setDesiredOrderStatus(newShortOrder.getClientOrderId(), OrderStatus.OPEN);
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -463,45 +466,38 @@ public class TestExecutionMonitor {
 		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
 		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
 		awaitNumOrders(5, 100);
-		Order newOrder = orderService.getLastOrder();
-		pollForStatuses(newOrder.getClientOrderId(), OrderStatus.SENDING);
-		Order balancingOrder = orderService.pollOrderUpdate(newOrder.getClientOrderId(), 100);
+		Order balancingOrderRef = orderService.getLastOrder();
+		Order balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
 		assertNotNull(balancingOrder);
-		TestUtils.assertEquals("0.7", balancingOrder.getAmount());
+		assertEquals(OrderStatus.SENDING, balancingOrder.getOrderStatus());
+		balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
 		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		TestUtils.assertEquals("0.13410", balancingOrder.getPrice());
+		TestUtils.assertEquals("0.1", balancingOrder.getAmount());
+		assertEquals(Side.ASK, balancingOrder.getSide());
+		assertEquals(MockOrderService.POL, balancingOrder.getMarket());
 		awaitNoMoreOrders(5, 100);
-		// let the balancing order be filled
-		orderService.clearDesiredOrderStatus();
-		orderService.setDefaultDesiredOrderStatus(OrderStatus.FILLED);
-		canProceed.set(true);
-		proceedLatch.countDown();
-		testLatch.await(1000, TimeUnit.MILLISECONDS);
-		if (testLatch.getCount() > 0)
-			fail("Expected execution monitor to be complete");
-		assertFalse(executionMonitor.isDone());
-		assertTrue(executionMonitor.isClosed());
 	}
 
 	@Test
-	public void resolvesInbalancedPartialFillsCreatesMultipleBalanceTrades() throws InterruptedException, NotEnoughFundsException {
+	public void testMisMatchedPartialFillsBidFillsLargerBothOpenCannotStillBalance() throws InterruptedException, NotEnoughFundsException {
 		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
-		ExecutionMonitor executionMonitor = createExecutionMonitor("0.13400", "0.13500", "2.5", "2.5", openingOrders);
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
 		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
 		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
 		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
-						new String[]{"0.13310"}, new String[]{"13"}, new String[]{"0.13410"}, new String[]{"15"}));
+						new String[]{"0.13310"}, new String[]{"3"}, new String[]{"0.13410"}, new String[]{"5"}));
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
-						new String[]{"0.13490"}, new String[]{"11"}, new String[]{"0.13590"}, new String[]{"12"}));
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
 		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
 				OrderStatus.OPEN, OrderStatus.OPEN});
-		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.4"));
-		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("1.1"));
-		canProceed.set(true);
-		proceedLatch.countDown();
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.2"));
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -523,24 +519,91 @@ public class TestExecutionMonitor {
 		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
 		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
 		TestUtils.assertEquals("0.13410", newLongOrder.getPrice());
-		assertTrue(longOrder.getAmount().compareTo(newLongOrder.getAmount()) > 0);
+		TestUtils.assertEquals("0.2", newLongOrder.getAmount());
 		assertEquals(MockOrderService.BIT, newLongOrder.getMarket());
 		assertEquals(OrderStatus.OPEN, newLongOrder.getOrderStatus());
 		TestUtils.assertEquals("0.13490", newShortOrder.getPrice());
-		assertTrue(shortOrder.getAmount().compareTo(newShortOrder.getAmount()) > 0);
+		TestUtils.assertEquals("0.3", newShortOrder.getAmount());
 		assertEquals(MockOrderService.POL, newShortOrder.getMarket());
 		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
 		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
-						new String[]{"0.13350"}, new String[]{"13"}, new String[]{"0.13450"}, new String[]{"15"}));
+						new String[]{"0.13450"}, new String[]{"3"}, new String[]{"0.13550"}, new String[]{"5"}));
 		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
 				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
-						new String[]{"0.13450"}, new String[]{"11"}, new String[]{"0.13550"}, new String[]{"12"}));
+						new String[]{"0.13390"}, new String[]{"1"}, new String[]{"0.13490"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, OrderStatus.OPEN});
 		orderService.clearDesiredOrderStatus();
-		orderService.setDefaultDesiredOrderStatus(OrderStatus.OPEN);
-		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED});
-		canProceed.set(true);
-		proceedLatch.countDown();
+		orderService.setDesiredOrderStatus(newLongOrder.getClientOrderId(), OrderStatus.OPEN);
+		orderService.setDesiredOrderStatus(newShortOrder.getClientOrderId(), OrderStatus.OPEN);
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNoMoreOrders(4, 100);
+	}
+
+	@Test
+	public void testMisMatchedPartialFillsAskFillsLargerBothOpenCanStillBalance() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13310"}, new String[]{"3"}, new String[]{"0.13410"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+				OrderStatus.OPEN, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.2"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNumOrders(4, 100);
+		Tuple2<Order, Order> newOrders = orderService.getLastOrders();
+		pollForStatuses(newOrders.getA().getClientOrderId(), OrderStatus.SENDING);
+		Order newLongOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
+		pollForStatuses(newOrders.getB().getClientOrderId(), OrderStatus.SENDING);
+		Order newShortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
+		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
+		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
+		TestUtils.assertEquals("0.13410", newLongOrder.getPrice());
+		TestUtils.assertEquals("0.3", newLongOrder.getAmount());
+		assertEquals(MockOrderService.BIT, newLongOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newLongOrder.getOrderStatus());
+		TestUtils.assertEquals("0.13490", newShortOrder.getPrice());
+		TestUtils.assertEquals("0.2", newShortOrder.getAmount());
+		assertEquals(MockOrderService.POL, newShortOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13450"}, new String[]{"3"}, new String[]{"0.13490"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13410"}, new String[]{"1"}, new String[]{"0.13450"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, OrderStatus.OPEN});
+		orderService.clearDesiredOrderStatus();
+		orderService.setDesiredOrderStatus(newLongOrder.getClientOrderId(), OrderStatus.OPEN);
+		orderService.setDesiredOrderStatus(newShortOrder.getClientOrderId(), OrderStatus.OPEN);
+		pollingService.poll();
 		longOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
 		shortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
 		assertNotNull(longOrder);
@@ -548,39 +611,315 @@ public class TestExecutionMonitor {
 		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
 		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
 		awaitNumOrders(5, 100);
-		Order newOrder = orderService.getLastOrder();
-		pollForStatuses(newOrder.getClientOrderId(), OrderStatus.SENDING);
-		Order balancingOrder = orderService.pollOrderUpdate(newOrder.getClientOrderId(), 100);
+		Order balancingOrderRef = orderService.getLastOrder();
+		Order balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
 		assertNotNull(balancingOrder);
-		TestUtils.assertEquals("0.7", balancingOrder.getAmount());
+		assertEquals(OrderStatus.SENDING, balancingOrder.getOrderStatus());
+		balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
 		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		TestUtils.assertEquals("0.13490", balancingOrder.getPrice());
+		TestUtils.assertEquals("0.1", balancingOrder.getAmount());
+		assertEquals(Side.BID, balancingOrder.getSide());
+		assertEquals(MockOrderService.BIT, balancingOrder.getMarket());
 		awaitNoMoreOrders(5, 100);
-		// let the balancing order be partially filled
-		orderService.clearDesiredOrderStatus();
-		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, 
-				OrderStatus.OPEN, OrderStatus.CANCELLED});
-		orderService.setDefaultDesiredOrderStatus(OrderStatus.PARTIALLY_FILLED);
-		canProceed.set(true);
-		proceedLatch.countDown();
-		balancingOrder = orderService.pollOrderUpdate(newOrder.getClientOrderId(), 100);
-		assertEquals(OrderStatus.PARTIALLY_FILLED, balancingOrder.getOrderStatus());
-		balancingOrder = orderService.pollOrderUpdate(newOrder.getClientOrderId(), 100);
-		assertEquals(OrderStatus.CANCELLED, balancingOrder.getOrderStatus());
-		awaitNumOrders(6, 100);
-		newOrder = orderService.getLastOrder();
-		pollForStatuses(newOrder.getClientOrderId(), OrderStatus.SENDING);
-		Order newBalancingOrder = orderService.pollOrderUpdate(newOrder.getClientOrderId(), 100);
-		assertNotNull(newBalancingOrder);
-		assertTrue(new BigDecimal("0.7").compareTo(newBalancingOrder.getAmount()) > 0);
-		assertEquals(OrderStatus.OPEN, newBalancingOrder.getOrderStatus());
-		// The ExecutionMonitor only waits 5 seconds until giving up
-		testLatch.await(10000, TimeUnit.MILLISECONDS);
-		if (testLatch.getCount() > 0)
-			fail("Expected execution monitor to be complete");
-		assertFalse(executionMonitor.isDone());
-		assertTrue(executionMonitor.isClosed());
 	}
 
+	@Test
+	public void testMisMatchedPartialFillsAskFillsLargerBothOpenCannotStillBalance() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13310"}, new String[]{"3"}, new String[]{"0.13410"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, 
+				OrderStatus.OPEN, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.2"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNumOrders(4, 100);
+		Tuple2<Order, Order> newOrders = orderService.getLastOrders();
+		pollForStatuses(newOrders.getA().getClientOrderId(), OrderStatus.SENDING);
+		Order newLongOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
+		pollForStatuses(newOrders.getB().getClientOrderId(), OrderStatus.SENDING);
+		Order newShortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
+		assertNotEquals(longOrder.getClientOrderId(), newLongOrder.getClientOrderId());
+		assertNotEquals(shortOrder.getClientOrderId(), newShortOrder.getClientOrderId());
+		TestUtils.assertEquals("0.13410", newLongOrder.getPrice());
+		TestUtils.assertEquals("0.3", newLongOrder.getAmount());
+		assertEquals(MockOrderService.BIT, newLongOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newLongOrder.getOrderStatus());
+		TestUtils.assertEquals("0.13490", newShortOrder.getPrice());
+		TestUtils.assertEquals("0.2", newShortOrder.getAmount());
+		assertEquals(MockOrderService.POL, newShortOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, newShortOrder.getOrderStatus());
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13500"}, new String[]{"3"}, new String[]{"0.13550"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13390"}, new String[]{"1"}, new String[]{"0.13490"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.CANCELLED, OrderStatus.OPEN});
+		orderService.clearDesiredOrderStatus();
+		orderService.setDesiredOrderStatus(newLongOrder.getClientOrderId(), OrderStatus.OPEN);
+		orderService.setDesiredOrderStatus(newShortOrder.getClientOrderId(), OrderStatus.OPEN);
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(newOrders.getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(newOrders.getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNoMoreOrders(4, 100);
+	}
+
+	@Test
+	public void testMisMatchedFillsBidFillsLargerBidSideClosed() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13310"}, new String[]{"3"}, new String[]{"0.13410"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.FILLED);
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNumOrders(3, 100);
+		Order balancingOrderRef = orderService.getLastOrder();
+		pollForStatuses(balancingOrderRef.getClientOrderId(), OrderStatus.SENDING);
+		Order balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
+		TestUtils.assertEquals("0.13490", balancingOrder.getPrice());
+		TestUtils.assertEquals("0.2", balancingOrder.getAmount());
+		assertEquals(MockOrderService.POL, balancingOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		assertEquals(Side.ASK, balancingOrder.getSide());
+		awaitNoMoreOrders(3, 100);
+	}
+
+	@Test
+	public void testMisMatchedFillsBidFillsLargerBidSideClosed2() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13410"}, new String[]{"3"}, new String[]{"0.13510"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.FILLED);
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNumOrders(3, 100);
+		Order balancingOrderRef = orderService.getLastOrder();
+		pollForStatuses(balancingOrderRef.getClientOrderId(), OrderStatus.SENDING);
+		Order balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
+		TestUtils.assertEquals("0.13490", balancingOrder.getPrice());
+		TestUtils.assertEquals("0.2", balancingOrder.getAmount());
+		assertEquals(MockOrderService.POL, balancingOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		assertEquals(Side.ASK, balancingOrder.getSide());
+		awaitNoMoreOrders(3, 100);
+	}
+
+	@Test
+	public void testMisMatchedFillsBidFillsLargerBidSideClosedNothingThere() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13410"}, new String[]{"3"}, new String[]{"0.13510"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13390"}, new String[]{"1"}, new String[]{"0.13490"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.FILLED);
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.PARTIALLY_FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, shortOrder.getOrderStatus());
+		awaitNoMoreOrders(2, 100);
+	}
+
+	@Test
+	public void testMisMatchedFillsAskFillsLargerAskSideClosed() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13310"}, new String[]{"3"}, new String[]{"0.13410"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.FILLED);
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		awaitNumOrders(3, 100);
+		Order balancingOrderRef = orderService.getLastOrder();
+		pollForStatuses(balancingOrderRef.getClientOrderId(), OrderStatus.SENDING);
+		Order balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
+		TestUtils.assertEquals("0.13410", balancingOrder.getPrice());
+		TestUtils.assertEquals("0.2", balancingOrder.getAmount());
+		assertEquals(MockOrderService.BIT, balancingOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		assertEquals(Side.BID, balancingOrder.getSide());
+		awaitNoMoreOrders(3, 100);
+	}
+
+	@Test
+	public void testMisMatchedFillsAskFillsLargerAskSideClosed2() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13410"}, new String[]{"3"}, new String[]{"0.13490"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13490"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED, OrderStatus.OPEN});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.FILLED);
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		awaitNumOrders(3, 100);
+		Order balancingOrderRef = orderService.getLastOrder();
+		pollForStatuses(balancingOrderRef.getClientOrderId(), OrderStatus.SENDING);
+		Order balancingOrder = orderService.pollOrderUpdate(balancingOrderRef.getClientOrderId(), 100);
+		TestUtils.assertEquals("0.13490", balancingOrder.getPrice());
+		TestUtils.assertEquals("0.2", balancingOrder.getAmount());
+		assertEquals(MockOrderService.BIT, balancingOrder.getMarket());
+		assertEquals(OrderStatus.OPEN, balancingOrder.getOrderStatus());
+		assertEquals(Side.BID, balancingOrder.getSide());
+		awaitNoMoreOrders(3, 100);
+	}
+
+	@Test
+	public void testMisMatchedFillsAskFillsLargerAskSideClosedNothingThere() throws InterruptedException, NotEnoughFundsException {
+		AtomicReference<Tuple2<Order, Order>> openingOrders = new AtomicReference<Tuple2<Order, Order>>();
+		createExecutionMonitor("0.13400", "0.13500", "0.5", "0.5", openingOrders);
+		pollForStatuses(openingOrders.get().getA().getClientOrderId(), OrderStatus.SENDING);
+		Order longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		pollForStatuses(openingOrders.get().getB().getClientOrderId(), OrderStatus.SENDING);
+		Order shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		arbService.testBooks.put(MockOrderService.BIT + ":" + longOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(longOrder.getMarket(), longOrder.getCurrencyPair(), 
+						new String[]{"0.13510"}, new String[]{"3"}, new String[]{"0.13610"}, new String[]{"5"}));
+		arbService.testBooks.put(MockOrderService.POL + ":" + shortOrder.getCurrencyPair().getName(), 
+				TestUtils.ob(shortOrder.getMarket(), shortOrder.getCurrencyPair(), 
+						new String[]{"0.13510"}, new String[]{"1"}, new String[]{"0.13590"}, new String[]{"2"}));
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED});
+		orderService.setDesiredOrderStatus(longOrder.getClientOrderId(), OrderStatus.PARTIALLY_FILLED, new BigDecimal("0.3"));
+		orderService.setDesiredOrderStatus(shortOrder.getClientOrderId(), OrderStatus.FILLED);
+		orderService.setDesiredActionOrderStatuses(new OrderStatus[]{OrderStatus.CANCELLED});
+		pollingService.poll();
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNotNull(shortOrder);
+		assertEquals(OrderStatus.PARTIALLY_FILLED, longOrder.getOrderStatus());
+		assertEquals(OrderStatus.FILLED, shortOrder.getOrderStatus());
+		longOrder = orderService.pollOrderUpdate(openingOrders.get().getA().getClientOrderId(), 100);
+		shortOrder = orderService.pollOrderUpdate(openingOrders.get().getB().getClientOrderId(), 100);
+		assertNotNull(longOrder);
+		assertNull(shortOrder);
+		assertEquals(OrderStatus.CANCELLED, longOrder.getOrderStatus());
+		awaitNoMoreOrders(2, 100);
+	}
+	
 	private void pollForStatuses(String clientOrderId, OrderStatus... statuses) throws InterruptedException {
 		for (OrderStatus status : statuses) {
 			Order order = orderService.pollOrderUpdate(clientOrderId, 100);
@@ -625,11 +964,40 @@ public class TestExecutionMonitor {
 		if (openingOrders == null)
 			openingOrders = new AtomicReference<Tuple2<Order, Order>>();
 		ExecutionMonitor executionMonitor =  new ExecutionMonitor(orderService, balanceService, arbService, 
-				backOfficeService, arbInstruction, 0);
+				backOfficeService, arbInstruction, pollingService, 0);
 		assertEquals("Expected execution monitor to create two orders", 2, orderService.getNumPlacedOrders());
 		openingOrders.set(orderService.getLastOrders());
-		canProceed = new AtomicBoolean(false);
 		return executionMonitor;
+	}
+	
+	private class TestPollingService implements PollingService {
+
+		private Map<String, PollListener> listeners = new HashMap<String, PollListener>();
+
+		private void poll() {
+			listeners.values().forEach(listener -> {
+				listener.polled();
+			});
+		}
+		
+		@Override
+		public void registerListener(String name, PollListener listener) {
+			listeners.put(name, listener);
+		}
+
+		@Override
+		public void unRegisterListener(String name) {
+			listeners.remove(name);
+		}
+
+		@Override
+		public void changePollingInterval(long interval) {
+		}
+
+		@Override
+		public void restorePollingInterval() {
+		}
+		
 	}
 	
 	private class TestArbService implements ArbService {

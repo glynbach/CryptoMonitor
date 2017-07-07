@@ -1,10 +1,13 @@
 package com.kieral.cryptomon.service.exchange;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -20,6 +23,8 @@ import com.kieral.cryptomon.service.PollingService;
 @Component
 public class ExchangePollingService implements PollingService {
 
+	private ScheduledFuture<?> pollingFuture;
+	
 	private final ScheduledExecutorService commonScheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
 	@Override
 	public Thread newThread(Runnable r) {
@@ -27,26 +32,61 @@ public class ExchangePollingService implements PollingService {
 		thread.setDaemon(true);
 		return thread;
 	}});
-	private final ConcurrentMap<String, PollClient> pollClients = new ConcurrentHashMap<String, PollClient>();
+	
+	// Insertion order is important here - typically the snapshot pollers will be added before
+	// the execution monitors
+	private final Map<String, PollClient> pollClients = new LinkedHashMap<String, PollClient>();
+	private final Object clientLock = new Object();
 			
 	@Autowired
 	CommonConfig commonConfig;
 	
 	@PostConstruct
 	public void init() {
-		commonScheduler.scheduleAtFixedRate(() -> {callPollers();}, commonConfig.getPollingInterval(), commonConfig.getPollingInterval(), TimeUnit.MILLISECONDS);
+		schedulePolling(commonConfig.getPollingInterval());
 	}
 
 	@Override
 	public void registerListener(String name, PollListener listener) {
 		if (listener == null || name == null)
 			return;
-		if (!pollClients.containsKey(name))
-			pollClients.putIfAbsent(name, new PollClient(listener, createExecutorService(name)));
+		synchronized(clientLock) {
+			if (!pollClients.containsKey(name))
+				pollClients.put(name, new PollClient(listener, createExecutorService(name)));
+		}
 	}
 
+	@Override
+	public void unRegisterListener(String name) {
+		synchronized(clientLock) {
+			pollClients.remove(name);
+		}
+	}
+
+	public void changePollingInterval(long interval) {
+		schedulePolling(interval);
+	}
+
+	public void restorePollingInterval() {
+		schedulePolling(commonConfig.getPollingInterval());
+	}
+
+	private void schedulePolling(long interval) {
+		if (pollingFuture != null && !pollingFuture.isDone()) { 
+			try {
+				pollingFuture.cancel(false);
+			} catch (Exception e) {
+			}
+		}
+		pollingFuture = commonScheduler.scheduleAtFixedRate(() -> {callPollers();}, interval, interval, TimeUnit.MILLISECONDS);
+	}
+	
 	private void callPollers() {
-		pollClients.values().forEach(pollClient -> {
+		List<PollClient> pollClients;
+		synchronized(clientLock) {
+			pollClients = new ArrayList<PollClient>(this.pollClients.values());
+		}
+		pollClients.forEach(pollClient -> {
 			try {
 				pollClient.processor.submit(() -> {pollClient.listener.polled();});;
 			} catch (Exception e) {
