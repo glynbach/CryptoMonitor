@@ -1,6 +1,8 @@
 package com.kieral.cryptomon;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import javax.annotation.PostConstruct;
 
@@ -14,10 +16,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -37,6 +42,9 @@ import com.kieral.cryptomon.service.arb.ArbInstructionHandler;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.exchange.ExchangePollingService;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
+import com.kieral.cryptomon.service.exchange.bitfinex.BitfinexSecurityModule;
+import com.kieral.cryptomon.service.exchange.bitfinex.BitfinexService;
+import com.kieral.cryptomon.service.exchange.bitfinex.BitfinexServiceConfig;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexSecurityModule;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexService;
 import com.kieral.cryptomon.service.exchange.bittrex.BittrexServiceConfig;
@@ -46,6 +54,9 @@ import com.kieral.cryptomon.service.exchange.gdax.GdaxServiceConfig;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexSecurityModule;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexService;
 import com.kieral.cryptomon.service.exchange.poloniex.PoloniexServiceConfig;
+import com.kieral.cryptomon.service.exchange.yobit.YobitSecurityModule;
+import com.kieral.cryptomon.service.exchange.yobit.YobitService;
+import com.kieral.cryptomon.service.exchange.yobit.YobitServiceConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookConfig;
 import com.kieral.cryptomon.service.liquidity.OrderBookManager;
 import com.kieral.cryptomon.service.liquidity.OrderBookSanityChecker;
@@ -100,6 +111,12 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	GdaxServiceConfig gdaxServiceConfig;
 
 	@Autowired
+	YobitServiceConfig yobitServiceConfig;
+
+	@Autowired
+	BitfinexServiceConfig bitfinexServiceConfig;
+
+	@Autowired
 	OrderBookConfig orderBookConfig;
 
 	@Bean
@@ -118,11 +135,23 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	}
 
 	@Bean
+	ExchangeService yobitService() {
+		return new YobitService(yobitServiceConfig, new YobitSecurityModule(yobitServiceConfig));		
+	}
+
+	@Bean
+	ExchangeService bitfinexService() {
+		return new BitfinexService(bitfinexServiceConfig, new BitfinexSecurityModule(bitfinexServiceConfig));		
+	}
+
+	@Bean
 	ExchangeManagerService exchangeManagerService() {
 		return new ExchangeManagerService(new ExchangeService[]{
 				poloniexService(),
 				bittrexService(),
-				gdaxService()
+				gdaxService(),
+				yobitService(),
+				bitfinexService()
 		});
 	}
 
@@ -202,7 +231,14 @@ public class CryptoMonConfig extends WebMvcConfigurerAdapter {
 	public RestTemplate restTemplate(RestTemplateBuilder builder) {
 		builder.detectRequestFactory(true);
 		RestTemplate template = builder.build();
-		configureLoggingUtils();
+        for(HttpMessageConverter<?> converter : template.getMessageConverters()){
+            if(converter instanceof MappingJackson2HttpMessageConverter){
+            	List<MediaType> mediaTypes = new ArrayList<MediaType>(((MappingJackson2HttpMessageConverter) converter).getSupportedMediaTypes());
+            	mediaTypes.add(MediaType.TEXT_HTML);
+            	((MappingJackson2HttpMessageConverter) converter).setSupportedMediaTypes(mediaTypes);
+            }
+        }		
+        configureLoggingUtils();
 		if (LoggingUtils.isLogRequestsEnabled() || LoggingUtils.isLogResponsesEnabled()) {
 			template.setRequestFactory(new BufferingClientHttpRequestFactory(template.getRequestFactory()));
 			template.setInterceptors(Arrays.asList(new ClientHttpRequestInterceptor[]{loggingRequestInterceptor()}));

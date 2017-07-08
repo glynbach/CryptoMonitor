@@ -11,7 +11,7 @@ public interface OrderBookResponse {
 	long getSequence();
 	long getCreatedTime();
 	boolean isValid();
-	List<OrderBookResponseEntry> getBidEntries(); 
-	List<OrderBookResponseEntry> getAskEntries();
+	List<? extends OrderBookResponseEntry> getBidEntries(); 
+	List<? extends OrderBookResponseEntry> getAskEntries();
 	
 }

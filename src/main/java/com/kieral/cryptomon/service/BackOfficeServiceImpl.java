@@ -48,22 +48,15 @@ public class BackOfficeServiceImpl implements BackOfficeService {
 	@Override
 	public void onExecutionCompletion(ArbInstruction instruction, List<Order> longOrders, List<Order> shortOrders,
 			boolean interventionRequired) {
-		// restore balances
-		try {
-			exchangeManagerService.updateBalances(instruction.getLeg(Side.BID).getMarket(), true);
-			exchangeManagerService.updateBalances(instruction.getLeg(Side.ASK).getMarket(), true);
-		} catch (Exception e) {
-			logger.error("Error updating balances after arb {} - suspending arb service", instruction, e);
-			arbService.suspend(true);
-			interventionRequired = true;
-		}
 		if (interventionRequired) {
-			// TODO: take action
-			// send alerts
+			// TODO: take some action if needed
 		}
+		// restore balances
+		processor.submit(new UpdateBalancesTask(instruction.getLeg(Side.BID).getMarket()));
+		processor.submit(new UpdateBalancesTask(instruction.getLeg(Side.ASK).getMarket()));
 		processor.submit(new ProcessCompletedInstructionTask(instruction, longOrders, shortOrders, interventionRequired));
 	}
-	
+
 	public void registerListener(BackOfficeListener listener) {
 		if (!listeners.contains(listener))
 			listeners.add(listener);
@@ -82,7 +75,41 @@ public class BackOfficeServiceImpl implements BackOfficeService {
 		}
 		return new Tuple2<BigDecimal, BigDecimal>(baseAmountTotal, quotedAmountTotal);
 	}
-	
+
+	class UpdateBalancesTask implements Runnable {
+		
+		final String market;
+		boolean success = false;
+		final int maxRetries = 5;
+		int retryCount = 0;
+		long retryWait = 1000;
+		
+		UpdateBalancesTask(String market) {
+			this.market = market;
+		}
+
+		@Override
+		public void run() {
+			while (!success && retryCount < maxRetries) {
+				try {
+					retryCount++;
+					exchangeManagerService.updateBalances(market, true);
+					success = true;
+				} catch (Exception e) {
+					logger.error("Error updating balances for {}", market, e);
+					try {
+						Thread.sleep(retryWait);
+					} catch (InterruptedException e1) {
+					}
+				}
+			}
+			if (!success) {
+				logger.error("Error updating balances after {} attempts - suspending arb service", maxRetries);
+				arbService.suspend(true);
+			}
+		}
+	}
+
 	class ProcessCompletedInstructionTask implements Runnable {
 
 		final ArbInstruction instruction;

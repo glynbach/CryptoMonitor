@@ -122,9 +122,11 @@ public class GloballyExclusiveExecutionController implements ExecutionController
 		if (quotedAmountShortfall.compareTo(SHORTFALL_LENIANCY) > 0) {
 			// does the long market have surplus
 			if (balanceService.getWorkingAmount(longMarket, quotedCurrency).compareTo(longLeg.getCurrencyPair().getMinDesiredQuotedBalance()) > 0) {
+				BigDecimal baseAdjustedShortfall = quotedAmountShortfall.divide(shortLeg.getPrice(), 8, RoundingMode.HALF_DOWN);
+				BigDecimal baseAmount = baseAdjustedShortfall.compareTo(longLeg.getAmount().getBaseAmount()) > 0 ? longLeg.getAmount().getBaseAmount() : baseAdjustedShortfall; 
 				logger.info("Taking arb to rebalance {} on {} - current balance {} - original instruction {}", quotedCurrency.name(), shortMarket, 
 						balanceService.getWorkingAmount(shortMarket, quotedCurrency).toPlainString(), instruction);
-				return ArbInstructionFactory.createArbInstruction(instruction, quotedAmountShortfall.divide(shortLeg.getPrice(), 8, RoundingMode.HALF_UP));
+				return ArbInstructionFactory.createArbInstruction(instruction, baseAmount);
 			}
 		}
 		// does the long market need the long base currency
@@ -134,7 +136,8 @@ public class GloballyExclusiveExecutionController implements ExecutionController
 			if (balanceService.getWorkingAmount(shortMarket, baseCurrency).compareTo(shortLeg.getCurrencyPair().getMinDesiredBaseBalance()) > 0) {
 				logger.info("Taking arb to rebalance {} on {} - current balance {} - original instruction {}", baseCurrency.name(), longMarket, 
 						balanceService.getWorkingAmount(longMarket, baseCurrency).toPlainString(), instruction);
-				return ArbInstructionFactory.createArbInstruction(instruction, baseAmountShortfall);
+				BigDecimal baseAmount = baseAmountShortfall.compareTo(shortLeg.getAmount().getBaseAmount()) > 0 ? shortLeg.getAmount().getBaseAmount() : baseAmountShortfall;
+				return ArbInstructionFactory.createArbInstruction(instruction, baseAmount);
 			}
 		}
 		return null;
