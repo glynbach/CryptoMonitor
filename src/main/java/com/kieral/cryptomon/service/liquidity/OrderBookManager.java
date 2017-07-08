@@ -73,7 +73,7 @@ public class OrderBookManager {
 				orderBookResponse.getCreatedTime(), orderBookResponse.isValid(), maxLevel);
 	}
 	
-	private List<OrderBookUpdate> getUpdatesFromEntries(Side side, List<OrderBookResponseEntry> entries) {
+	private List<OrderBookUpdate> getUpdatesFromEntries(Side side, List<? extends OrderBookResponseEntry> entries) {
 		List<OrderBookUpdate> updates = new ArrayList<OrderBookUpdate>();
 		if (entries != null) {
 			entries.forEach(entry -> {

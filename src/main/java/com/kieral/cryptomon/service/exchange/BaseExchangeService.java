@@ -804,6 +804,7 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 	private <T> T getMarketResponse(ExchangeApiRequest apiRequest, String descr, Class<? extends T> clazz) throws SecurityModuleException, 
 																					ApiRequestException, ExpectedResponseException, ResponseTimedOutException {
 		HttpHeaders headers = new HttpHeaders();
+		headers.add("Content-type", "application/json");
 		HttpEntity<?> entity = new HttpEntity<>(headers);
 		return processResponse(logger.isDebugEnabled(), apiRequest.getUrl(), entity, apiRequest, descr, clazz);
 	}
@@ -859,6 +860,8 @@ public abstract class BaseExchangeService implements ExchangeService, OrderedStr
 					logger.error("Received rest exception with status {} and response body {}", e.getStatusCode(), e.getResponseBodyAsString());
 					exception.set(e);
 				}
+			} catch (Exception e) {
+				logger.error("Unhandled exception: ", e);
 			} finally {
 				responseLatch.countDown();
 			}

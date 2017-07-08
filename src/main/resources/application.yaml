@@ -130,3 +130,55 @@ GDAX:
       trading-fee: "0.3"
       min-desired-base-balance: 8
       min-desired-quoted-balance: 0.8
+YOBIT: 
+  exchange: yobit
+  enabled: false
+  push-api: ""
+  snapshot-api: "https://yobit.net/api/"
+  trading-api: "https://yobit.net/tapi/"
+  subscription-mode: POLLING
+  polling-interval: 2000
+  max-levels: 20
+  max-trans-per-second: 6
+  skip-hearbeats: true
+  snapshot-baseline: true
+  snapshot-baseline-Sequence: true
+  api-key-loc: "${user.home}/.cryptomon/.yobitApiKey"
+  api-secret-loc: "${user.home}/.cryptomon/.yobitApiSecret"
+  currency-pairs: 
+    - pair: "ltc_btc"
+      price-scale: 8
+      trading-fee: "0.2"
+      min-desired-base-balance: 35
+      min-desired-quoted-balance: 0.8
+    - pair: "eth_btc"
+      price-scale: 8
+      trading-fee: "0.2"
+      min-desired-base-balance: 8
+      min-desired-quoted-balance: 0.8
+BITFINEX: 
+  exchange: bitfinex
+  enabled: false
+  push-api: ""
+  snapshot-api: "https://api.bitfinex.com/v1/"
+  trading-api: "https://api.bitfinex.com/v1/"
+  subscription-mode: POLLING
+  polling-interval: 2000
+  max-levels: 20
+  max-trans-per-second: 2
+  skip-hearbeats: true
+  snapshot-baseline: true
+  snapshot-baseline-Sequence: true
+  api-key-loc: "${user.home}/.cryptomon/.bitfinexApiKey"
+  api-secret-loc: "${user.home}/.cryptomon/.bitfinexApiSecret"
+  currency-pairs: 
+    - pair: "LTCBTC"
+      price-scale: 8
+      trading-fee: "0.2"
+      min-desired-base-balance: 35
+      min-desired-quoted-balance: 0.8
+    - pair: "ETHBTC"
+      price-scale: 8
+      trading-fee: "0.2"
+      min-desired-base-balance: 8
+      min-desired-quoted-balance: 0.8

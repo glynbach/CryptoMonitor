@@ -276,7 +276,7 @@ public class BittrexOrderResponse implements OrderResponse {
 		BigDecimal tradeAmount = BigDecimal.ZERO;
 		if (quantity != null && quantityRemaining != null)
 			tradeAmount = quantity.subtract(quantityRemaining);
-		return new BaseTradesResponse(Arrays.asList(new TradeResponse[]{new BaseTradeResponse(null, price, tradeAmount, 
+		return new BaseTradesResponse(Arrays.asList(new TradeResponse[]{new BaseTradeResponse(null, pricePerUnit, tradeAmount, 
 				CommonUtils.returnLargestOf(commissionPaid, commissionReserved), System.currentTimeMillis(), true)})); 
 	}
 
