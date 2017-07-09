@@ -10,17 +10,16 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.service.CommonConfig;
 import com.kieral.cryptomon.service.PollListener;
 import com.kieral.cryptomon.service.PollingService;
 
-@Component
 public class ExchangePollingService implements PollingService {
 
 	private ScheduledFuture<?> pollingFuture;
@@ -41,9 +40,12 @@ public class ExchangePollingService implements PollingService {
 	@Autowired
 	CommonConfig commonConfig;
 	
+    private final AtomicBoolean initialised = new AtomicBoolean(false);
+	
 	@PostConstruct
 	public void init() {
-		schedulePolling(commonConfig.getPollingInterval());
+		if (initialised.compareAndSet(false, true))
+			schedulePolling(commonConfig.getPollingInterval());
 	}
 
 	@Override

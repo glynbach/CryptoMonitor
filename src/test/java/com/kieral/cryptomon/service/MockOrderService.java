@@ -407,8 +407,13 @@ public class MockOrderService implements OrderService {
 	}
 
 	@Override
-	public void requestBalances() {
-		orderService.requestBalances();
+	public void requestAllBalances() {
+		orderService.requestAllBalances();
+	}
+
+	@Override
+	public boolean requestBalances(String market) {
+		return orderService.requestBalances(market);
 	}
 
 }

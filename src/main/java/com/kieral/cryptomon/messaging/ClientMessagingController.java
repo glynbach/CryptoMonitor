@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -102,36 +103,40 @@ public class ClientMessagingController {
     @Autowired
     private SimpMessagingTemplate template;
     
+    private final AtomicBoolean initialised = new AtomicBoolean(false);
+    
     @PostConstruct
     public void init(){
-    	exchangeManager.getEnabledExchanges().forEach(service -> {
-    		exchanges.add(service);
-    		service.registerOrderBookListener(orderBook -> {
-    			books.putIfAbsent(service.getName(), new ConcurrentHashMap<String, OrderBook>());
-    			books.get(service.getName()).put(orderBook.getCurrencyPair().getName(), orderBook);
-    			orderBooks.putIfAbsent(service.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
-    			orderBooks.get(service.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
-    			sendArbProspects();
-    		});
-    		service.registerStatusListener(status  -> {
-    			ConnectionStatus lastStatus;
-    			lastStatus = statuses.put(service.getName(), status);
-    			if (lastStatus == null || lastStatus != status)
-    				template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(service.getName()));
-    		});
-    	});
-    	orderService.registerOrderListener(order -> {
-    		if (order != null && order.getMarket() != null) {
-    			template.convertAndSend("/topic/openOrders", this.getOpenOrders(order.getMarket()));
-    			template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(order.getMarket()));
-    		}
-    	});
-    	backOfficeService.registerListener(summary -> {
-    		if (summary != null) {
-    			addBackOfficeUpdate(summary);
-    			template.convertAndSend("/topic/backOfficeUpdates", getBackOfficeUpdates());
-    		}
-    	});
+    	if (initialised.compareAndSet(false, true)) {
+	    	exchangeManager.getEnabledExchanges().forEach(service -> {
+	    		exchanges.add(service);
+	    		service.registerOrderBookListener(orderBook -> {
+	    			books.putIfAbsent(service.getName(), new ConcurrentHashMap<String, OrderBook>());
+	    			books.get(service.getName()).put(orderBook.getCurrencyPair().getName(), orderBook);
+	    			orderBooks.putIfAbsent(service.getName(), new ConcurrentHashMap<String, OrderBookMessage>());
+	    			orderBooks.get(service.getName()).put(orderBook.getCurrencyPair().getName(), new OrderBookMessage(orderBook));
+	    			sendArbProspects();
+	    		});
+	    		service.registerStatusListener(status  -> {
+	    			ConnectionStatus lastStatus;
+	    			lastStatus = statuses.put(service.getName(), status);
+	    			if (lastStatus == null || lastStatus != status)
+	    				template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(service.getName()));
+	    		});
+	    	});
+	    	orderService.registerOrderListener(order -> {
+	    		if (order != null && order.getMarket() != null) {
+	    			template.convertAndSend("/topic/openOrders", this.getOpenOrders(order.getMarket()));
+	    			template.convertAndSend("/topic/exchangeStatus", getExchangeStatus(order.getMarket()));
+	    		}
+	    	});
+	    	backOfficeService.registerListener(summary -> {
+	    		if (summary != null) {
+	    			addBackOfficeUpdate(summary);
+	    			template.convertAndSend("/topic/backOfficeUpdates", getBackOfficeUpdates());
+	    		}
+	    	});
+    	}
     }
 
 

@@ -204,20 +204,20 @@ public class BalanceService {
 		
 	}
 
-	public List<String> getPrettyPrint(boolean printToConsole) {
+	public String getPrettyPrint() {
 		List<Balance> sortedBalances = balances.values().stream()
 				.sorted(byMarket.thenComparing(byCurrency)).collect(Collectors.toList());
 		List<String> lines = new ArrayList<String>(); 
 		final AtomicReference<String> lastMarket = new AtomicReference<String>();
 		final AtomicReference<StringBuffer> line1 = new AtomicReference<StringBuffer>();
 		final AtomicReference<StringBuffer> line2 = new AtomicReference<StringBuffer>();
-		lines.add("Current Working Balances ---------------------------");
+		lines.add("\nCurrent Working Balances ---------------------------");
 		sortedBalances.forEach(balance -> {
 			if (!balance.getMarket().equals(lastMarket.get())) {
 				if (lastMarket.get() != null) {
-					lines.add(lastMarket.get() + ": ");
-					lines.add(line1.get().toString());
-					lines.add(line2.get().toString());
+					lines.add("\n" + lastMarket.get() + ": ");
+					lines.add("\n" + line1.get().toString());
+					lines.add("\n" + line2.get().toString());
 				}
 				lastMarket.set(balance.getMarket());
 				line1.set(new StringBuffer(""));
@@ -227,17 +227,12 @@ public class BalanceService {
 			line2.get().append("\t\t").append(balance.getWorkingAmount().toPlainString());
 		});
 		if (lastMarket.get() != null) {
-			lines.add(lastMarket.get() + ": ");
-			lines.add(line1.get().toString());
-			lines.add(line2.get().toString());
+			lines.add("\n" + lastMarket.get() + ": ");
+			lines.add("\n" + line1.get().toString());
+			lines.add("\n" + line2.get().toString());
 		}
-		lines.add("----------------------------------------------------");
-		if (printToConsole) {
-			lines.forEach(line ->{
-				System.out.println(line);
-			}); 
-		}
-		return lines;
+		lines.add("\n----------------------------------------------------");
+		return lines.stream().reduce("", String::concat);
 	}
 	
 	@Override

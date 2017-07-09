@@ -34,6 +34,8 @@ public interface OrderService {
 
 	void checkStatuses(String market, List<Order> orders);
 	
-	void requestBalances();
-	
+	void requestAllBalances();
+
+	boolean requestBalances(String market);
+
 }
