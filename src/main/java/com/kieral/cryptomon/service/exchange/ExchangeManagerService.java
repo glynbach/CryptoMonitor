@@ -47,6 +47,10 @@ public class ExchangeManagerService {
 		return new ArrayList<ExchangeService>(enabledExchanges);
 	}
 
+	public ExchangeService getEnabledExchange(String market) {
+		return enabledExchangeMap.get(market);
+	}
+
 	public List<String> getEnabledExchangeNames() {
 		List<ExchangeService> enabledExchanges = getEnabledExchanges();
 		if (enabledExchanges == null || enabledExchanges.size() == 0)

@@ -16,6 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -26,7 +27,6 @@ import javax.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.CurrencyPair;
@@ -36,12 +36,12 @@ import com.kieral.cryptomon.service.exception.OrderNotExistsException;
 import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.exchange.ExchangeService;
 
-@Component
 public class OrderServiceImpl implements OrderService {
 
 	private static final AtomicLong orderIdCounter = new AtomicLong(Instant.now().getEpochSecond());
 	private static final AtomicInteger counter = new AtomicInteger(0);
 	private static final BigDecimal MARKET_ORDER_PRICE = new BigDecimal("-1");
+	private static final int MAX_BALANCE_RETRIES = 3;
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	
@@ -58,48 +58,64 @@ public class OrderServiceImpl implements OrderService {
 	
 	private final ConcurrentMap<String, Map<String, Order>> openOrders = new ConcurrentHashMap<String, Map<String, Order>>();
 	private final ConcurrentMap<String, Map<String, Order>> closedOrders = new ConcurrentHashMap<String, Map<String, Order>>();
+	private final ConcurrentMap<String, AtomicInteger> attempts =  new ConcurrentHashMap<String, AtomicInteger>();
 
 	@Autowired
 	private ExchangeManagerService exchangeManagerService;
 	@Autowired
 	private BalanceService balanceService;
 
+    private final AtomicBoolean initialised = new AtomicBoolean(false);
+
 	@PostConstruct
 	public void init() {
-		exchangeManagerService.getEnabledExchanges().forEach(exchange -> {
-			exchange.registerTradingStatusListener(enabled -> {
-				if (enabled) {
-					logger.info("Exchange {} enabled for trading", exchange.getName());
-					asyncProcessor.submit(() -> {
-						try {
-							List<Order> openOrders = exchange.getOpenOrders();
-							if (openOrders != null) {
-								openOrders.forEach(order -> {
-									updateStatus(order, order.getOrderStatus());
-								});
-							}
-						} catch (Exception e) {
-							logger.warn("Error requesting open orders", e);
-						}
-						requestBalances(exchange, 0);
-					});
-				}
-			});
-		});
-	}
-
-	@Override
-	public void requestBalances() {
-		synchronized(this) {
+		if (initialised.compareAndSet(false, true)) {
+			logger.info("Initialising");
 			exchangeManagerService.getEnabledExchanges().forEach(exchange -> {
-				requestBalances(exchange, 0);
+				logger.info("Registering trading status listener for {}", exchange.getName());
+				exchange.registerTradingStatusListener(enabled -> {
+					if (enabled) {
+						logger.info("Exchange {} enabled for trading", exchange.getName());
+						asyncProcessor.submit(() -> {
+							try {
+								List<Order> openOrders = exchange.getOpenOrders();
+								if (openOrders != null) {
+									openOrders.forEach(order -> {
+										updateStatus(order, order.getOrderStatus());
+									});
+								}
+							} catch (Exception e) {
+								logger.warn("Error requesting open orders", e);
+							}
+							requestBalances(exchange, 0, true);
+						});
+					}
+				});
 			});
 		}
 	}
+
+	@Override
+	public void requestAllBalances() {
+		synchronized(this) {
+			exchangeManagerService.getEnabledExchanges().forEach(exchange -> {
+				requestBalances(exchange, 0, true);
+			});
+		}
+	}
+
+	public boolean requestBalances(String market) {
+		ExchangeService exchange = exchangeManagerService.getEnabledExchange(market);
+		if (exchange != null)
+			return requestBalances(exchange, 0, true);
+		return false;
+	}
 	
-	private void requestBalances(ExchangeService exchange, long delay) {
-		int maxTries = 5;
-		int tries = 0;
+
+	private boolean requestBalances(ExchangeService exchange, long delay, boolean reset) {
+		attempts.putIfAbsent(exchange.getName() + ":BALANCE", new AtomicInteger(0));
+		if (reset)
+			attempts.get(exchange.getName() + ":BALANCE").set(0);
 		if (delay > 0) {
 			try {
 				Thread.sleep(delay);
@@ -117,13 +133,15 @@ public class OrderServiceImpl implements OrderService {
 					balanceService.setConfirmedBalance(exchange.getName(), currency, BigDecimal.ZERO, true);
 				}
 			});
+			logger.info("Balances updated for {} - latest balances {}", exchange.getName(), balanceService.getPrettyPrint());
+			return true;
 		} catch (Exception e) {
-			tries++;
 			logger.error("Error updating balances for " + exchange.getName(), e);
 			// resubmit with delay
-			if (tries < maxTries)
-				requestBalances(exchange, 1000);
+			if (attempts.get(exchange.getName() + ":BALANCE").incrementAndGet() < MAX_BALANCE_RETRIES)
+				requestBalances(exchange, 1000, false);
 		}
+		return false;
 	}
 
 	@Override

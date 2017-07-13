@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
 
@@ -28,6 +29,8 @@ public class OrderBookConfig {
 	private final Map<String, Map<Currency, BigDecimal>> marketSignificantAmounts = new HashMap<String, Map<Currency, BigDecimal>>();
 	private final Map<Currency, BigDecimal> significantAmounts = new HashMap<Currency, BigDecimal>();
 
+    private final AtomicBoolean initialised = new AtomicBoolean(false);
+	
 	public BigDecimal getDefaultSignificantAmount() {
 		return defaultSignificantAmount;
 	}
@@ -54,25 +57,27 @@ public class OrderBookConfig {
 
 	@PostConstruct
 	public void init() {
-		if (defaultSignificantAmount == null)
-			defaultSignificantAmount = DEFAULT_SIGNIFICANT_AMOUNT;
-		if (currencies != null) {
-			currencies.forEach(csa -> {
-				significantAmounts.put(csa.getCurrency(), csa.getSignificantAmount());
-			});
-		}
-		if (markets != null) {
-			markets.forEach(mp -> {
-				if (mp.getDefaultSignificantAmount() != null)
-					marketDefaultSignificantAmounts.put(mp.getMarket(), mp.getDefaultSignificantAmount());
-				if (mp.getCurrencies() != null) {
-					mp.getCurrencies().forEach(csa -> {
-						if (!marketSignificantAmounts.containsKey(mp.getMarket()))
-							marketSignificantAmounts.put(mp.getMarket(), new HashMap<Currency, BigDecimal>());
-						marketSignificantAmounts.get(mp.getMarket()).put(csa.getCurrency(), csa.getSignificantAmount());
-					});
-				}
-			});
+		if (initialised.compareAndSet(false, true)) {
+			if (defaultSignificantAmount == null)
+				defaultSignificantAmount = DEFAULT_SIGNIFICANT_AMOUNT;
+			if (currencies != null) {
+				currencies.forEach(csa -> {
+					significantAmounts.put(csa.getCurrency(), csa.getSignificantAmount());
+				});
+			}
+			if (markets != null) {
+				markets.forEach(mp -> {
+					if (mp.getDefaultSignificantAmount() != null)
+						marketDefaultSignificantAmounts.put(mp.getMarket(), mp.getDefaultSignificantAmount());
+					if (mp.getCurrencies() != null) {
+						mp.getCurrencies().forEach(csa -> {
+							if (!marketSignificantAmounts.containsKey(mp.getMarket()))
+								marketSignificantAmounts.put(mp.getMarket(), new HashMap<Currency, BigDecimal>());
+							marketSignificantAmounts.get(mp.getMarket()).put(csa.getCurrency(), csa.getSignificantAmount());
+						});
+					}
+				});
+			}
 		}
 	}
 

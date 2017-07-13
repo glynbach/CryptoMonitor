@@ -39,7 +39,7 @@ public class TestBalanceService {
 	
 	@Test
 	public void testInitialBalances() {
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("1", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("50", balanceService.getConfirmedAmount(POL, Currency.LTC));
 		assertValues("10", balanceService.getConfirmedAmount(POL, Currency.ETH));
@@ -62,7 +62,7 @@ public class TestBalanceService {
 	
 	@Test
 	public void testAdjustedBalances() throws NotEnoughFundsException {
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		balanceService.adiustWorkingAmount(POL, Currency.BTC, bd("0.001"));
 		balanceService.adiustWorkingAmount(POL, Currency.LTC, bd("-1.21"));
 		balanceService.adiustWorkingAmount(POL, Currency.ETH, bd("3.33"));
@@ -72,7 +72,7 @@ public class TestBalanceService {
 		balanceService.adiustWorkingAmount(GD, Currency.BTC, bd("12.00"));
 		balanceService.adiustWorkingAmount(GD, Currency.LTC, bd("0.001"));
 		balanceService.adiustWorkingAmount(GD, Currency.ETH, bd("-0.001"));
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("1", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("50", balanceService.getConfirmedAmount(POL, Currency.LTC));
 		assertValues("10", balanceService.getConfirmedAmount(POL, Currency.ETH));
@@ -92,11 +92,11 @@ public class TestBalanceService {
 		assertValues("70.001", balanceService.getWorkingAmount(GD, Currency.LTC));
 		assertValues("29.999", balanceService.getWorkingAmount(GD, Currency.ETH));
 		balanceService.adiustWorkingAmount(POL, Currency.BTC, bd("0.001"));
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("1", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("1.002", balanceService.getWorkingAmount(POL, Currency.BTC));
 		balanceService.adiustWorkingAmount(POL, Currency.BTC, bd("-0.003"));
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("1", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("0.999", balanceService.getWorkingAmount(POL, Currency.BTC));
 	}
@@ -126,7 +126,7 @@ public class TestBalanceService {
 		latch.await(5000, TimeUnit.MILLISECONDS);
 		if (latch.getCount() > 0)
 			fail(String.format("Expected all 11 adjustments to happen but still %s remaining", latch.getCount()));
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("0", balanceService.getWorkingAmount(POL, Currency.BTC));
 		if (exception.get() != null)
 			throw exception.get();
@@ -134,11 +134,11 @@ public class TestBalanceService {
 	
 	@Test
 	public void testReconConfirmedBalancesRestoreWorkingBalances() throws NotEnoughFundsException {
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		balanceService.adiustWorkingAmount(POL, Currency.BTC, bd("0.001"));
 		balanceService.adiustWorkingAmount(POL, Currency.LTC, bd("-1.21"));
 		balanceService.adiustWorkingAmount(GD, Currency.BTC, bd("12.00"));
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("1", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("50", balanceService.getConfirmedAmount(POL, Currency.LTC));
 		assertValues("3", balanceService.getConfirmedAmount(GD, Currency.BTC));
@@ -146,7 +146,7 @@ public class TestBalanceService {
 		assertValues("48.79", balanceService.getWorkingAmount(POL, Currency.LTC));
 		assertValues("15", balanceService.getWorkingAmount(GD, Currency.BTC));
 		balanceService.setConfirmedBalance(POL, Currency.BTC, bd("2"), true);
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("2", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("50", balanceService.getConfirmedAmount(POL, Currency.LTC));
 		assertValues("3", balanceService.getConfirmedAmount(GD, Currency.BTC));
@@ -157,11 +157,11 @@ public class TestBalanceService {
 
 	@Test
 	public void testNonReconConfirmedBalancesNotRestoreWorkingBalances() throws NotEnoughFundsException {
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		balanceService.adiustWorkingAmount(POL, Currency.BTC, bd("0.001"));
 		balanceService.adiustWorkingAmount(POL, Currency.LTC, bd("-1.21"));
 		balanceService.adiustWorkingAmount(GD, Currency.BTC, bd("12.00"));
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("1", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("50", balanceService.getConfirmedAmount(POL, Currency.LTC));
 		assertValues("3", balanceService.getConfirmedAmount(GD, Currency.BTC));
@@ -169,7 +169,7 @@ public class TestBalanceService {
 		assertValues("48.79", balanceService.getWorkingAmount(POL, Currency.LTC));
 		assertValues("15", balanceService.getWorkingAmount(GD, Currency.BTC));
 		balanceService.setConfirmedBalance(POL, Currency.BTC, bd("2"), false);
-		balanceService.getPrettyPrint(true);
+		System.out.println(balanceService.getPrettyPrint());
 		assertValues("2", balanceService.getConfirmedAmount(POL, Currency.BTC));
 		assertValues("50", balanceService.getConfirmedAmount(POL, Currency.LTC));
 		assertValues("3", balanceService.getConfirmedAmount(GD, Currency.BTC));

@@ -107,7 +107,7 @@ public class CryptoMonController {
     	logger.info("Received check order status for clientOrderId {}", clientOrderId);
     	try {
 			orderService.checkStatus(market, clientOrderId);
-			orderService.requestBalances();
+			orderService.requestAllBalances();
 		} catch (OrderNotExistsException e) {
 			logger.error("Received check order status {} {} for unrecognised order", market, clientOrderId);
 			model.addAttribute("error", String.format("Unrecognised clientOrderId %s for market %s", clientOrderId, market));

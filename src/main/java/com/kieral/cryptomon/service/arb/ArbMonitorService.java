@@ -34,16 +34,20 @@ public class ArbMonitorService implements ArbService {
 	
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
+    private final AtomicBoolean initialised = new AtomicBoolean(false);
+
 	@PostConstruct
 	public void init() {
-		exchangeManager.getEnabledExchanges().forEach(service -> {
-			service.registerOrderBookListener(orderBook -> {
-				processOrderBook(orderBook);
+		if (initialised.compareAndSet(false, true)) {
+			exchangeManager.getEnabledExchanges().forEach(service -> {
+				service.registerOrderBookListener(orderBook -> {
+					processOrderBook(orderBook);
+				});
+				exchangeManager.registerConnectionStatusListener(service.getName(), status -> {
+					processStatus(service.getName(), status);
+				});
 			});
-			exchangeManager.registerConnectionStatusListener(service.getName(), status -> {
-				processStatus(service.getName(), status);
-			});
-		});
+		}
 	}
 
 	@Override

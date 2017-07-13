@@ -13,24 +13,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.Side;
 import com.kieral.cryptomon.model.trading.Order;
 import com.kieral.cryptomon.model.trading.Trade;
 import com.kieral.cryptomon.service.arb.ArbInstruction;
 import com.kieral.cryptomon.service.arb.ArbService;
-import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
 import com.kieral.cryptomon.service.util.CommonUtils;
 import com.kieral.cryptomon.service.util.Tuple2;
 
-@Component
 public class BackOfficeServiceImpl implements BackOfficeService {
 
 	private final static AtomicInteger counter = new AtomicInteger(0);
 	
+//	@Autowired
+//	private ExchangeManagerService exchangeManagerService;
 	@Autowired
-	private ExchangeManagerService exchangeManagerService;
+	private OrderService orderService;
 	@Autowired
 	private ArbService arbService;
 
@@ -51,9 +50,7 @@ public class BackOfficeServiceImpl implements BackOfficeService {
 		if (interventionRequired) {
 			// TODO: take some action if needed
 		}
-		// restore balances
-		processor.submit(new UpdateBalancesTask(instruction.getLeg(Side.BID).getMarket()));
-		processor.submit(new UpdateBalancesTask(instruction.getLeg(Side.ASK).getMarket()));
+		// restore balances and calculate p&l
 		processor.submit(new ProcessCompletedInstructionTask(instruction, longOrders, shortOrders, interventionRequired));
 	}
 
@@ -76,40 +73,6 @@ public class BackOfficeServiceImpl implements BackOfficeService {
 		return new Tuple2<BigDecimal, BigDecimal>(baseAmountTotal, quotedAmountTotal);
 	}
 
-	class UpdateBalancesTask implements Runnable {
-		
-		final String market;
-		boolean success = false;
-		final int maxRetries = 5;
-		int retryCount = 0;
-		long retryWait = 1000;
-		
-		UpdateBalancesTask(String market) {
-			this.market = market;
-		}
-
-		@Override
-		public void run() {
-			while (!success && retryCount < maxRetries) {
-				try {
-					retryCount++;
-					exchangeManagerService.updateBalances(market, true);
-					success = true;
-				} catch (Exception e) {
-					logger.error("Error updating balances for {}", market, e);
-					try {
-						Thread.sleep(retryWait);
-					} catch (InterruptedException e1) {
-					}
-				}
-			}
-			if (!success) {
-				logger.error("Error updating balances after {} attempts - suspending arb service", maxRetries);
-				arbService.suspend(true);
-			}
-		}
-	}
-
 	class ProcessCompletedInstructionTask implements Runnable {
 
 		final ArbInstruction instruction;
@@ -127,6 +90,14 @@ public class BackOfficeServiceImpl implements BackOfficeService {
 		
 		@Override
 		public void run() {
+			if (!orderService.requestBalances(instruction.getLeg(Side.BID).getMarket())) {
+				logger.error("Failed to get balances for {} - suspending arbService", instruction.getLeg(Side.BID).getMarket());
+				arbService.suspend(true);
+			}
+			if (!orderService.requestBalances(instruction.getLeg(Side.ASK).getMarket())) {
+				logger.error("Failed to get balances for {} - suspending arbService", instruction.getLeg(Side.ASK).getMarket());
+				arbService.suspend(true);
+			}
 			// evaluate p&l
 			BigDecimal netBaseAmount = BigDecimal.ZERO;
 			BigDecimal netQuotedAmount = BigDecimal.ZERO;

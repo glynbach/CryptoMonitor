@@ -9,7 +9,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 import com.kieral.cryptomon.model.general.Currency;
 import com.kieral.cryptomon.model.general.Side;
@@ -28,7 +27,6 @@ import com.kieral.cryptomon.service.exchange.ExchangeManagerService;
  * Allows only one set of arbitrage executions to be in play
  *
  */
-@Component
 public class GloballyExclusiveExecutionController implements ExecutionController {
 
 	private final static int MAX_PERMITTED_ARBS = 15;

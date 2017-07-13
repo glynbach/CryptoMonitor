@@ -9,8 +9,8 @@
 	<div class="exchangeStatus" ng-controller="ExchangeController">
 		<div ng-repeat="exchange in exchanges">
 			<div class="exchange-container card">
-				<div ng-class="{'card-danger' : exchange.arbServiceSuspended, 'card-danger' : !exchange.connected, 'card-danger' : !exchange.tradingEnabled, 
-								'card-success' : exchange.connected, 'card-header' : true}">
+				<div ng-class="{'card-danger' : exchange.arbServiceSuspended || !exchange.connected || !exchange.tradingEnabled, 
+								'card-success' : exchange.connected &amp;&amp; exchange.tradingEnabled &amp;&amp; !exchange.arbServiceSuspended, 'card-header' : true}">
 					<h5 class="card-title card-inverse">{{exchange.name}} <small>[{{exchange.connectedStatus}} / {{exchange.tradingStatus}} / {{exchange.arbServiceStatus}}]
 						<span ng-repeat="balance in exchange.balances.balances" class="d-inline-block">&nbsp;&nbsp;{{balance.currency}}: {{balance.amount}}</span></small></h5>
 				</div>
