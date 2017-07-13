@@ -25,6 +25,7 @@ public enum Currency {
 	SYS,
 	SJCX,
 	ION,
+	GBYTE,
 	GBP,
 	EUR,
 	USD
